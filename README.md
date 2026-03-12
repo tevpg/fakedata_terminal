@@ -117,16 +117,31 @@ The runtime is config-first:
 - Layouts define panel geometry
 - Regions alias one or more panels
 - Styles bind widgets and options to regions
-- CLI flags can override style defaults
+- Config precedence is: packaged config, then local overlays, then CLI flags
 
-The main config lives in [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml). Validation and runtime adaptation are handled in [`style_config.py`](/fs/sysbits/fakedata_terminal/style_config.py) and [`cli_config.py`](/fs/sysbits/fakedata_terminal/cli_config.py).
+The packaged base config lives in [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml). Validation, overlay merging, and runtime adaptation are handled in [`style_config.py`](/fs/sysbits/fakedata_terminal/style_config.py) and [`cli_config.py`](/fs/sysbits/fakedata_terminal/cli_config.py).
+
+Automatic config search order:
+
+- packaged base: [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml)
+- user overlay: `~/.config/fakedata-terminal/styles.yaml` (or `$XDG_CONFIG_HOME/fakedata-terminal/styles.yaml`)
+- project overlay: `./.fakedata-terminal.yaml` or `./.fakedata-terminal.yml`
+
+You can also add one or more explicit overlays with `--config PATH`. Those are applied after the automatic files, in the order given on the command line.
+
+Overlay semantics:
+
+- mappings merge recursively, so local config can redefine only the keys it needs
+- scalar values replace earlier values
+- lists replace earlier lists rather than appending
+- relative image paths inside a config file are resolved relative to that file
 
 ## Project Structure
 
 - [`app.py`](/fs/sysbits/fakedata_terminal/app.py): curses runtime and widget rendering
 - [`cli.py`](/fs/sysbits/fakedata_terminal/cli.py): launcher wrapper
 - [`cli_config.py`](/fs/sysbits/fakedata_terminal/cli_config.py): argument parsing and runtime config assembly
-- [`style_config.py`](/fs/sysbits/fakedata_terminal/style_config.py): YAML style loading and validation
+- [`style_config.py`](/fs/sysbits/fakedata_terminal/style_config.py): YAML loading, overlay merging, and validation
 - [`vocab.py`](/fs/sysbits/fakedata_terminal/vocab.py): themed fake-data generators
 - [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml): layouts, regions, and style presets
 - [`data/`](/fs/sysbits/fakedata_terminal/data): image assets used by image panels
@@ -135,4 +150,5 @@ The main config lives in [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data
 
 - Running `python3 app.py` with no arguments prints the CLI help and exits.
 - Image mode fails fast if `Pillow` or `jp2a` is unavailable.
+- `--config PATH` is repeatable and can add site, user, or project-specific overlays.
 - Preset names currently include `clocks`, `cycle9`, `cycle4`, `science`, `science2`, `geometries`, `test1` through `test7`, and `gauges`.

@@ -8,6 +8,7 @@ import sys
 try:
     from .style_config import (
         config_style_names,
+        discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
@@ -20,6 +21,7 @@ try:
 except ImportError:
     from style_config import (
         config_style_names,
+        discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
@@ -38,27 +40,29 @@ VOCAB_CHOICES = [
 ]
 
 
-def _style_choices() -> list[str]:
-    return config_style_names()
+def _style_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    return config_style_names(config_paths)
 
 
-def _layout_choices() -> list[str]:
-    return layout_names()
+def _layout_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    return layout_names(config_paths)
 
 
-def _build_parser() -> argparse.ArgumentParser:
+def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "FakeData Terminal — cinematic terminal data display. "
-            "Current behavior is config-first: use --style for a preset, or "
-            "--layout plus --assign overrides to build a screen explicitly."
+            "Load the packaged config, then local overlays, then apply CLI overrides. "
+            "Use --style for a preset, or --layout plus --assign overrides to build a screen explicitly."
         ),
         epilog=(
             "Examples:\n"
             "  %(prog)s --list\n"
+            "  %(prog)s --config ./lab.yaml --list\n"
             "  %(prog)s --layouts\n"
             "  %(prog)s --widgets\n"
             "  %(prog)s --style test1\n"
+            "  %(prog)s --config ~/.config/fakedata-terminal/styles.yaml --style lab\n"
             "  %(prog)s --layout grid_2x2 --assign p1=life --assign p2=blank --assign p3=text --assign p4=clock\n"
             "  %(prog)s --style test1 --assign p4=matrix --panel-speed p4=80\n"
             "  %(prog)s --layout grid_3x3 --assign large_left=image --assign right=clock "
@@ -70,16 +74,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--list", action="store_true",
         help="List configured styles, layouts, and available widgets, then exit.")
     parser.add_argument(
+        "--config", action="append", default=[], metavar="PATH",
+        help=("Load an extra config overlay. Repeatable. Relative image paths inside that file are "
+              "resolved relative to the file itself."))
+    parser.add_argument(
         "--layouts", action="store_true",
         help="Show configured layouts as fixed-size box diagrams, with their defined regions, then exit.")
     parser.add_argument(
         "--widgets", action="store_true",
         help="Showcase available widgets in left/right pairs on a grid_2x2 layout, then exit.")
     parser.add_argument(
-        "--style", type=str, default=None, choices=_style_choices(),
+        "--style", type=str, default=None, choices=_style_choices(config_paths),
         help="Config-defined style preset.")
     parser.add_argument(
-        "--layout", type=str, default=None, choices=_layout_choices(),
+        "--layout", type=str, default=None, choices=_layout_choices(config_paths),
         help="Explicit layout for the generalized panel runtime.")
     parser.add_argument(
         "--vocab", type=str, default=None, choices=VOCAB_CHOICES,
@@ -116,33 +124,34 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_list() -> None:
+def _print_list(config_paths: tuple[str, ...] | None = None) -> None:
     print("Styles:")
-    for name in _style_choices():
+    for name in _style_choices(config_paths):
         print(f"  {name}")
     print()
     print("Layouts:")
-    for name in _layout_choices():
+    for name in _layout_choices(config_paths):
         print(f"  {name}")
     print()
     print("Widgets:")
-    for name in widget_names():
+    for name in widget_names(config_paths):
         print(f"  {name}")
 
 
-def _print_layouts() -> None:
-    print(format_layout_diagrams())
+def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
+    print(format_layout_diagrams(config_paths))
 
-def _showcase_widget_names(include_image: bool) -> list[str]:
-    names = [name for name in widget_names() if name not in {"blank", "cycle"}]
+def _showcase_widget_names(include_image: bool, config_paths: tuple[str, ...] | None = None) -> list[str]:
+    names = [name for name in widget_names(config_paths) if name not in {"blank", "cycle"}]
     if not include_image:
         names = [name for name in names if name != "image"]
     return names
 
 
-def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser) -> dict:
-    all_widgets = [name for name in widget_names() if name != "blank"]
-    widgets = _showcase_widget_names(bool(image_paths))
+def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser,
+                           config_paths: tuple[str, ...] | None = None) -> dict:
+    all_widgets = [name for name in widget_names(config_paths) if name != "blank"]
+    widgets = _showcase_widget_names(bool(image_paths), config_paths)
     if not widgets:
         parser.error("--widgets found no widgets to show")
 
@@ -167,6 +176,7 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
             vocab=vocab,
             speed=speed,
             text=text,
+            config_paths=config_paths,
         )
         for area in runtime["areas"]:
             area["label"] = area["mode"]
@@ -197,8 +207,9 @@ def _parse_equals(expr: str, parser, flag_name: str) -> tuple[str, str]:
     return left, right
 
 
-def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name: str) -> str:
-    layouts = layout_catalog()
+def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name: str,
+                          config_paths: tuple[str, ...] | None = None) -> str:
+    layouts = layout_catalog(config_paths)
     layout_cfg = layouts.get(layout_name)
     if not isinstance(layout_cfg, dict):
         parser.error(f"unknown layout '{layout_name}'")
@@ -218,7 +229,7 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
 def _apply_assign_overrides(base_style: dict | None, assignments: list[str], panel_speeds: list[str],
                             panel_vocabs: list[str], panel_images: list[str],
                             parser, *, layout_name: str, style_name: str, vocab: str,
-                            speed: int, text: str) -> dict:
+                            speed: int, text: str, config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
     if base_style:
         for area in base_style["areas"]:
@@ -238,7 +249,7 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
 
     for item in assignments:
         target, widget = _parse_equals(item, parser, "--assign")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--assign")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--assign", config_paths)
         target_panels = set(normalized_target.split("+"))
         to_delete = []
         for existing_key in list(regions_cfg):
@@ -270,7 +281,7 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
 
     for item in panel_speeds:
         target, speed_text = _parse_equals(item, parser, "--panel-speed")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-speed")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-speed", config_paths)
         try:
             panel_speed = int(speed_text)
         except ValueError:
@@ -283,7 +294,7 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
 
     for item in panel_vocabs:
         target, vocab_name = _parse_equals(item, parser, "--panel-vocab")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-vocab")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-vocab", config_paths)
         if vocab_name not in VOCAB_CHOICES:
             parser.error(f"--panel-vocab style must be one of: {', '.join(VOCAB_CHOICES)}")
         if normalized_target not in regions_cfg:
@@ -292,7 +303,7 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
 
     for item in panel_images:
         target, image_path = _parse_equals(item, parser, "--panel-image")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-image")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-image", config_paths)
         if normalized_target not in regions_cfg:
             parser.error(f"--panel-image target '{target}' has no matching assignment")
         if regions_cfg[normalized_target].get("widget") != "image":
@@ -311,13 +322,31 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
         vocab=vocab,
         speed=speed,
         text=text,
+        config_paths=config_paths,
     )
+
+
+def _resolve_config_paths(raw_argv: list[str]) -> tuple[str, ...]:
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config", action="append", default=[], metavar="PATH")
+    config_args, _ = config_parser.parse_known_args(raw_argv)
+    ordered_paths = [str(path) for path in discover_config_paths()] + config_args.config
+    deduped = []
+    seen = set()
+    for path in ordered_paths:
+        expanded = os.path.abspath(os.path.expanduser(path))
+        if expanded in seen:
+            continue
+        seen.add(expanded)
+        deduped.append(expanded)
+    return tuple(deduped)
 
 
 def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     del demo_scenes
-    parser = _build_parser()
     raw_argv = sys.argv[1:] if argv is None else list(argv)
+    config_paths = _resolve_config_paths(raw_argv)
+    parser = _build_parser(config_paths)
 
     if not raw_argv:
         parser.print_help()
@@ -326,16 +355,16 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     args = parser.parse_args(raw_argv)
 
-    issues = validate_style_catalog()
+    issues = validate_style_catalog(config_paths)
     if issues:
         parser.error("styles.yaml validation failed:\n  " + "\n  ".join(issues))
 
     if args.list:
-        _print_list()
+        _print_list(config_paths)
         raise SystemExit(0)
 
     if args.layouts:
-        _print_layouts()
+        _print_layouts(config_paths)
         raise SystemExit(0)
 
     if args.widgets and (args.style is not None or args.layout is not None or args.assign or args.panel_speed or args.panel_vocab or args.panel_image):
@@ -348,7 +377,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
     image_explicit = any(a == "--image" or a.startswith("--image=") for a in raw_argv)
 
-    default_images = default_image_paths()
+    default_images = default_image_paths(config_paths)
     image_paths = []
     if args.image is not None and len(args.image) < 1:
         parser.error("--image expects at least one file path")
@@ -368,11 +397,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         image_paths = default_images[:]
 
     if args.widgets:
-        widget_showcase = _build_widget_showcase(runtime_vocab, runtime_speed, runtime_text, image_paths, parser)
+        widget_showcase = _build_widget_showcase(runtime_vocab, runtime_speed, runtime_text, image_paths, parser, config_paths)
         config_style_runtime = widget_showcase["initial"]
         runtime_layout_name = config_style_runtime["layout"]
     else:
-        base_runtime = resolve_config_style(args.style, parser) if args.style else None
+        base_runtime = resolve_config_style(args.style, parser, config_paths) if args.style else None
         runtime_layout_name = args.layout or (base_runtime["layout"] if base_runtime else None)
         if not runtime_layout_name:
             parser.error("no layout available")
@@ -397,6 +426,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 vocab=runtime_vocab,
                 speed=runtime_speed,
                 text=runtime_text,
+                config_paths=config_paths,
             )
         else:
             config_style_runtime = base_runtime

@@ -1,9 +1,10 @@
-"""Load YAML style definitions and adapt the supported subset to the legacy runtime."""
+"""Load YAML style definitions, merge overlays, and adapt them to the runtime."""
 
 from __future__ import annotations
 
 from functools import lru_cache
 import glob
+import os
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,11 @@ import yaml
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 STYLE_CONFIG_PATH = PACKAGE_DIR / "data" / "styles.yaml"
+USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "styles.yaml"
+PROJECT_CONFIG_NAMES = (
+    ".fakedata-terminal.yaml",
+    ".fakedata-terminal.yml",
+)
 
 TOP_LEVEL_KEYS = {"defaults", "layouts", "styles", "widgets"}
 DEFAULT_KEYS = {"vocab", "speed", "panel_speed", "image"}
@@ -23,41 +29,86 @@ IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 
 
-@lru_cache(maxsize=1)
-def load_style_catalog() -> dict[str, Any]:
-    if not STYLE_CONFIG_PATH.is_file():
-        return {}
-    with STYLE_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+def discover_config_paths() -> list[Path]:
+    paths = [STYLE_CONFIG_PATH]
+    if USER_CONFIG_PATH.is_file():
+        paths.append(USER_CONFIG_PATH)
+    cwd = Path.cwd()
+    for name in PROJECT_CONFIG_NAMES:
+        candidate = cwd / name
+        if candidate.is_file():
+            paths.append(candidate)
+            break
+    return paths
+
+
+def _normalize_config_paths(config_paths: list[str] | tuple[str, ...] | None) -> tuple[str, ...]:
+    if config_paths is None:
+        paths = discover_config_paths()
+    else:
+        paths = [Path(path).expanduser() for path in config_paths]
+    normalized = []
+    for path in paths:
+        resolved = Path(path).resolve()
+        normalized.append(str(resolved))
+    return tuple(normalized)
+
+
+def _load_catalog_file(config_path: str) -> dict[str, Any]:
+    path = Path(config_path)
+    if not path.is_file():
+        raise ValueError(f"Style config file not found: {path}")
+    with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Style config root must be a mapping: {STYLE_CONFIG_PATH}")
-    return data
+        raise ValueError(f"Style config root must be a mapping: {path}")
+    return _normalize_catalog_paths(data, path)
 
 
-def config_style_names() -> list[str]:
-    catalog = load_style_catalog()
+def _merge_catalogs(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _merge_catalogs(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+@lru_cache(maxsize=None)
+def load_style_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    normalized_paths = _normalize_config_paths(config_paths)
+    catalog: dict[str, Any] = {}
+    for config_path in normalized_paths:
+        catalog = _merge_catalogs(catalog, _load_catalog_file(config_path))
+    return catalog
+
+
+def config_style_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_style_catalog(config_paths)
     styles = catalog.get("styles", {})
     if not isinstance(styles, dict):
         return []
     return list(styles.keys())
 
 
-def layout_names() -> list[str]:
-    catalog = load_style_catalog()
+def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_style_catalog(config_paths)
     layouts = catalog.get("layouts", {})
     if not isinstance(layouts, dict):
         return []
     return list(layouts.keys())
 
 
-def layout_catalog() -> dict[str, Any]:
-    catalog = load_style_catalog()
+def layout_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_style_catalog(config_paths)
     layouts = catalog.get("layouts", {})
     return layouts if isinstance(layouts, dict) else {}
 
 
-def widget_names() -> list[str]:
-    catalog = load_style_catalog()
+def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_style_catalog(config_paths)
     widgets = catalog.get("widgets", {})
     names = set()
     if isinstance(widgets, dict):
@@ -72,134 +123,135 @@ def widget_names() -> list[str]:
     return sorted(names)
 
 
-def default_image_paths() -> list[str]:
-    catalog = load_style_catalog()
+def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_style_catalog(config_paths)
     defaults = catalog.get("defaults", {})
     if not isinstance(defaults, dict):
         return []
     return _expand_image_spec(defaults.get("image"))
 
 
-def validate_style_catalog() -> list[str]:
-    catalog = load_style_catalog()
+def validate_style_catalog(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_style_catalog(config_paths)
     issues: list[str] = []
+    config_label = _config_label(config_paths)
     if not isinstance(catalog, dict):
-        return [f"{STYLE_CONFIG_PATH.name}: root must be a mapping"]
+        return [f"{config_label}: root must be a mapping"]
 
-    _unknown_keys(catalog, TOP_LEVEL_KEYS, STYLE_CONFIG_PATH.name, issues)
+    _unknown_keys(catalog, TOP_LEVEL_KEYS, config_label, issues)
 
     defaults = catalog.get("defaults", {})
     if defaults is not None:
         if not isinstance(defaults, dict):
-            issues.append(f"{STYLE_CONFIG_PATH.name}: defaults must be a mapping")
+            issues.append(f"{config_label}: defaults must be a mapping")
         else:
             _unknown_keys(defaults, DEFAULT_KEYS, "defaults", issues)
             image_spec = defaults.get("image")
             if image_spec is not None and not isinstance(image_spec, dict):
-                issues.append(f"{STYLE_CONFIG_PATH.name}: defaults.image must be a mapping")
+                issues.append(f"{config_label}: defaults.image must be a mapping")
             elif isinstance(image_spec, dict):
                 _unknown_keys(image_spec, IMAGE_KEYS, "defaults.image", issues)
 
     layouts = catalog.get("layouts", {})
     if layouts is not None:
         if not isinstance(layouts, dict):
-            issues.append(f"{STYLE_CONFIG_PATH.name}: layouts must be a mapping")
+            issues.append(f"{config_label}: layouts must be a mapping")
         else:
             for layout_name, layout_cfg in layouts.items():
                 if not isinstance(layout_cfg, dict):
-                    issues.append(f"{STYLE_CONFIG_PATH.name}: layout '{layout_name}' must be a mapping")
+                    issues.append(f"{config_label}: layout '{layout_name}' must be a mapping")
                     continue
                 _unknown_keys(layout_cfg, LAYOUT_KEYS, f"layouts.{layout_name}", issues)
                 panels = layout_cfg.get("panels", {})
                 if not isinstance(panels, dict):
-                    issues.append(f"{STYLE_CONFIG_PATH.name}: layout '{layout_name}' panels must be a mapping")
+                    issues.append(f"{config_label}: layout '{layout_name}' panels must be a mapping")
                 else:
                     for panel_name, panel_cfg in panels.items():
                         if not isinstance(panel_cfg, dict):
-                            issues.append(f"{STYLE_CONFIG_PATH.name}: layout '{layout_name}' panel '{panel_name}' must be a mapping")
+                            issues.append(f"{config_label}: layout '{layout_name}' panel '{panel_name}' must be a mapping")
                             continue
                         _unknown_keys(panel_cfg, PANEL_KEYS, f"layouts.{layout_name}.panels.{panel_name}", issues)
                         missing = PANEL_KEYS - set(panel_cfg)
                         if missing:
                             issues.append(
-                                f"{STYLE_CONFIG_PATH.name}: layout '{layout_name}' panel '{panel_name}' missing keys: {', '.join(sorted(missing))}"
+                                f"{config_label}: layout '{layout_name}' panel '{panel_name}' missing keys: {', '.join(sorted(missing))}"
                             )
                 regions = layout_cfg.get("regions", {})
                 if not isinstance(regions, dict):
-                    issues.append(f"{STYLE_CONFIG_PATH.name}: layout '{layout_name}' regions must be a mapping")
+                    issues.append(f"{config_label}: layout '{layout_name}' regions must be a mapping")
 
     styles = catalog.get("styles", {})
     if styles is not None:
         if not isinstance(styles, dict):
-            issues.append(f"{STYLE_CONFIG_PATH.name}: styles must be a mapping")
+            issues.append(f"{config_label}: styles must be a mapping")
         else:
-            layout_names_set = set(layout_names())
+            layout_names_set = set(layout_names(config_paths))
             for style_name, style_cfg in styles.items():
                 if not isinstance(style_cfg, dict):
-                    issues.append(f"{STYLE_CONFIG_PATH.name}: style '{style_name}' must be a mapping")
+                    issues.append(f"{config_label}: style '{style_name}' must be a mapping")
                     continue
                 _unknown_keys(style_cfg, STYLE_KEYS, f"styles.{style_name}", issues)
                 layout_name = style_cfg.get("layout")
                 if layout_name and layout_name not in layout_names_set:
-                    issues.append(f"{STYLE_CONFIG_PATH.name}: style '{style_name}' references unknown layout '{layout_name}'")
+                    issues.append(f"{config_label}: style '{style_name}' references unknown layout '{layout_name}'")
                 regions = style_cfg.get("regions", {})
                 if not isinstance(regions, dict):
-                    issues.append(f"{STYLE_CONFIG_PATH.name}: style '{style_name}' regions must be a mapping")
+                    issues.append(f"{config_label}: style '{style_name}' regions must be a mapping")
                     continue
                 for region_name, region_cfg in regions.items():
                     if not isinstance(region_cfg, dict):
                         issues.append(
-                            f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' must be a mapping"
+                            f"{config_label}: style '{style_name}' region '{region_name}' must be a mapping"
                         )
                         continue
                     _unknown_keys(region_cfg, REGION_KEYS, f"styles.{style_name}.regions.{region_name}", issues)
                     widget = region_cfg.get("widget")
                     if widget is None:
                         issues.append(
-                            f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' is missing 'widget'"
+                            f"{config_label}: style '{style_name}' region '{region_name}' is missing 'widget'"
                         )
                     elif not _supported_widget(str(widget)):
                         issues.append(
-                            f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' uses unsupported widget '{widget}'"
+                            f"{config_label}: style '{style_name}' region '{region_name}' uses unsupported widget '{widget}'"
                         )
                     cycle_spec = region_cfg.get("cycle")
                     if cycle_spec is not None and not isinstance(cycle_spec, dict):
                         issues.append(
-                            f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' cycle must be a mapping"
+                            f"{config_label}: style '{style_name}' region '{region_name}' cycle must be a mapping"
                         )
                     elif isinstance(cycle_spec, dict):
                         _unknown_keys(cycle_spec, CYCLE_KEYS, f"styles.{style_name}.regions.{region_name}.cycle", issues)
                         widgets = cycle_spec.get("widgets")
                         if widgets is not None and not isinstance(widgets, list):
                             issues.append(
-                                f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' cycle.widgets must be a list"
+                                f"{config_label}: style '{style_name}' region '{region_name}' cycle.widgets must be a list"
                             )
                         elif isinstance(widgets, list):
                             if str(widget) != "cycle":
                                 issues.append(
-                                    f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
+                                    f"{config_label}: style '{style_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
                                 )
                             for idx, cycle_widget in enumerate(widgets):
                                 cycle_widget_name = str(cycle_widget)
                                 if not _supported_widget(cycle_widget_name):
                                     issues.append(
-                                        f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
+                                        f"{config_label}: style '{style_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
                                     )
                                 elif cycle_widget_name in {"cycle", "blank"}:
                                     issues.append(
-                                        f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
+                                        f"{config_label}: style '{style_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
                                     )
                     image_spec = region_cfg.get("image")
                     if image_spec is not None and not isinstance(image_spec, dict):
                         issues.append(
-                            f"{STYLE_CONFIG_PATH.name}: style '{style_name}' region '{region_name}' image must be a mapping"
+                            f"{config_label}: style '{style_name}' region '{region_name}' image must be a mapping"
                         )
                     elif isinstance(image_spec, dict):
                         _unknown_keys(image_spec, IMAGE_KEYS, f"styles.{style_name}.regions.{region_name}.image", issues)
 
     widgets = catalog.get("widgets", {})
     if widgets is not None and not isinstance(widgets, dict):
-        issues.append(f"{STYLE_CONFIG_PATH.name}: widgets must be a mapping")
+        issues.append(f"{config_label}: widgets must be a mapping")
 
     return issues
 
@@ -207,11 +259,11 @@ def validate_style_catalog() -> list[str]:
 def _unknown_keys(mapping: dict[str, Any], allowed: set[str], context: str, issues: list[str]) -> None:
     for key in mapping:
         if str(key) not in allowed:
-            issues.append(f"{STYLE_CONFIG_PATH.name}: {context} has unrecognized key '{key}'")
+            issues.append(f"{context} has unrecognized key '{key}'")
 
 
-def format_layout_diagrams() -> str:
-    layouts = layout_catalog()
+def format_layout_diagrams(config_paths: tuple[str, ...] | None = None) -> str:
+    layouts = layout_catalog(config_paths)
     blocks = []
     for layout_name, layout_cfg in layouts.items():
         blocks.append(_format_single_layout(layout_name, layout_cfg))
@@ -336,13 +388,12 @@ def _expand_image_spec(image_spec: dict[str, Any] | None) -> list[str]:
         return []
     paths = image_spec.get("paths")
     if isinstance(paths, list):
-        return [_resolve_config_path(path) for path in paths]
+        return [str(path) for path in paths]
     pattern = image_spec.get("glob")
     if pattern:
-        resolved_pattern = _resolve_config_path(pattern)
-        return sorted(glob.glob(resolved_pattern))
+        return sorted(glob.glob(str(pattern)))
     single = image_spec.get("path")
-    return [_resolve_config_path(single)] if single else []
+    return [str(single)] if single else []
 
 
 def _region_image_paths(region_cfg: Any) -> list[str]:
@@ -357,11 +408,51 @@ def _region_image_paths(region_cfg: Any) -> list[str]:
     return []
 
 
-def _resolve_config_path(pathish: Any) -> str:
+def _config_label(config_paths: tuple[str, ...] | None) -> str:
+    normalized = _normalize_config_paths(config_paths)
+    if len(normalized) == 1:
+        return Path(normalized[0]).name
+    return "merged style config"
+
+
+def _resolve_config_path(pathish: Any, base_dir: Path) -> str:
     path = Path(str(pathish)).expanduser()
     if not path.is_absolute():
-        path = STYLE_CONFIG_PATH.parent / path
-    return str(path)
+        path = base_dir / path
+    return str(path.resolve())
+
+
+def _normalize_image_mapping(image_spec: Any, base_dir: Path) -> None:
+    if not isinstance(image_spec, dict):
+        return
+    if isinstance(image_spec.get("paths"), list):
+        image_spec["paths"] = [_resolve_config_path(path, base_dir) for path in image_spec["paths"]]
+    if image_spec.get("path") is not None:
+        image_spec["path"] = _resolve_config_path(image_spec["path"], base_dir)
+    if image_spec.get("glob") is not None:
+        image_spec["glob"] = _resolve_config_path(image_spec["glob"], base_dir)
+
+
+def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict[str, Any]:
+    base_dir = source_path.parent
+    defaults = catalog.get("defaults")
+    if isinstance(defaults, dict):
+        _normalize_image_mapping(defaults.get("image"), base_dir)
+    styles = catalog.get("styles")
+    if isinstance(styles, dict):
+        for style_cfg in styles.values():
+            if not isinstance(style_cfg, dict):
+                continue
+            regions = style_cfg.get("regions")
+            if not isinstance(regions, dict):
+                continue
+            for region_cfg in regions.values():
+                if not isinstance(region_cfg, dict):
+                    continue
+                if any(key in region_cfg for key in ("paths", "path", "glob")):
+                    _normalize_image_mapping(region_cfg, base_dir)
+                _normalize_image_mapping(region_cfg.get("image"), base_dir)
+    return catalog
 
 
 def _widget_name(region_cfg: Any) -> str | None:
@@ -383,8 +474,8 @@ def _region_cycle_widgets(region_cfg: Any) -> list[str]:
     return [str(widget) for widget in widgets]
 
 
-def adapt_style_to_legacy(style_name: str, parser) -> dict[str, Any]:
-    catalog = load_style_catalog()
+def adapt_style_to_legacy(style_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_style_catalog(config_paths)
     styles = catalog.get("styles", {})
     defaults = catalog.get("defaults", {})
 
@@ -393,12 +484,12 @@ def adapt_style_to_legacy(style_name: str, parser) -> dict[str, Any]:
 
     style_cfg = styles[style_name]
     if not isinstance(style_cfg, dict):
-        parser.error(f"style '{style_name}' must be a mapping in {STYLE_CONFIG_PATH.name}")
+        parser.error(f"style '{style_name}' must be a mapping in {_config_label(config_paths)}")
 
     layout = style_cfg.get("layout")
     regions = style_cfg.get("regions", {})
     if not isinstance(regions, dict):
-        parser.error(f"style '{style_name}' regions must be a mapping in {STYLE_CONFIG_PATH.name}")
+        parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     style_speed = style_cfg.get("speed", defaults.get("speed", 30))
     vocab = style_cfg.get("vocab", defaults.get("vocab", "science"))
@@ -494,11 +585,12 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
 
 def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[str, Any],
                            regions_cfg: dict[str, Any], parser, *,
-                           vocab: str, speed: int | float, text: str) -> dict[str, Any]:
+                           vocab: str, speed: int | float, text: str,
+                           config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
         parser.error(f"style '{style_name}' regions must be a mapping in {STYLE_CONFIG_PATH.name}")
 
-    default_images = default_image_paths()
+    default_images = default_image_paths(config_paths)
     seen = []
     areas = []
     image_paths = []
@@ -550,8 +642,9 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
 
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
                            style_name: str = "<cli>", vocab: str = "science",
-                           speed: int | float = 30, text: str = "") -> dict[str, Any]:
-    catalog = load_style_catalog()
+                           speed: int | float = 30, text: str = "",
+                           config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_style_catalog(config_paths)
     layouts = catalog.get("layouts", {})
     layout_cfg = layouts.get(layout_name)
     if not isinstance(layout_cfg, dict):
@@ -559,11 +652,12 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     return _resolve_runtime_style(
         style_name, layout_name, layout_cfg, regions_cfg, parser,
         vocab=vocab, speed=speed, text=text,
+        config_paths=config_paths,
     )
 
 
-def resolve_config_style(style_name: str, parser) -> dict[str, Any]:
-    catalog = load_style_catalog()
+def resolve_config_style(style_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_style_catalog(config_paths)
     styles = catalog.get("styles", {})
     defaults = catalog.get("defaults", {})
 
@@ -572,7 +666,7 @@ def resolve_config_style(style_name: str, parser) -> dict[str, Any]:
 
     style_cfg = styles[style_name]
     if not isinstance(style_cfg, dict):
-        parser.error(f"style '{style_name}' must be a mapping in {STYLE_CONFIG_PATH.name}")
+        parser.error(f"style '{style_name}' must be a mapping in {_config_label(config_paths)}")
 
     layout_name = style_cfg.get("layout")
     regions_cfg = style_cfg.get("regions", {})
