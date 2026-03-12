@@ -187,7 +187,7 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
         "active": True,
         "scenes": scenes,
         "idx": 0,
-        "next": 0.0,
+        "next": float("inf"),
         "pair_duration": 10.0,
         "done": False,
         "initial": initial,

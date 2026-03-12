@@ -1996,6 +1996,37 @@ def main(stdscr):
         except curses.error:
             pass
 
+    def _draw_showcase_footer():
+        if not _showcase_state["active"] or rows < 1:
+            return
+        label = f"[Left/h] back  [Right/l] forward  [+/-] faster/slower  [Q] exit   Speed: {current_base_speed}"
+        try:
+            stdscr.addnstr(
+                rows - 1,
+                max(0, (cols - len(label)) // 2),
+                label,
+                min(len(label), cols),
+                curses.color_pair(2) | curses.A_BOLD,
+            )
+        except curses.error:
+            pass
+
+    def _set_showcase_scene(next_idx: int) -> None:
+        global CONFIG_STYLE
+        nonlocal area_specs, area_states
+        scenes = _showcase_state.get("scenes", [])
+        if not scenes:
+            return
+        next_idx %= len(scenes)
+        _showcase_state["idx"] = next_idx
+        _showcase_state["done"] = False
+        CONFIG_STYLE = scenes[next_idx]
+        area_specs = _current_area_specs(rows, cols)
+        area_states = _sync_areas(area_specs)
+        _sync_cycle_start_modes(area_specs, area_states, time.time())
+        for spec in area_specs:
+            _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"])
+
     def _role_for_area(spec: dict) -> str:
         if spec.get("role"):
             return spec["role"]
@@ -2219,6 +2250,7 @@ def main(stdscr):
 
         _draw_info_box()
         _draw_pause_label()
+        _draw_showcase_footer()
 
         if GLITCH_INTERVAL > 0 and not _paused:
             now = time.time()
@@ -2234,6 +2266,12 @@ def main(stdscr):
         key = stdscr.getch()
         if key in (ord('q'), ord('Q'), 27):
             break
+        if _showcase_state["active"] and key in (curses.KEY_LEFT, ord('h'), ord('H')):
+            _set_showcase_scene(_showcase_state["idx"] - 1)
+            continue
+        if _showcase_state["active"] and key in (curses.KEY_RIGHT, ord('l'), ord('L')):
+            _set_showcase_scene(_showcase_state["idx"] + 1)
+            continue
         if key == ord(' '):
             if _paused:
                 _shift_pause_timers(time.time() - _paused_at)
@@ -2249,22 +2287,6 @@ def main(stdscr):
             current_base_speed = max(1, current_base_speed - 1)
             for area in area_states.values():
                 _reset_area_timing(area)
-
-        if (not _paused and _showcase_state["active"]
-                and not _showcase_state["done"]
-                and time.time() >= _showcase_state["next"]):
-            next_idx = _showcase_state["idx"] + 1
-            if next_idx >= len(_showcase_state["scenes"]):
-                _showcase_state["done"] = True
-                break
-            _showcase_state["idx"] = next_idx
-            CONFIG_STYLE = _showcase_state["scenes"][next_idx]
-            area_specs = _current_area_specs(rows, cols)
-            area_states = _sync_areas(area_specs)
-            _sync_cycle_start_modes(area_specs, area_states, time.time())
-            for spec in area_specs:
-                _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"])
-            _showcase_state["next"] = time.time() + _showcase_state["pair_duration"]
 
         if (not _paused and _demo_state["active"]
                 and not _demo_state["done"]
