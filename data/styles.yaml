@@ -1,0 +1,435 @@
+# Starter config sketch for a layout/region/style driven version of
+# fakedata-terminal.py.
+#
+# Design rules captured here:
+# - layouts define panel geometry
+# - regions are named aliases for one or more panels
+# - styles bind widgets/options to regions
+# - defaults < style < CLI override
+# - panel aggregation is explicit; no implicit expansion from "none"
+
+defaults:
+  vocab: science
+  speed: 30
+  panel_speed: {}
+  image:
+    glob: "geom*.png"
+
+layouts:
+  full:
+    panels:
+      p1: {x: 0.00, y: 0.00, w: 1.00, h: 1.00}
+    regions:
+      full: p1
+
+  grid_2x2:
+    panels:
+      p1: {x: 0.00, y: 0.00, w: 0.50, h: 0.50}
+      p2: {x: 0.00, y: 0.50, w: 0.50, h: 0.50}
+      p3: {x: 0.50, y: 0.00, w: 0.50, h: 0.50}
+      p4: {x: 0.50, y: 0.50, w: 0.50, h: 0.50}
+    regions:
+      left: p1+p2
+      right: p3+p4
+      top: p1+p3
+      bottom: p2+p4
+      full: p1+p2+p3+p4
+
+
+  grid_3x3:
+    panels:
+      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.3333}
+      p2: {x: 0.00, y: 0.3333, w: 0.3333, h: 0.3333}
+      p3: {x: 0.00, y: 0.6667, w: 0.3333, h: 0.3333}
+      p4: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.3333}
+      p5: {x: 0.3333, y: 0.3333, w: 0.3333, h: 0.3333}
+      p6: {x: 0.3333, y: 0.6667, w: 0.3333, h: 0.3333}
+      p7: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.3333}
+      p8: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.3333}
+      p9: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.3333}
+    regions:
+      left: p1+p2+p3
+      center: p4+p5+p6
+      right: p7+p8+p9
+      large_left: p1+p2+p3+p4+p5+p6
+      large_right: p4+p5+p6+p7+p8+p9
+      top: p1+p4+p7
+      middle: p2+p5+p8
+      bottom: p3+p6+p9
+      full: p1+p2+p3+p4+p5+p6+p7+p8+p9
+
+  grid_3x3_special:
+    panels:
+      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.3333}
+      p2: {x: 0.00, y: 0.3333, w: 0.3333, h: 0.3333}
+      p3: {x: 0.00, y: 0.6667, w: 0.3333, h: 0.3333}
+      p4: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.3333}
+      p5: {x: 0.3333, y: 0.3333, w: 0.3333, h: 0.3333}
+      p6: {x: 0.3333, y: 0.6667, w: 0.3333, h: 0.3333}
+      p7: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.250}
+      p8: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.250}
+      p9: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.5}
+    regions:
+      left: p1+p2+p3
+      center: p4+p5+p6
+      right: p7+p8+p9
+      large_left: p1+p2+p3+p4+p5+p6
+      large_right: p4+p5+p6+p7+p8+p9
+      top: p1+p4+p7
+      middle: p2+p5+p8
+      bottom: p3+p6+p9
+      full: p1+p2+p3+p4+p5+p6+p7+p8+p9
+
+  grid_4x3:
+    panels:
+      p1:  {x: 0.00, y: 0.00, w: 0.25, h: 0.3333}
+      p2:  {x: 0.00, y: 0.3333, w: 0.25, h: 0.3333}
+      p3:  {x: 0.00, y: 0.6667, w: 0.25, h: 0.3333}
+      p4:  {x: 0.25, y: 0.00, w: 0.25, h: 0.3333}
+      p5:  {x: 0.25, y: 0.3333, w: 0.25, h: 0.3333}
+      p6:  {x: 0.25, y: 0.6667, w: 0.25, h: 0.3333}
+      p7:  {x: 0.50, y: 0.00, w: 0.25, h: 0.3333}
+      p8:  {x: 0.50, y: 0.3333, w: 0.25, h: 0.3333}
+      p9:  {x: 0.50, y: 0.6667, w: 0.25, h: 0.3333}
+      p10: {x: 0.75, y: 0.00, w: 0.25, h: 0.3333}
+      p11: {x: 0.75, y: 0.3333, w: 0.25, h: 0.3333}
+      p12: {x: 0.75, y: 0.6667, w: 0.25, h: 0.3333}
+    regions:
+      left: p1+p2+p3
+      center_left: p4+p5+p6
+      center_right: p7+p8+p9
+      right: p10+p11+p12
+      top: p1+p4+p7+p10
+      middle: p2+p5+p8+p11
+      bottom: p3+p6+p9+p12
+      full: p1+p2+p3+p4+p5+p6+p7+p8+p9+p10+p11+p12
+
+  main_2x2_right_stack_3:
+    panels:
+      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.50}
+      p2: {x: 0.00, y: 0.50, w: 0.3333, h: 0.50}
+      p3: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.50}
+      p4: {x: 0.3333, y: 0.50, w: 0.3333, h: 0.50}
+      p5: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.3333}
+      p6: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.3333}
+      p7: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.3333}
+    regions:
+      main: p1+p2+p3+p4
+      right: p5+p6+p7
+      right_top: p5
+      right_mid: p6
+      right_bottom: p7
+      full: p1+p2+p3+p4+p5+p6+p7
+
+  grid_3x2:
+    panels:
+      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.50}
+      p2: {x: 0.00, y: 0.50, w: 0.3333, h: 0.50}
+      p3: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.50}
+      p4: {x: 0.3333, y: 0.50, w: 0.3333, h: 0.50}
+      p5: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.50}
+      p6: {x: 0.6667, y: 0.50, w: 0.3333, h: 0.50}
+    regions:
+      main: p1+p2+p3+p4
+      right: p5+p6
+      right_top: p5
+      right_bottom: p6
+      full: p1+p2+p3+p4+p5+p6
+
+styles:
+
+  clocks:
+    note: >
+      9 clocks
+    layout: grid_4x3
+    speed: 90
+    regions:
+      p1:
+        widget: clock
+      p2:
+        widget: clock
+      p3:
+        widget: clock
+      p4:
+        widget: clock
+      p5:
+        widget: clock
+      p6:
+        widget: clock
+      p7:
+        widget: clock
+      p8:
+        widget: clock
+      p9:
+        widget: clock
+      p10:
+        widget: clock
+      p11:
+        widget: clock
+      p12:
+        widget: clock
+
+  cycle9:
+    note: >
+      Cycle everything through 9 panels
+    layout: grid_3x3
+    vocab: science
+    regions:
+      p1:
+        widget: cycle
+      p2:
+        widget: cycle
+      p3:
+        widget: cycle
+      p4:
+        widget: cycle
+      p5:
+        widget: cycle
+      p6:
+        widget: cycle
+      p7:
+        widget: cycle
+      p8:
+        widget: cycle
+      p9:
+        widget: cycle
+
+  cycle4:
+    note: >
+      Cycle everything through 4 panels
+    layout: grid_2x2
+    vocab: science
+    regions:
+      p1:
+        widget: cycle
+      p2:
+        widget: cycle
+      p3:
+        widget: cycle
+      p4:
+        widget: cycle
+
+
+  science:
+    note: >
+      Derived from: --style science --main scroller --sidebar clock --sidebar-speed 80
+    layout: grid_3x3_special
+    vocab: science
+    text: "*** DO NOT USE DOORBELL ***"
+    regions:
+      large_left:
+        widget: text_wide
+      p7:
+        widget: readouts
+      p8:
+        widget: text_spew
+      p9:
+        widget: text_scant
+
+  science2:
+    note: >
+      grid_3x2 science layout with image centre, fast clock, and life.
+    layout: grid_3x2
+    vocab: science
+    regions:
+      p3+p4:
+        widget: image
+        speed: 90
+        image:
+          paths:
+          - geom_09_polar_lattice.png
+          - geom_11_radial_spokes.png
+          - geom_12_checker_ring.png
+          - pineapple2.jpg
+          - geom_14_octagon_web.png
+          - geom_15_interference_waves.png
+          - geom_21_wave_grid.png
+          - pineapple2.jpg
+          - geom_23_moire_squares.png
+          - geom_31_cone.png
+          - geom_32_sphere_wireframe.png
+          - pineapple2.jpg
+          - geom_33_torus.png
+          - geom_35_icosahedron_web.png
+          - geom_36_isometric_stairs.png
+          - pineapple2.jpg
+          - geom_37_interlocking_cubes.png
+          - geom_38_prism_fan.png
+          - geom_39_hypercube_projection.png
+          - pineapple2.jpg
+          - geom_40_geodesic_dome.png
+      p1:
+        widget: text_wide
+        speed: 90
+      p2:
+        widget: text
+      p5:
+        widget: clock
+        speed: 70
+      p6:
+        widget: life
+        speed: 90
+
+  geometries:
+    note: >
+      Derived from: --style hacker --main image --image geom*png --sidebar gauges
+    layout: main_2x2_right_stack_3
+    vocab: hacker
+    regions:
+      main:
+        widget: image
+        image:
+          glob: "geom*png"
+        speed: 70
+      right_top:
+        widget: sparkline
+        title: "SIGNAL"
+      right_mid:
+        widget: readouts
+        title: "READOUTS"
+      right_bottom:
+        widget: text_scant
+        title: "FEED"
+        source_vocab: hacker
+
+  test1:
+    note: >
+      Mixed 2x2 smoke-test style with one widget per panel/region.
+    layout: grid_2x2
+    vocab: science
+    regions:
+      p1:
+        widget: life
+      p2:
+        widget: sparkline
+        title: "SIGNAL"
+      p3:
+        widget: text
+      p4:
+        widget: clock
+
+  test2:
+    note: >
+      Full-screen single-widget skeleton style.
+    layout: full
+    vocab: finance
+    regions:
+      full:
+        widget: text_wide
+
+  test3:
+    note: >
+      3x3 split using a large-left region and narrow right column.
+    layout: grid_3x3
+    vocab: navigation
+    regions:
+      large_left:
+        widget: matrix
+      right:
+        widget: life
+        speed: 55
+
+  test4:
+    note: >
+      Main-plus-sidebar stack with one large text region and two smaller instruments.
+    layout: grid_3x2
+    vocab: medicine
+    regions:
+      main:
+        widget: text_scant
+      right_top:
+        widget: bars
+        title: "LEVELS"
+      right_bottom:
+        widget: clock
+        speed: 70
+
+  test5:
+    note: >
+      2x2 layout merged into top and bottom bands.
+    layout: grid_2x2
+    vocab: military
+    regions:
+      top:
+        widget: oscilloscope
+      bottom:
+        widget: readouts
+        title: "SYSTEMS"
+
+  test6:
+    note: >
+      3x3 layout split into left, center, and right columns.
+    layout: grid_3x3
+    vocab: spaceteam
+    regions:
+      left:
+        widget: sparkline
+        title: "SIGNAL"
+      center:
+        widget: text
+      right:
+        widget: sweep
+
+  test7:
+    note: >
+      Main-plus-sidebar stack with a large visual field and three smaller panels.
+    layout: main_2x2_right_stack_3
+    vocab: pharmacy
+    regions:
+      main:
+        widget: blocks
+      right_top:
+        widget: text_spew
+      right_mid:
+        widget: readouts
+        title: "DOSING"
+      right_bottom:
+        widget: clock
+
+  gauges:
+    note: >
+      Three clocks + three sparklines
+    layout: grid_3x3
+    vocab: pharmacy
+    regions:
+      p1+p2:
+        widget: clock
+        speed: 40
+      p3:
+        widget: sweep
+        speed: 60
+      p5+p6:
+        widget: life
+        speed: 100
+      p4:
+        widget: sparkline
+        speed: 60
+      p7+p8:
+        widget: clock
+        speed: 100
+      p9:
+        widget: oscilloscope
+        speed: 90
+
+widgets:
+  # Existing single-region widgets
+  atomic:
+    - text
+    - text_wide
+    - text_scant
+    - text_spew
+    - image
+    - life
+    - bars
+    - clock
+    - matrix
+    - oscilloscope
+    - blocks
+    - sweep
+    - cycle
+
+  # Proposed names for the current "gauges" composite when split into regions.
+  composite_parts:
+    - sparkline
+    - readouts
+    - text_scant
