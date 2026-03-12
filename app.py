@@ -246,6 +246,14 @@ def main(stdscr):
         "Get-Command", "Get-CimClass", "Get-EventLog", "Get-NetAdapter",
         "Get-ComputerInfo", "about_Arrays", "about_Pipelines", "about_Objects",
     ]
+    primes_path = os.path.join(os.path.dirname(__file__), "data", "primes.txt")
+    try:
+        with open(primes_path, "r", encoding="utf-8") as prime_file:
+            prime_values = [line.strip() for line in prime_file if line.strip()]
+    except OSError:
+        prime_values = ["2", "3", "5", "7", "11"]
+    if not prime_values:
+        prime_values = ["2", "3", "5", "7", "11"]
 
     def layout(cols):
         side_mode = _effective_sidebar_mode()
@@ -380,6 +388,7 @@ def main(stdscr):
             "gauge_last_values": [],
             "gauge_next_reads_at": 0.0,
             "gauge_count": 0,
+            "gauge_prime_idx": 0,
             "blocks_bg": random.choice([1, 3, 7]),
             "blocks_cells": [],
             "sweep_cells": [],
@@ -1139,17 +1148,24 @@ def main(stdscr):
         ]
         return fillers.get(style_name, default_rows)
 
+    def _next_prime_value(area: dict) -> str:
+        idx = area["gauge_prime_idx"] % len(prime_values)
+        value = prime_values[idx]
+        area["gauge_prime_idx"] = (idx + 1) % len(prime_values)
+        return value
+
     def _refresh_readout_rows(area: dict, rows: int):
         target_lines = _readout_line_capacity(rows)
         if target_lines <= 1:
             area["gauge_reads"] = [("COUNT", lambda area=area: str(area["gauge_count"]), "")]
             return
         fillers = _readout_filler_rows(_area_style(area))
-        data_lines = list(area["gauge_base_reads"][:target_lines - 1])
+        data_lines = list(area["gauge_base_reads"][:max(0, target_lines - 2)])
         fill_idx = 0
-        while len(data_lines) < target_lines - 1:
+        while len(data_lines) < max(0, target_lines - 2):
             data_lines.append(fillers[fill_idx % len(fillers)])
             fill_idx += 1
+        data_lines.append(("PRIME", lambda area=area: _next_prime_value(area), ""))
         data_lines.append(("COUNT", lambda area=area: str(area["gauge_count"]), ""))
         area["gauge_reads"] = data_lines
 
@@ -1365,9 +1381,11 @@ def main(stdscr):
                 break
             if label == "COUNT":
                 val_str = str(area["gauge_count"])
+            elif label == "PRIME":
+                val_str = area["gauge_last_values"][i] if i < len(area["gauge_last_values"]) else val_fn()
             else:
                 val_str = area["gauge_last_values"][i] if i < len(area["gauge_last_values"]) else val_fn()
-            arrow = " " if label == "COUNT" else (area["gauge_arrows"][i] if i < len(area["gauge_arrows"]) else " ")
+            arrow = " " if label in {"COUNT", "PRIME"} else (area["gauge_arrows"][i] if i < len(area["gauge_arrows"]) else " ")
             line = (" " * block_pad) + f"{label[:10]:<10s} {val_str:>8s} {unit[:8]:<8s} {arrow}"
             safe_w = _safe_row_width(y, row, x, width)
             if safe_w <= 0:
@@ -1843,7 +1861,7 @@ def main(stdscr):
                 vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
                 for i, val_str in enumerate(vals):
                     label = area["gauge_reads"][i][0] if i < len(area["gauge_reads"]) else ""
-                    if label == "COUNT":
+                    if label in {"COUNT", "PRIME"}:
                         continue
                     num = _gauge_parse_num(val_str)
                     if num is None:
