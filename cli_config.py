@@ -142,13 +142,25 @@ def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
     print(format_layout_diagrams(config_paths))
 
 def _showcase_widget_names(include_image: bool, config_paths: tuple[str, ...] | None = None) -> list[str]:
+    del include_image
     names = [name for name in widget_names(config_paths) if name not in {"blank", "cycle"}]
-    if not include_image:
-        names = [name for name in names if name != "image"]
     return names
 
 
+def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module, image_checker) -> str | None:
+    if widget != "image":
+        return None
+    if not image_paths:
+        return "No images configured"
+    if image_module is None:
+        return "Pillow not installed"
+    if not image_checker():
+        return "jp2a not installed"
+    return None
+
+
 def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser,
+                           image_module, image_checker,
                            config_paths: tuple[str, ...] | None = None) -> dict:
     all_widgets = [name for name in widget_names(config_paths) if name != "blank"]
     widgets = _showcase_widget_names(bool(image_paths), config_paths)
@@ -160,13 +172,15 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
     while idx < len(widgets):
         left_widget = widgets[idx]
         right_widget = widgets[idx + 1] if idx + 1 < len(widgets) else widgets[0]
+        left_unavailable = _widget_unavailable_reason(left_widget, image_paths, image_module, image_checker)
+        right_unavailable = _widget_unavailable_reason(right_widget, image_paths, image_module, image_checker)
         regions_cfg = {
-            "left": {"widget": left_widget},
-            "right": {"widget": right_widget},
+            "left": {"widget": "blank" if left_unavailable else left_widget},
+            "right": {"widget": "blank" if right_unavailable else right_widget},
         }
-        if left_widget == "image":
+        if left_widget == "image" and not left_unavailable:
             regions_cfg["left"]["image"] = {"paths": image_paths[:]}
-        if right_widget == "image":
+        if right_widget == "image" and not right_unavailable:
             regions_cfg["right"]["image"] = {"paths": image_paths[:]}
         runtime = resolve_runtime_layout(
             "grid_2x2",
@@ -178,8 +192,12 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
             text=text,
             config_paths=config_paths,
         )
+        widget_by_region = {"left": left_widget, "right": right_widget}
+        unavailable_by_region = {"left": left_unavailable, "right": right_unavailable}
         for area in runtime["areas"]:
-            area["label"] = area["mode"]
+            area["label"] = widget_by_region.get(area["name"], area["mode"])
+            if unavailable_by_region.get(area["name"]):
+                area["unavailable_message"] = unavailable_by_region[area["name"]]
         scenes.append(runtime)
         idx += 2
     initial = scenes[0]
@@ -397,7 +415,16 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         image_paths = default_images[:]
 
     if args.widgets:
-        widget_showcase = _build_widget_showcase(runtime_vocab, runtime_speed, runtime_text, image_paths, parser, config_paths)
+        widget_showcase = _build_widget_showcase(
+            runtime_vocab,
+            runtime_speed,
+            runtime_text,
+            image_paths,
+            parser,
+            image_module,
+            image_checker,
+            config_paths,
+        )
         config_style_runtime = widget_showcase["initial"]
         runtime_layout_name = config_style_runtime["layout"]
     else:

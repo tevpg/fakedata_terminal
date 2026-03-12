@@ -418,6 +418,7 @@ def main(stdscr):
             "textwall_pause_until": 0.0,
             "textwall_reverse_left": 0,
             "style_override": style_name,
+            "unavailable_message": None,
         }
 
     def _dense_line(width: int, line_fn=None) -> str:
@@ -1658,6 +1659,21 @@ def main(stdscr):
             except curses.error:
                 pass
 
+    def _repaint_unavailable(area: dict, rows: int, y: int, x: int, width: int):
+        lines = _image_message(rows, width, area.get("unavailable_message") or "")
+        blank = " " * width
+        for r in range(rows):
+            safe_w = _safe_row_width(y, r, x, width)
+            if safe_w <= 0:
+                continue
+            try:
+                stdscr.addnstr(y + r, x, blank, safe_w, curses.color_pair(1))
+                line = lines[r][:safe_w].ljust(safe_w)
+                attr = curses.color_pair(4) | curses.A_BOLD if line.strip() else curses.color_pair(1)
+                stdscr.addnstr(y + r, x, line, safe_w, attr)
+            except curses.error:
+                pass
+
     def _draw_separator(nrows, left_w):
         if _effective_sidebar_mode() == "none":
             return
@@ -1942,12 +1958,15 @@ def main(stdscr):
         elif mode == "life":
             _repaint_life(area, rows, y, x, width)
         elif mode == "blank":
-            blank = " " * width
-            for r in range(rows):
-                try:
-                    stdscr.addnstr(y + r, x, blank, width, curses.color_pair(1))
-                except curses.error:
-                    pass
+            if area.get("unavailable_message"):
+                _repaint_unavailable(area, rows, y, x, width)
+            else:
+                blank = " " * width
+                for r in range(rows):
+                    try:
+                        stdscr.addnstr(y + r, x, blank, width, curses.color_pair(1))
+                    except curses.error:
+                        pass
 
     def _draw_area_label(y: int, x: int, width: int, label: str | None):
         if not label or width < 6:
@@ -2099,6 +2118,7 @@ def main(stdscr):
                 area["style_override"] = spec.get("vocab")
                 area["image_paths"] = spec.get("image_paths") or []
                 area["cycle_widgets"] = spec.get("cycle_widgets") or []
+                area["unavailable_message"] = spec.get("unavailable_message")
                 _reset_area_timing(area)
             else:
                 area["title"] = spec.get("title")
@@ -2108,6 +2128,7 @@ def main(stdscr):
                 area["style_override"] = spec.get("vocab")
                 area["image_paths"] = spec.get("image_paths") or []
                 area["cycle_widgets"] = spec.get("cycle_widgets") or []
+                area["unavailable_message"] = spec.get("unavailable_message")
             synced[spec["name"]] = area
         return synced
 
