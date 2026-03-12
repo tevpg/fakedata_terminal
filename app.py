@@ -419,6 +419,7 @@ def main(stdscr):
             "textwall_reverse_left": 0,
             "style_override": style_name,
             "unavailable_message": None,
+            "static_lines": [],
         }
 
     def _dense_line(width: int, line_fn=None) -> str:
@@ -1674,6 +1675,24 @@ def main(stdscr):
             except curses.error:
                 pass
 
+    def _repaint_static_lines(area: dict, rows: int, y: int, x: int, width: int):
+        blank = " " * width
+        lines = area.get("static_lines") or []
+        top = 1 if rows > 2 else 0
+        for r in range(rows):
+            safe_w = _safe_row_width(y, r, x, width)
+            if safe_w <= 0:
+                continue
+            try:
+                stdscr.addnstr(y + r, x, blank, safe_w, curses.color_pair(1))
+                line_idx = r - top
+                if 0 <= line_idx < len(lines):
+                    line = lines[line_idx][:safe_w].ljust(safe_w)
+                    attr = curses.color_pair(2) if not line.endswith(":") else curses.color_pair(2) | curses.A_BOLD
+                    stdscr.addnstr(y + r, x, line, safe_w, attr)
+            except curses.error:
+                pass
+
     def _draw_separator(nrows, left_w):
         if _effective_sidebar_mode() == "none":
             return
@@ -1958,7 +1977,9 @@ def main(stdscr):
         elif mode == "life":
             _repaint_life(area, rows, y, x, width)
         elif mode == "blank":
-            if area.get("unavailable_message"):
+            if area.get("static_lines"):
+                _repaint_static_lines(area, rows, y, x, width)
+            elif area.get("unavailable_message"):
                 _repaint_unavailable(area, rows, y, x, width)
             else:
                 blank = " " * width
@@ -2015,6 +2036,24 @@ def main(stdscr):
         except curses.error:
             pass
 
+    def _draw_showcase_header():
+        if not _showcase_state["active"] or not CONFIG_STYLE:
+            return
+        header_lines = CONFIG_STYLE.get("showcase_header_lines") or []
+        if not header_lines:
+            return
+        width = max(len(line) for line in header_lines) + 1
+        border_top = "┌" + "─" * (width - 1) + "┐"
+        border_bot = "└" + "─" * (width - 1) + "┘"
+        try:
+            stdscr.addnstr(0, 1, border_top[:width + 2], width + 2, curses.color_pair(2))
+            for idx, line in enumerate(header_lines, start=1):
+                attr = curses.color_pair(2) | (curses.A_BOLD if idx == 1 else 0)
+                stdscr.addnstr(idx, 1, f"│{line:<{width-1}s}│", width + 2, attr)
+            stdscr.addnstr(len(header_lines) + 1, 1, border_bot[:width + 2], width + 2, curses.color_pair(2))
+        except curses.error:
+            pass
+
     def _draw_showcase_footer():
         if not _showcase_state["active"] or rows < 1:
             return
@@ -2031,7 +2070,7 @@ def main(stdscr):
             pass
 
     def _set_showcase_scene(next_idx: int) -> None:
-        global CONFIG_STYLE
+        global CONFIG_STYLE, STYLE_ARG
         nonlocal area_specs, area_states
         scenes = _showcase_state.get("scenes", [])
         if not scenes:
@@ -2040,6 +2079,8 @@ def main(stdscr):
         _showcase_state["idx"] = next_idx
         _showcase_state["done"] = False
         CONFIG_STYLE = scenes[next_idx]
+        STYLE_ARG = CONFIG_STYLE.get("vocab", STYLE_ARG)
+        GEN_POOL[:], RCOL_POOL[:] = _build_pools(STYLE_ARG)
         area_specs = _current_area_specs(rows, cols)
         area_states = _sync_areas(area_specs)
         _sync_cycle_start_modes(area_specs, area_states, time.time())
@@ -2094,6 +2135,8 @@ def main(stdscr):
         specs = []
         for area_spec in sorted(CONFIG_STYLE["areas"], key=lambda item: (item["x"], item["y"], item["name"])):
             rect = _scaled_rect(area_spec, rows, cols)
+            if rect.get("vocab") is None and CONFIG_STYLE.get("vocab") is not None:
+                rect["vocab"] = CONFIG_STYLE["vocab"]
             specs.append(rect)
         return specs
 
@@ -2119,6 +2162,7 @@ def main(stdscr):
                 area["image_paths"] = spec.get("image_paths") or []
                 area["cycle_widgets"] = spec.get("cycle_widgets") or []
                 area["unavailable_message"] = spec.get("unavailable_message")
+                area["static_lines"] = spec.get("static_lines") or []
                 _reset_area_timing(area)
             else:
                 area["title"] = spec.get("title")
@@ -2129,6 +2173,7 @@ def main(stdscr):
                 area["image_paths"] = spec.get("image_paths") or []
                 area["cycle_widgets"] = spec.get("cycle_widgets") or []
                 area["unavailable_message"] = spec.get("unavailable_message")
+                area["static_lines"] = spec.get("static_lines") or []
             synced[spec["name"]] = area
         return synced
 
@@ -2271,6 +2316,7 @@ def main(stdscr):
 
         _draw_info_box()
         _draw_pause_label()
+        _draw_showcase_header()
         _draw_showcase_footer()
 
         if GLITCH_INTERVAL > 0 and not _paused:
@@ -2363,12 +2409,13 @@ def run(argv=None) -> int:
     GLITCH_INTERVAL = config["glitch_interval"]
 
     GEN_POOL[:], RCOL_POOL[:] = _build_pools(STYLE_ARG)
-    show_startup_banner(SCRIPT_NAME, config)
+    if not _showcase_state["active"]:
+        show_startup_banner(SCRIPT_NAME, config)
 
-    for countdown in (2, 1):
-        print(f"  Starting in {countdown}...", end="\r", flush=True)
-        time.sleep(1)
-    print(" " * 30, end="\r")
+        for countdown in (2, 1):
+            print(f"  Starting in {countdown}...", end="\r", flush=True)
+            time.sleep(1)
+        print(" " * 30, end="\r")
 
     def _is_resize_restartable(exc: Exception) -> bool:
         if isinstance(exc, curses.error):
@@ -2406,15 +2453,6 @@ def run(argv=None) -> int:
             if not _is_resize_restartable(exc):
                 raise
             time.sleep(0.05)
-    if _showcase_state["active"]:
-        displayed = _showcase_state.get("displayed_widgets", [])
-        all_widgets = _showcase_state.get("all_widgets", displayed)
-        displayed_set = set(displayed)
-        print()
-        print("Widget showcase:")
-        for name in all_widgets:
-            suffix = "" if name in displayed_set else " [not displayed]"
-            print(f"  {name}{suffix}")
     print(f"\n[{SCRIPT_NAME}] terminated.")
     return 0
 

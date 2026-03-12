@@ -58,10 +58,10 @@ python3 app.py --style science
 python3 app.py --style clocks
 ```
 
-Showcase all widgets:
+Browse the interactive demo pages:
 
 ```bash
-python3 app.py --widgets
+python3 app.py --demo
 ```
 
 Build a layout manually:

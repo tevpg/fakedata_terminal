@@ -10,7 +10,7 @@
 
 defaults:
   vocab: science
-  speed: 30
+  speed: 50
   panel_speed: {}
   image:
     glob: "geom*.png"
@@ -47,28 +47,6 @@ layouts:
       p7: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.3333}
       p8: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.3333}
       p9: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.3333}
-    regions:
-      left: p1+p2+p3
-      center: p4+p5+p6
-      right: p7+p8+p9
-      large_left: p1+p2+p3+p4+p5+p6
-      large_right: p4+p5+p6+p7+p8+p9
-      top: p1+p4+p7
-      middle: p2+p5+p8
-      bottom: p3+p6+p9
-      full: p1+p2+p3+p4+p5+p6+p7+p8+p9
-
-  grid_3x3_special:
-    panels:
-      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.3333}
-      p2: {x: 0.00, y: 0.3333, w: 0.3333, h: 0.3333}
-      p3: {x: 0.00, y: 0.6667, w: 0.3333, h: 0.3333}
-      p4: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.3333}
-      p5: {x: 0.3333, y: 0.3333, w: 0.3333, h: 0.3333}
-      p6: {x: 0.3333, y: 0.6667, w: 0.3333, h: 0.3333}
-      p7: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.250}
-      p8: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.250}
-      p9: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.5}
     regions:
       left: p1+p2+p3
       center: p4+p5+p6
@@ -213,7 +191,7 @@ styles:
   science:
     note: >
       Derived from: --style science --main scroller --sidebar clock --sidebar-speed 80
-    layout: grid_3x3_special
+    layout: grid_3x3
     vocab: science
     text: "*** DO NOT USE DOORBELL ***"
     regions:

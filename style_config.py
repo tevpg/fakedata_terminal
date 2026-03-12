@@ -491,7 +491,7 @@ def adapt_style_to_legacy(style_name: str, parser, config_paths: tuple[str, ...]
     if not isinstance(regions, dict):
         parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
 
-    style_speed = style_cfg.get("speed", defaults.get("speed", 30))
+    style_speed = style_cfg.get("speed", defaults.get("speed", 50))
     vocab = style_cfg.get("vocab", defaults.get("vocab", "science"))
 
     if layout == "full":
@@ -642,7 +642,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
 
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
                            style_name: str = "<cli>", vocab: str = "science",
-                           speed: int | float = 30, text: str = "",
+                           speed: int | float = 50, text: str = "",
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_style_catalog(config_paths)
     layouts = catalog.get("layouts", {})
@@ -676,6 +676,6 @@ def resolve_config_style(style_name: str, parser, config_paths: tuple[str, ...] 
         parser,
         style_name=style_name,
         vocab=style_cfg.get("vocab", defaults.get("vocab", "science")),
-        speed=style_cfg.get("speed", defaults.get("speed", 30)),
+        speed=style_cfg.get("speed", defaults.get("speed", 50)),
         text=style_cfg.get("text", ""),
     )

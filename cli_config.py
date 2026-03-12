@@ -60,7 +60,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --list\n"
             "  %(prog)s --config ./lab.yaml --list\n"
             "  %(prog)s --layouts\n"
-            "  %(prog)s --widgets\n"
+            "  %(prog)s --demo\n"
             "  %(prog)s --style test1\n"
             "  %(prog)s --config ~/.config/fakedata-terminal/styles.yaml --style lab\n"
             "  %(prog)s --layout grid_2x2 --assign p1=life --assign p2=blank --assign p3=text --assign p4=clock\n"
@@ -81,8 +81,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--layouts", action="store_true",
         help="Show configured layouts as fixed-size box diagrams, with their defined regions, then exit.")
     parser.add_argument(
-        "--widgets", action="store_true",
-        help="Showcase available widgets in left/right pairs on a grid_2x2 layout, then exit.")
+        "--demo", action="store_true",
+        help="Browse demo pages for widgets, vocabs, layouts, and configured presets.")
     parser.add_argument(
         "--style", type=str, default=None, choices=_style_choices(config_paths),
         help="Config-defined style preset.")
@@ -141,8 +141,7 @@ def _print_list(config_paths: tuple[str, ...] | None = None) -> None:
 def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
     print(format_layout_diagrams(config_paths))
 
-def _showcase_widget_names(include_image: bool, config_paths: tuple[str, ...] | None = None) -> list[str]:
-    del include_image
+def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     names = [name for name in widget_names(config_paths) if name not in {"blank", "cycle"}]
     return names
 
@@ -159,13 +158,63 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
     return None
 
 
-def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser,
-                           image_module, image_checker,
-                           config_paths: tuple[str, ...] | None = None) -> dict:
-    all_widgets = [name for name in widget_names(config_paths) if name != "blank"]
-    widgets = _showcase_widget_names(bool(image_paths), config_paths)
+def _format_catalog_columns(config_paths: tuple[str, ...]) -> list[str]:
+    widgets = widget_names(config_paths)
+    layouts = layout_names(config_paths)
+    vocabs = VOCAB_CHOICES[:]
+    styles = config_style_names(config_paths)
+    columns = [
+        ("Widgets", widgets),
+        ("Layouts", layouts),
+        ("Vocabs", vocabs),
+        ("Styles", styles),
+    ]
+    widths = []
+    for heading, values in columns:
+        longest = max([len(heading), *(len(value) for value in values)] or [len(heading)])
+        widths.append(longest + 2)
+    height = max(len(values) for _, values in columns)
+    lines = []
+    heading_line = "    ".join(f"{heading:<{widths[idx]}}" for idx, (heading, _) in enumerate(columns))
+    rule_line = "    ".join("-" * (widths[idx] - 1) for idx in range(len(columns)))
+    lines.extend([heading_line.rstrip(), rule_line.rstrip(), ""])
+    for row in range(height):
+        parts = []
+        for idx, (_, values) in enumerate(columns):
+            entry = values[row] if row < len(values) else ""
+            parts.append(f"{entry:<{widths[idx]}}")
+        lines.append("    ".join(parts).rstrip())
+    lines.extend(["", "Config files:"])
+    lines.extend(str(path) for path in config_paths)
+    return lines
+
+
+def _build_intro_scene(vocab: str, speed: int, parser, config_paths: tuple[str, ...]) -> dict:
+    runtime = resolve_runtime_layout(
+        "full",
+        {"full": {"widget": "blank"}},
+        parser,
+        style_name="<demo:intro>",
+        vocab=vocab,
+        speed=speed,
+        text="",
+        config_paths=config_paths,
+    )
+    runtime["areas"][0]["static_lines"] = [
+        "FakeData Terminal is a curses-based dashboard generator for animated, fake telemetry and operator screens.",
+        "This demo pages through the available widgets, vocabularies, layouts, styles, and active config files.",
+        "",
+        *_format_catalog_columns(config_paths),
+    ]
+    return runtime
+
+
+def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[str], parser,
+                         image_module, image_checker,
+                         config_paths: tuple[str, ...]) -> list[dict]:
+    widgets = _showcase_widget_names(config_paths)
     if not widgets:
-        parser.error("--widgets found no widgets to show")
+        parser.error("--demo found no widgets to show")
 
     scenes = []
     idx = 0
@@ -186,7 +235,7 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
             "grid_2x2",
             regions_cfg,
             parser,
-            style_name="<widgets>",
+            style_name="<demo:widgets>",
             vocab=vocab,
             speed=speed,
             text=text,
@@ -195,11 +244,69 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
         widget_by_region = {"left": left_widget, "right": right_widget}
         unavailable_by_region = {"left": left_unavailable, "right": right_unavailable}
         for area in runtime["areas"]:
-            area["label"] = widget_by_region.get(area["name"], area["mode"])
+            area["label"] = f"widget: {widget_by_region.get(area['name'], area['mode'])}"
             if unavailable_by_region.get(area["name"]):
                 area["unavailable_message"] = unavailable_by_region[area["name"]]
         scenes.append(runtime)
         idx += 2
+    return scenes
+
+
+def _build_vocab_scenes(speed: int, text: str, parser, config_paths: tuple[str, ...]) -> list[dict]:
+    scenes = []
+    for vocab_name in VOCAB_CHOICES:
+        runtime = resolve_runtime_layout(
+            "grid_3x3",
+            {
+                "left": {"widget": "text"},
+                "center": {"widget": "text_wide"},
+                "p7": {"widget": "readouts"},
+                "p8+p9": {"widget": "text_scant"},
+            },
+            parser,
+            style_name=f"<demo:vocab:{vocab_name}>",
+            vocab=vocab_name,
+            speed=speed,
+            text=text,
+            config_paths=config_paths,
+        )
+        runtime["showcase_header_lines"] = [f"vocab: {vocab_name}"]
+        scenes.append(runtime)
+    return scenes
+
+
+def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str, ...]) -> list[dict]:
+    scenes = []
+    layouts = layout_catalog(config_paths)
+    for layout_name, layout_cfg in layouts.items():
+        panels = layout_cfg.get("panels", {})
+        regions_cfg = {panel_name: {"widget": "clock"} for panel_name in panels}
+        runtime = resolve_runtime_layout(
+            layout_name,
+            regions_cfg,
+            parser,
+            style_name=f"<demo:layout:{layout_name}>",
+            vocab=vocab,
+            speed=speed,
+            text="",
+            config_paths=config_paths,
+        )
+        runtime["showcase_header_lines"] = [
+            f"layout: {layout_name}",
+            "(adjacent panels can be combined)",
+        ]
+        scenes.append(runtime)
+    return scenes
+
+
+def _build_demo_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser,
+                         image_module, image_checker,
+                         config_paths: tuple[str, ...] | None = None) -> dict:
+    resolved_paths = config_paths or ()
+    scenes = [_build_intro_scene(vocab, speed, parser, resolved_paths)]
+    scenes.extend(_build_widget_scenes(vocab, speed, text, image_paths, parser, image_module, image_checker, resolved_paths))
+    scenes.extend(_build_vocab_scenes(speed, text, parser, resolved_paths))
+    scenes.extend(_build_layout_scenes(vocab, speed, parser, resolved_paths))
     initial = scenes[0]
     return {
         "active": True,
@@ -209,8 +316,6 @@ def _build_widget_showcase(vocab: str, speed: int, text: str, image_paths: list[
         "pair_duration": 10.0,
         "done": False,
         "initial": initial,
-        "all_widgets": all_widgets,
-        "displayed_widgets": widgets,
     }
 
 
@@ -385,11 +490,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.widgets and (args.style is not None or args.layout is not None or args.assign or args.panel_speed or args.panel_vocab or args.panel_image):
-        parser.error("--widgets is a standalone showcase mode; do not combine it with --style, --layout, or panel overrides")
+    if args.demo and (args.style is not None or args.layout is not None or args.assign or args.panel_speed or args.panel_vocab or args.panel_image):
+        parser.error("--demo is a standalone showcase mode; do not combine it with --style, --layout, or panel overrides")
 
-    if not args.widgets and args.style is None and args.layout is None:
-        parser.error("specify either --style, --layout, or --widgets")
+    if not args.demo and args.style is None and args.layout is None:
+        parser.error("specify either --style, --layout, or --demo")
 
     speed_explicit = any(a == "--speed" or a.startswith("--speed=") for a in raw_argv)
     text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
@@ -406,7 +511,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 parser.error(f"image file not found: {raw_path}")
             image_paths.append(path)
 
-    runtime_speed = args.speed if speed_explicit and args.speed is not None else 30
+    runtime_speed = args.speed if speed_explicit and args.speed is not None else 50
     runtime_text = args.text.strip() if text_explicit and args.text is not None else ""
     runtime_vocab = args.vocab or DEFAULT_VOCAB
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
@@ -414,8 +519,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     if not image_explicit:
         image_paths = default_images[:]
 
-    if args.widgets:
-        widget_showcase = _build_widget_showcase(
+    if args.demo:
+        widget_showcase = _build_demo_showcase(
             runtime_vocab,
             runtime_speed,
             runtime_text,
@@ -434,7 +539,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             parser.error("no layout available")
 
         runtime_vocab = args.vocab or (base_runtime["vocab"] if base_runtime else DEFAULT_VOCAB)
-        runtime_speed = args.speed if speed_explicit and args.speed is not None else (base_runtime["speed"] if base_runtime else 30)
+        runtime_speed = args.speed if speed_explicit and args.speed is not None else (base_runtime["speed"] if base_runtime else 50)
         runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
 
         has_cli_overrides = bool(
@@ -468,7 +573,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     image_sources = config_style_runtime["image_paths"] if not image_explicit else image_paths
     image_mode_active = any(area["mode"] == "image" for area in config_style_runtime["areas"])
-    if args.widgets:
+    if args.demo:
         image_mode_active = any(
             area["mode"] == "image"
             for scene in widget_showcase["scenes"]
@@ -490,7 +595,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "main_mode": None,
         "sidebar_mode": None,
         "style": config_style_runtime["vocab"],
-        "style_name": "<widgets>" if args.widgets else (args.style or f"<cli:{runtime_layout_name}>"),
+        "style_name": "<demo>" if args.demo else (args.style or f"<cli:{runtime_layout_name}>"),
         "styles": VOCAB_CHOICES[:],
         "config_style": config_style_runtime,
         "layout_name": config_style_runtime["layout"],
