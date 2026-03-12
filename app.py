@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 
 if sys.platform == "win32":
     try:
@@ -2326,10 +2327,42 @@ def run(argv=None) -> int:
         time.sleep(1)
     print(" " * 30, end="\r")
 
-    try:
-        curses.wrapper(main)
-    except KeyboardInterrupt:
-        pass
+    def _is_resize_restartable(exc: Exception) -> bool:
+        if isinstance(exc, curses.error):
+            return True
+        if not isinstance(exc, IndexError):
+            return False
+        tb = traceback.extract_tb(exc.__traceback__)
+        for frame in tb:
+            if os.path.abspath(frame.filename) != os.path.abspath(__file__):
+                continue
+            if frame.name in {
+                "main",
+                "_paint_area",
+                "_repaint_text_buffer",
+                "_repaint_readouts",
+                "_repaint_bars",
+                "_repaint_scope",
+                "_repaint_sparkline",
+                "_repaint_blocks",
+                "_repaint_sweep",
+                "_repaint_life",
+                "_ensure_area",
+                "_sync_areas",
+            }:
+                return True
+        return False
+
+    while True:
+        try:
+            curses.wrapper(main)
+            break
+        except KeyboardInterrupt:
+            break
+        except Exception as exc:
+            if not _is_resize_restartable(exc):
+                raise
+            time.sleep(0.05)
     if _showcase_state["active"]:
         displayed = _showcase_state.get("displayed_widgets", [])
         all_widgets = _showcase_state.get("all_widgets", displayed)
