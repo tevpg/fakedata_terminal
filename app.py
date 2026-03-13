@@ -477,6 +477,7 @@ def main(stdscr):
             "style_override": style_name,
             "unavailable_message": None,
             "static_lines": [],
+            "static_align": "top",
         }
 
     def _dense_line(width: int, line_fn=None) -> str:
@@ -1871,7 +1872,11 @@ def main(stdscr):
     def _repaint_static_lines(area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width
         lines = area.get("static_lines") or []
-        top = 1 if rows > 2 else 0
+        align = area.get("static_align") or "top"
+        if align == "center":
+            top = max(0, (rows - len(lines)) // 2)
+        else:
+            top = 1 if rows > 2 else 0
         for r in range(rows):
             safe_w = _safe_row_width(y, r, x, width)
             if safe_w <= 0:
@@ -1880,7 +1885,12 @@ def main(stdscr):
                 stdscr.addnstr(y + r, x, blank, safe_w, curses.color_pair(1))
                 line_idx = r - top
                 if 0 <= line_idx < len(lines):
-                    line = lines[line_idx][:safe_w].ljust(safe_w)
+                    source_line = lines[line_idx][:safe_w]
+                    if align == "center":
+                        start = max(0, (safe_w - len(source_line)) // 2)
+                        line = (" " * start + source_line).ljust(safe_w)
+                    else:
+                        line = source_line.ljust(safe_w)
                     attr = curses.color_pair(2) if not line.endswith(":") else curses.color_pair(2) | curses.A_BOLD
                     stdscr.addnstr(y + r, x, line, safe_w, attr)
             except curses.error:
@@ -2363,6 +2373,7 @@ def main(stdscr):
                 area["cycle_widgets"] = spec.get("cycle_widgets") or []
                 area["unavailable_message"] = spec.get("unavailable_message")
                 area["static_lines"] = spec.get("static_lines") or []
+                area["static_align"] = spec.get("static_align") or "top"
                 _reset_area_timing(area)
             else:
                 area["title"] = spec.get("title")
@@ -2375,6 +2386,7 @@ def main(stdscr):
                 area["cycle_widgets"] = spec.get("cycle_widgets") or []
                 area["unavailable_message"] = spec.get("unavailable_message")
                 area["static_lines"] = spec.get("static_lines") or []
+                area["static_align"] = spec.get("static_align") or "top"
             synced[spec["name"]] = area
         return synced
 

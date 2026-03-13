@@ -7,6 +7,7 @@
 # - styles bind widgets/options to regions
 # - defaults < style < CLI override
 # - panel aggregation is explicit; no implicit expansion from "none"
+# - stable packaged layouts live in data/layouts.yaml
 
 defaults:
   vocab: science
@@ -14,105 +15,6 @@ defaults:
   panel_speed: {}
   image:
     glob: "geom*.png"
-
-layouts:
-  full:
-    panels:
-      p1: {x: 0.00, y: 0.00, w: 1.00, h: 1.00}
-    regions:
-      full: p1
-
-  grid_2x2:
-    panels:
-      p1: {x: 0.00, y: 0.00, w: 0.50, h: 0.50}
-      p2: {x: 0.00, y: 0.50, w: 0.50, h: 0.50}
-      p3: {x: 0.50, y: 0.00, w: 0.50, h: 0.50}
-      p4: {x: 0.50, y: 0.50, w: 0.50, h: 0.50}
-    regions:
-      left: p1+p2
-      right: p3+p4
-      top: p1+p3
-      bottom: p2+p4
-      full: p1+p2+p3+p4
-
-
-  grid_3x3:
-    panels:
-      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.3333}
-      p2: {x: 0.00, y: 0.3333, w: 0.3333, h: 0.3333}
-      p3: {x: 0.00, y: 0.6667, w: 0.3333, h: 0.3333}
-      p4: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.3333}
-      p5: {x: 0.3333, y: 0.3333, w: 0.3333, h: 0.3333}
-      p6: {x: 0.3333, y: 0.6667, w: 0.3333, h: 0.3333}
-      p7: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.3333}
-      p8: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.3333}
-      p9: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.3333}
-    regions:
-      left: p1+p2+p3
-      center: p4+p5+p6
-      right: p7+p8+p9
-      large_left: p1+p2+p3+p4+p5+p6
-      large_right: p4+p5+p6+p7+p8+p9
-      top: p1+p4+p7
-      middle: p2+p5+p8
-      bottom: p3+p6+p9
-      full: p1+p2+p3+p4+p5+p6+p7+p8+p9
-
-  grid_4x3:
-    panels:
-      p1:  {x: 0.00, y: 0.00, w: 0.25, h: 0.3333}
-      p2:  {x: 0.00, y: 0.3333, w: 0.25, h: 0.3333}
-      p3:  {x: 0.00, y: 0.6667, w: 0.25, h: 0.3333}
-      p4:  {x: 0.25, y: 0.00, w: 0.25, h: 0.3333}
-      p5:  {x: 0.25, y: 0.3333, w: 0.25, h: 0.3333}
-      p6:  {x: 0.25, y: 0.6667, w: 0.25, h: 0.3333}
-      p7:  {x: 0.50, y: 0.00, w: 0.25, h: 0.3333}
-      p8:  {x: 0.50, y: 0.3333, w: 0.25, h: 0.3333}
-      p9:  {x: 0.50, y: 0.6667, w: 0.25, h: 0.3333}
-      p10: {x: 0.75, y: 0.00, w: 0.25, h: 0.3333}
-      p11: {x: 0.75, y: 0.3333, w: 0.25, h: 0.3333}
-      p12: {x: 0.75, y: 0.6667, w: 0.25, h: 0.3333}
-    regions:
-      left: p1+p2+p3
-      center_left: p4+p5+p6
-      center_right: p7+p8+p9
-      right: p10+p11+p12
-      top: p1+p4+p7+p10
-      middle: p2+p5+p8+p11
-      bottom: p3+p6+p9+p12
-      full: p1+p2+p3+p4+p5+p6+p7+p8+p9+p10+p11+p12
-
-  main_2x2_right_stack_3:
-    panels:
-      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.50}
-      p2: {x: 0.00, y: 0.50, w: 0.3333, h: 0.50}
-      p3: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.50}
-      p4: {x: 0.3333, y: 0.50, w: 0.3333, h: 0.50}
-      p5: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.3333}
-      p6: {x: 0.6667, y: 0.3333, w: 0.3333, h: 0.3333}
-      p7: {x: 0.6667, y: 0.6667, w: 0.3333, h: 0.3333}
-    regions:
-      main: p1+p2+p3+p4
-      right: p5+p6+p7
-      right_top: p5
-      right_mid: p6
-      right_bottom: p7
-      full: p1+p2+p3+p4+p5+p6+p7
-
-  grid_3x2:
-    panels:
-      p1: {x: 0.00, y: 0.00, w: 0.3333, h: 0.50}
-      p2: {x: 0.00, y: 0.50, w: 0.3333, h: 0.50}
-      p3: {x: 0.3333, y: 0.00, w: 0.3333, h: 0.50}
-      p4: {x: 0.3333, y: 0.50, w: 0.3333, h: 0.50}
-      p5: {x: 0.6667, y: 0.00, w: 0.3333, h: 0.50}
-      p6: {x: 0.6667, y: 0.50, w: 0.3333, h: 0.50}
-    regions:
-      main: p1+p2+p3+p4
-      right: p5+p6
-      right_top: p5
-      right_bottom: p6
-      full: p1+p2+p3+p4+p5+p6
 
 styles:
 

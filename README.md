@@ -6,7 +6,7 @@ FakeData Terminal is a curses-based Python app that renders animated, fake telem
 
 - Renders multi-panel terminal scenes using `curses`
 - Drives text widgets from themed vocab pools such as `science`, `hacker`, `medicine`, and `finance`
-- Loads layouts and style presets from [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml)
+- Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and style presets from [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml)
 - Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset style or build a screen explicitly with `--layout` and `--assign`
 
@@ -119,11 +119,11 @@ The runtime is config-first:
 - Styles bind widgets and options to regions
 - Config precedence is: packaged config, then local overlays, then CLI flags
 
-The packaged base config lives in [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml). Validation, overlay merging, and runtime adaptation are handled in [`style_config.py`](/fs/sysbits/fakedata_terminal/style_config.py) and [`cli_config.py`](/fs/sysbits/fakedata_terminal/cli_config.py).
+The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml). Validation, overlay merging, and runtime adaptation are handled in [`style_config.py`](/home/tags/fakedata_terminal/style_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
 
 Automatic config search order:
 
-- packaged base: [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml)
+- packaged base: [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml)
 - user overlay: `~/.config/fakedata-terminal/styles.yaml` (or `$XDG_CONFIG_HOME/fakedata-terminal/styles.yaml`)
 - project overlay: `./.fakedata-terminal.yaml` or `./.fakedata-terminal.yml`
 
@@ -143,7 +143,8 @@ Overlay semantics:
 - [`cli_config.py`](/fs/sysbits/fakedata_terminal/cli_config.py): argument parsing and runtime config assembly
 - [`style_config.py`](/fs/sysbits/fakedata_terminal/style_config.py): YAML loading, overlay merging, and validation
 - [`vocab.py`](/fs/sysbits/fakedata_terminal/vocab.py): themed fake-data generators
-- [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml): layouts, regions, and style presets
+- [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml): packaged layout geometry and region aliases
+- [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml): defaults and style presets
 - [`data/`](/fs/sysbits/fakedata_terminal/data): image assets used by image panels
 
 ## Notes

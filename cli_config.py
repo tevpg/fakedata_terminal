@@ -81,7 +81,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         description=(
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
-            "Use --style for a preset, or --layout plus --assign overrides to build a screen explicitly."
+            "Use --style for a preset, or --layout plus --assign overrides to build a screen explicitly. "
+            "Run --demo for a quick tour of widgets, vocabs, layouts, and presets."
         ),
         epilog=(
             "Examples:\n"
@@ -110,7 +111,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         help="Show configured layouts as fixed-size box diagrams, with their defined regions, then exit.")
     parser.add_argument(
         "--demo", action="store_true",
-        help="Browse demo pages for widgets, vocabs, layouts, and configured presets.")
+        help="Browse a quick tour of widgets, vocabs, layouts, and configured presets.")
     parser.add_argument(
         "--style", type=str, default=None, choices=_style_choices(config_paths),
         help="Config-defined style preset.")
@@ -159,7 +160,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
 
 
 def _print_list(config_paths: tuple[str, ...] | None = None) -> None:
-    for line in _format_catalog_columns(config_paths or ()):
+    for line in _format_catalog_columns(config_paths or (), colourize=True):
         print(line)
 
 
@@ -167,7 +168,7 @@ def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
     print(format_layout_diagrams(config_paths))
 
 def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    names = [name for name in widget_names(config_paths) if name not in {"blank", "cycle"}]
+    names = [name for name in widget_names(config_paths) if name != "blank"]
     return names
 
 
@@ -183,17 +184,17 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
     return None
 
 
-def _format_catalog_columns(config_paths: tuple[str, ...]) -> list[str]:
+def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
     widgets = widget_names(config_paths)
     layouts = layout_names(config_paths)
     vocabs = VOCAB_CHOICES[:]
     styles = config_style_names(config_paths)
-    colours = [_ansi_colour_label(name) for name in COLOUR_CHOICES]
+    colours = [_ansi_colour_label(name) for name in COLOUR_CHOICES] if colourize else COLOUR_CHOICES[:]
     columns = [
-        ("Widgets", widgets),
-        ("Layouts", layouts),
-        ("Vocabs", vocabs),
         ("Styles", styles),
+        ("Layouts", layouts),
+        ("Widgets", widgets),
+        ("Vocabs", vocabs),
         ("Colours", colours),
     ]
     widths = []
@@ -251,8 +252,8 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
         left_unavailable = _widget_unavailable_reason(left_widget, image_paths, image_module, image_checker)
         right_unavailable = _widget_unavailable_reason(right_widget, image_paths, image_module, image_checker)
         regions_cfg = {
-            "left": {"widget": "blank" if left_unavailable else left_widget},
-            "right": {"widget": "blank" if right_unavailable else right_widget},
+            "left": _showcase_region_cfg(left_widget, left_unavailable),
+            "right": _showcase_region_cfg(right_widget, right_unavailable),
         }
         if left_widget == "image" and not left_unavailable:
             regions_cfg["left"]["image"] = {"paths": image_paths[:]}
@@ -274,9 +275,26 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
             area["label"] = f"widget: {widget_by_region.get(area['name'], area['mode'])}"
             if unavailable_by_region.get(area["name"]):
                 area["unavailable_message"] = unavailable_by_region[area["name"]]
+            if widget_by_region.get(area["name"]) == "cycle":
+                area["static_align"] = "center"
+                area["static_lines"] = [
+                    "cycle",
+                    "",
+                    "Rotates one panel through a configured widget list.",
+                    "Use widget: cycle with cycle.widgets in style config",
+                    "or assign it to a region from the CLI.",
+                ]
         scenes.append(runtime)
         idx += 2
     return scenes
+
+
+def _showcase_region_cfg(widget: str, unavailable: str | None) -> dict:
+    if widget == "cycle":
+        return {"widget": "blank"}
+    if unavailable:
+        return {"widget": "blank"}
+    return {"widget": widget}
 
 
 def _build_vocab_scenes(speed: int, text: str, parser, config_paths: tuple[str, ...]) -> list[dict]:

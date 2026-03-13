@@ -12,7 +12,12 @@ import yaml
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
+LAYOUT_CONFIG_PATH = PACKAGE_DIR / "data" / "layouts.yaml"
 STYLE_CONFIG_PATH = PACKAGE_DIR / "data" / "styles.yaml"
+PACKAGE_CONFIG_PATHS = (
+    LAYOUT_CONFIG_PATH,
+    STYLE_CONFIG_PATH,
+)
 USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "styles.yaml"
 PROJECT_CONFIG_NAMES = (
     ".fakedata-terminal.yaml",
@@ -30,7 +35,7 @@ CYCLE_KEYS = {"widgets"}
 
 
 def discover_config_paths() -> list[Path]:
-    paths = [STYLE_CONFIG_PATH]
+    paths = [path for path in PACKAGE_CONFIG_PATHS if path.is_file()]
     if USER_CONFIG_PATH.is_file():
         paths.append(USER_CONFIG_PATH)
     cwd = Path.cwd()
@@ -367,11 +372,24 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
                 if x0 < px < x1:
                     canvas[cy][px] = ch
 
-    lines = [f"Layout: {layout_name}"] + ["".join(row).rstrip() for row in canvas]
-    if regions:
-        lines.append("Regions:")
-        for region_name, region_spec in regions.items():
-            lines.append(f"  {region_name}: {region_spec}")
+    diagram_lines = [f"Layout: {layout_name}"] + ["".join(row).rstrip() for row in canvas]
+    if not regions:
+        return "\n".join(diagram_lines)
+
+    region_lines = ["Regions:"]
+    for region_name, region_spec in regions.items():
+        region_lines.append(f"  {region_name}: {region_spec}")
+
+    left_width = max(len(line) for line in diagram_lines)
+    row_count = max(len(diagram_lines), len(region_lines))
+    lines = []
+    for idx in range(row_count):
+        left = diagram_lines[idx] if idx < len(diagram_lines) else ""
+        right = region_lines[idx] if idx < len(region_lines) else ""
+        if right:
+            lines.append(f"{left.ljust(left_width)}    {right}".rstrip())
+        else:
+            lines.append(left)
     return "\n".join(lines)
 
 
@@ -597,7 +615,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
                            vocab: str, speed: int | float, text: str,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
-        parser.error(f"style '{style_name}' regions must be a mapping in {STYLE_CONFIG_PATH.name}")
+        parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
     seen = []
@@ -688,4 +706,5 @@ def resolve_config_style(style_name: str, parser, config_paths: tuple[str, ...] 
         vocab=style_cfg.get("vocab", defaults.get("vocab", "science")),
         speed=style_cfg.get("speed", defaults.get("speed", 50)),
         text=style_cfg.get("text", ""),
+        config_paths=config_paths,
     )
