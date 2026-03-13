@@ -1,14 +1,14 @@
 # FakeData Terminal
 
-FakeData Terminal is a curses-based Python app that renders animated, fake telemetry screens in the terminal. It combines configurable layouts, widget assignments, themed vocabularies, and optional image-to-ASCII rendering to produce cinematic dashboard displays.
+FakeData Terminal renders animated, fake telemetry screens in the terminal. It combines configurable layouts, widget assignments, themed vocabularies, and optional image-to-ASCII rendering to produce cinematic dashboard displays.
 
 ## What It Does
 
 - Renders multi-panel terminal scenes using `curses`
 - Drives text widgets from themed vocab pools such as `science`, `hacker`, `medicine`, and `finance`
-- Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and style presets from [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml)
+- Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and scene presets from [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml)
 - Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
-- Lets you start from a preset style or build a screen explicitly with `--layout`, `--panel-widget`, and `--default-*`
+- Lets you start from a preset scene or build a screen explicitly with `--layout`, `--panel-widget`, and `--default-*`
 - Supports widget-level fallback defaults in YAML via the top-level `widgets:` section
 
 ## Requirements
@@ -26,10 +26,10 @@ On Windows, the app attempts to install `windows-curses` automatically if it is 
 This repository does not include packaging metadata, so the most direct entrypoint is the source file:
 
 ```bash
-python3 app.py --list
-python3 app.py --style science
-python3 app.py --layouts
-python3 app.py --layout grid_2x2 --default-widget tunnel
+python3 fakedata_terminal.py --list
+python3 fakedata_terminal.py --scene science
+python3 fakedata_terminal.py --layouts
+python3 fakedata_terminal.py --layout grid_2x2 --default-widget tunnel
 ```
 
 If you want image widgets, install the extra dependencies first:
@@ -41,35 +41,35 @@ python3 -m pip install PyYAML Pillow
 
 ## Common Commands
 
-List available presets, layouts, and widgets:
+List available scenes, layouts, and widgets:
 
 ```bash
-python3 app.py --list
+python3 fakedata_terminal.py --list
 ```
 
 Show layout diagrams:
 
 ```bash
-python3 app.py --layouts
+python3 fakedata_terminal.py --layouts
 ```
 
-Run a preset style:
+Run a preset scene:
 
 ```bash
-python3 app.py --style science
-python3 app.py --style clocks
+python3 fakedata_terminal.py --scene science
+python3 fakedata_terminal.py --scene clocks
 ```
 
 Browse the interactive demo pages:
 
 ```bash
-python3 app.py --demo
+python3 fakedata_terminal.py --demo
 ```
 
 Build a layout manually:
 
 ```bash
-  python3 app.py \
+  python3 fakedata_terminal.py \
   --layout grid_2x2 \
   --panel-widget p1=life \
   --panel-widget p2=clock \
@@ -80,8 +80,8 @@ Build a layout manually:
 Override per-region behavior:
 
 ```bash
-  python3 app.py \
-  --style test1 \
+  python3 fakedata_terminal.py \
+  --scene test1 \
   --panel-widget p4=matrix \
   --panel-speed p4=80 \
   --panel-vocab p4=hacker
@@ -90,7 +90,7 @@ Override per-region behavior:
 Run an image panel:
 
 ```bash
-  python3 app.py \
+  python3 fakedata_terminal.py \
   --layout grid_3x2 \
   --panel-widget p3+p4=image \
   --panel-widget p5=clock \
@@ -101,7 +101,7 @@ Run an image panel:
 Set layout-wide defaults for unassigned panels:
 
 ```bash
-python3 app.py \
+python3 fakedata_terminal.py \
   --layout grid_3x3 \
   --default-widget cycle \
   --default-speed 70 \
@@ -110,12 +110,12 @@ python3 app.py \
   --panel-image large_left=data/geom_33_torus.png
 ```
 
-If no `--style` or `--layout` is provided, the configured `defaults.layout` is used.
+If no `--scene` or `--layout` is provided, the configured `defaults.layout` is used.
 
 Enable periodic glitch effects:
 
 ```bash
-python3 app.py --style science --glitch 5
+python3 fakedata_terminal.py --scene science --glitch 5
 ```
 
 ## Controls
@@ -132,16 +132,16 @@ The runtime is config-first:
 
 - Layouts define panel geometry
 - Regions alias one or more panels
-- Styles bind widgets and options to regions
+- Scenes bind widgets and options to regions
 - Config precedence is: packaged config, then local overlays, then CLI flags
 - Widget defaults can supply fallback `speed`, `colour`, `source_vocab`, `image`, and `cycle` settings per widget type
 
-The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml). Validation, overlay merging, and runtime adaptation are handled in [`style_config.py`](/home/tags/fakedata_terminal/style_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
+The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml). Validation, overlay merging, and runtime adaptation are handled in [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
 
 Automatic config search order:
 
-- packaged base: [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml)
-- user overlay: `~/.config/fakedata-terminal/styles.yaml` (or `$XDG_CONFIG_HOME/fakedata-terminal/styles.yaml`)
+- packaged base: [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml)
+- user overlay: `~/.config/fakedata-terminal/scenes.yaml` (or `$XDG_CONFIG_HOME/fakedata-terminal/scenes.yaml`)
 - project overlay: `./.fakedata-terminal.yaml` or `./.fakedata-terminal.yml`
 
 You can also add one or more explicit overlays with `--config PATH`. Those are applied after the automatic files, in the order given on the command line.
@@ -184,14 +184,33 @@ Supported widget-default keys are:
 - `image`
 - `cycle`
 
+### Core Terms
+
+These pieces fit together in a specific order:
+
+- `Panel`: a single rectangular tile in a layout, usually named `p1`, `p2`, and so on.
+- `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
+- `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `p2` or `p1+p2+p3`, or by an alias defined in the layout such as `main`, `left`, or `large_left`. Each region is assigned exactly one widget.
+- `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `clock`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
+- `Region attributes`: options attached to one region assignment, such as `speed`, `source_vocab`, `colour`, `title`, `image`, and `cycle`.
+- `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.
+- `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide vocab/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, and `python3 fakedata_terminal.py --demo` to browse sample scenes, widgets, layouts, and vocabs.
+
+In short:
+
+- layouts define panels and region aliases
+- regions group panels into usable rectangular areas
+- widgets render inside regions
+- scenes combine a layout with widget assignments and attributes
+
 ### Precedence
 
 There are two layers of precedence to keep in mind.
 
 Config file merge order:
 
-- packaged base config in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml)
-- user config in `~/.config/fakedata-terminal/styles.yaml`
+- packaged base config in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml)
+- user config in `~/.config/fakedata-terminal/scenes.yaml`
 - project config in `./.fakedata-terminal.yaml` or `./.fakedata-terminal.yml`
 - extra `--config PATH` files, in the order given
 
@@ -199,25 +218,25 @@ Within the merged config, area attributes resolve in this order:
 
 - global `defaults.*`
 - widget-specific defaults from `widgets.<widget>.*`
-- style region settings in `styles.<style>.regions.*`
-- CLI defaults such as `--default-colour`, `--default-speed`, and `--default-widget` for values still not set by the config/style layer
+- scene region settings in `scenes.<scene>.regions.*`
+- CLI defaults such as `--default-colour`, `--default-speed`, and `--default-widget` for values still not set by the config/scene layer
 - CLI per-panel overrides such as `--panel-colour`, `--panel-speed`, `--panel-vocab`, `--panel-image`, and `--panel-widget`
 - built-in code fallback inside the widget implementation if an attribute is still unset
 
 ## Project Structure
 
-- [`app.py`](/home/tags/fakedata_terminal/app.py): curses runtime and widget rendering
+- [`fakedata_terminal.py`](/home/tags/fakedata_terminal/fakedata_terminal.py): curses runtime and widget rendering
 - [`cli.py`](/home/tags/fakedata_terminal/cli.py): launcher wrapper
 - [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py): argument parsing and runtime config assembly
-- [`style_config.py`](/home/tags/fakedata_terminal/style_config.py): YAML loading, overlay merging, and validation
+- [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py): YAML loading, overlay merging, and validation
 - [`vocab.py`](/home/tags/fakedata_terminal/vocab.py): themed fake-data generators
 - [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml): packaged layout geometry and region aliases
-- [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml): defaults, widget fallbacks, and style presets
+- [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml): defaults, widget fallbacks, and scene presets
 - [`data/`](/home/tags/fakedata_terminal/data): image assets used by image panels
 
 ## Notes
 
-- Running `python3 app.py` with no arguments uses the configured `defaults.layout`.
+- Running `python3 fakedata_terminal.py` with no arguments uses the configured `defaults.layout`.
 - Image mode fails fast if `Pillow` or `jp2a` is unavailable.
 - `--config PATH` is repeatable and can add site, user, or project-specific overlays.
 - CLI defaults are `--default-speed`, `--default-colour`, and `--default-widget`.

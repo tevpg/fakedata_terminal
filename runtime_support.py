@@ -190,9 +190,9 @@ def make_text_state():
     return {"theme": theme, "left": left, "countdown": random.randint(35, 50)}
 
 
-def make_area_state(style_name: str | None, default_style: str, get_bar_config) -> dict:
-    area_style = style_name or default_style
-    bar_headers, bar_labels = get_bar_config(area_style)
+def make_area_state(vocab_name: str | None, default_vocab: str, get_bar_config) -> dict:
+    area_vocab = vocab_name or default_vocab
+    bar_headers, bar_labels = get_bar_config(area_vocab)
     return {
         "buf": [],
         "tick": 0,
@@ -268,7 +268,7 @@ def make_area_state(style_name: str | None, default_style: str, get_bar_config) 
         "textwall_next_reverse_at": 0.0,
         "textwall_pause_until": 0.0,
         "textwall_reverse_left": 0,
-        "style_override": style_name,
+        "vocab_override": vocab_name,
         "unavailable_message": None,
         "static_lines": [],
         "static_align": "top",

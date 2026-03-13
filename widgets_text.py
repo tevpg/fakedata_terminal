@@ -16,7 +16,7 @@ class TextWidgets:
         *,
         curses_module,
         stdscr,
-        style_arg_getter,
+        vocab_arg_getter,
         build_pools,
         build_area_state,
         get_bar_config,
@@ -37,7 +37,7 @@ class TextWidgets:
     ):
         self.curses = curses_module
         self.stdscr = stdscr
-        self.style_arg_getter = style_arg_getter
+        self.vocab_arg_getter = vocab_arg_getter
         self.build_pools = build_pools
         self.build_area_state = build_area_state
         self.get_bar_config = get_bar_config
@@ -55,20 +55,20 @@ class TextWidgets:
         self.list_cycle_widget_names = list_cycle_widget_names
         self.help_text_topics_unix = help_text_topics_unix
         self.help_text_topics_win = help_text_topics_win
-        self.style_pool_cache = {}
+        self.vocab_pool_cache = {}
 
-    def area_style(self, area: dict) -> str:
-        return area.get("style_override") or self.style_arg_getter()
+    def area_vocab(self, area: dict) -> str:
+        return area.get("vocab_override") or self.vocab_arg_getter()
 
-    def style_pools(self, style_name: str):
-        pools = self.style_pool_cache.get(style_name)
+    def vocab_pools(self, vocab_name: str):
+        pools = self.vocab_pool_cache.get(vocab_name)
         if pools is None:
-            pools = self.build_pools(style_name)
-            self.style_pool_cache[style_name] = pools
+            pools = self.build_pools(vocab_name)
+            self.vocab_pool_cache[vocab_name] = pools
         return pools
 
-    def make_area_state(self, style_name: str | None = None):
-        return self.build_area_state(style_name, self.style_arg_getter(), self.get_bar_config)
+    def make_area_state(self, vocab_name: str | None = None):
+        return self.build_area_state(vocab_name, self.vocab_arg_getter(), self.get_bar_config)
 
     def splice_text(self, base_line: str, msg: str, col_width: int) -> str:
         msg_len = len(msg)
@@ -129,9 +129,9 @@ class TextWidgets:
 
     def new_area_text_entry(self, mode: str, width: int, state: dict, role: str):
         txt_state = state["text"]
-        area_style = self.area_style(state)
-        is_pharm = area_style == "pharmacy"
-        gen_pool, rcol_pool = self.style_pools(area_style)
+        area_vocab = self.area_vocab(state)
+        is_pharm = area_vocab == "pharmacy"
+        gen_pool, rcol_pool = self.vocab_pools(area_vocab)
         if is_pharm and role == "main":
             line_fn = lambda: random.choice(self.p_main_gen_pool)()
             rcol_fn = lambda: random.choice(self.p_main_rcol_pool)()

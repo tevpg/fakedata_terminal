@@ -1,4 +1,4 @@
-"""Load YAML style definitions, merge overlays, and adapt them to the runtime."""
+"""Load YAML scene definitions, merge overlays, and adapt them to the runtime."""
 
 from __future__ import annotations
 
@@ -13,22 +13,22 @@ import yaml
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 LAYOUT_CONFIG_PATH = PACKAGE_DIR / "data" / "layouts.yaml"
-STYLE_CONFIG_PATH = PACKAGE_DIR / "data" / "styles.yaml"
+SCENE_CONFIG_PATH = PACKAGE_DIR / "data" / "scenes.yaml"
 PACKAGE_CONFIG_PATHS = (
     LAYOUT_CONFIG_PATH,
-    STYLE_CONFIG_PATH,
+    SCENE_CONFIG_PATH,
 )
-USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "styles.yaml"
+USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "scenes.yaml"
 PROJECT_CONFIG_NAMES = (
     ".fakedata-terminal.yaml",
     ".fakedata-terminal.yml",
 )
 
-TOP_LEVEL_KEYS = {"defaults", "layouts", "styles", "widgets"}
+TOP_LEVEL_KEYS = {"defaults", "layouts", "scenes", "widgets"}
 DEFAULT_KEYS = {"layout", "vocab", "speed", "panel_speed", "image", "widget", "colour", "color"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
-STYLE_KEYS = {"note", "layout", "vocab", "speed", "text", "regions"}
+SCENE_KEYS = {"note", "layout", "vocab", "speed", "text", "regions"}
 REGION_KEYS = {"widget", "speed", "title", "source_vocab", "image", "paths", "path", "glob", "cycle", "colour", "color"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
@@ -63,11 +63,11 @@ def _normalize_config_paths(config_paths: list[str] | tuple[str, ...] | None) ->
 def _load_catalog_file(config_path: str) -> dict[str, Any]:
     path = Path(config_path)
     if not path.is_file():
-        raise ValueError(f"Style config file not found: {path}")
+        raise ValueError(f"Scene config file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Style config root must be a mapping: {path}")
+        raise ValueError(f"Scene config root must be a mapping: {path}")
     return _normalize_catalog_paths(data, path)
 
 
@@ -83,7 +83,7 @@ def _merge_catalogs(base: dict[str, Any], override: dict[str, Any]) -> dict[str,
 
 
 @lru_cache(maxsize=None)
-def load_style_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+def load_scene_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     normalized_paths = _normalize_config_paths(config_paths)
     catalog: dict[str, Any] = {}
     for config_path in normalized_paths:
@@ -91,16 +91,16 @@ def load_style_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str,
     return catalog
 
 
-def config_style_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_style_catalog(config_paths)
-    styles = catalog.get("styles", {})
-    if not isinstance(styles, dict):
+def config_scene_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_scene_catalog(config_paths)
+    scenes = catalog.get("scenes", {})
+    if not isinstance(scenes, dict):
         return []
-    return list(styles.keys())
+    return list(scenes.keys())
 
 
 def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
     if not isinstance(layouts, dict):
         return []
@@ -108,13 +108,13 @@ def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
 
 
 def layout_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
     return layouts if isinstance(layouts, dict) else {}
 
 
 def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     widgets = catalog.get("widgets", {})
     names = set()
     if isinstance(widgets, dict):
@@ -132,7 +132,7 @@ def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
 
 
 def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     widgets = catalog.get("widgets", {})
     defaults: dict[str, dict[str, Any]] = {}
     if not isinstance(widgets, dict):
@@ -146,7 +146,7 @@ def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict
 
 
 def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     defaults = catalog.get("defaults", {})
     if not isinstance(defaults, dict):
         return []
@@ -154,7 +154,7 @@ def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str
 
 
 def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     defaults = catalog.get("defaults", {})
     if not isinstance(defaults, dict):
         defaults = {}
@@ -171,8 +171,8 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
     }
 
 
-def validate_style_catalog(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_style_catalog(config_paths)
+def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    catalog = load_scene_catalog(config_paths)
     issues: list[str] = []
     config_label = _config_label(config_paths)
     if not isinstance(catalog, dict):
@@ -226,74 +226,74 @@ def validate_style_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 if not isinstance(regions, dict):
                     issues.append(f"{config_label}: layout '{layout_name}' regions must be a mapping")
 
-    styles = catalog.get("styles", {})
-    if styles is not None:
-        if not isinstance(styles, dict):
-            issues.append(f"{config_label}: styles must be a mapping")
+    scenes = catalog.get("scenes", {})
+    if scenes is not None:
+        if not isinstance(scenes, dict):
+            issues.append(f"{config_label}: scenes must be a mapping")
         else:
             layout_names_set = set(layout_names(config_paths))
-            for style_name, style_cfg in styles.items():
-                if not isinstance(style_cfg, dict):
-                    issues.append(f"{config_label}: style '{style_name}' must be a mapping")
+            for scene_name, scene_cfg in scenes.items():
+                if not isinstance(scene_cfg, dict):
+                    issues.append(f"{config_label}: scene '{scene_name}' must be a mapping")
                     continue
-                _unknown_keys(style_cfg, STYLE_KEYS, f"styles.{style_name}", issues)
-                layout_name = style_cfg.get("layout")
+                _unknown_keys(scene_cfg, SCENE_KEYS, f"scenes.{scene_name}", issues)
+                layout_name = scene_cfg.get("layout")
                 if layout_name and layout_name not in layout_names_set:
-                    issues.append(f"{config_label}: style '{style_name}' references unknown layout '{layout_name}'")
-                regions = style_cfg.get("regions", {})
+                    issues.append(f"{config_label}: scene '{scene_name}' references unknown layout '{layout_name}'")
+                regions = scene_cfg.get("regions", {})
                 if not isinstance(regions, dict):
-                    issues.append(f"{config_label}: style '{style_name}' regions must be a mapping")
+                    issues.append(f"{config_label}: scene '{scene_name}' regions must be a mapping")
                     continue
                 for region_name, region_cfg in regions.items():
                     if not isinstance(region_cfg, dict):
                         issues.append(
-                            f"{config_label}: style '{style_name}' region '{region_name}' must be a mapping"
+                            f"{config_label}: scene '{scene_name}' region '{region_name}' must be a mapping"
                         )
                         continue
-                    _unknown_keys(region_cfg, REGION_KEYS, f"styles.{style_name}.regions.{region_name}", issues)
+                    _unknown_keys(region_cfg, REGION_KEYS, f"scenes.{scene_name}.regions.{region_name}", issues)
                     widget = region_cfg.get("widget")
                     if widget is None:
                         issues.append(
-                            f"{config_label}: style '{style_name}' region '{region_name}' is missing 'widget'"
+                            f"{config_label}: scene '{scene_name}' region '{region_name}' is missing 'widget'"
                         )
                     elif not _supported_widget(str(widget)):
                         issues.append(
-                            f"{config_label}: style '{style_name}' region '{region_name}' uses unsupported widget '{widget}'"
+                            f"{config_label}: scene '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
                         )
                     cycle_spec = region_cfg.get("cycle")
                     if cycle_spec is not None and not isinstance(cycle_spec, dict):
                         issues.append(
-                            f"{config_label}: style '{style_name}' region '{region_name}' cycle must be a mapping"
+                            f"{config_label}: scene '{scene_name}' region '{region_name}' cycle must be a mapping"
                         )
                     elif isinstance(cycle_spec, dict):
-                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"styles.{style_name}.regions.{region_name}.cycle", issues)
+                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"scenes.{scene_name}.regions.{region_name}.cycle", issues)
                         widgets = cycle_spec.get("widgets")
                         if widgets is not None and not isinstance(widgets, list):
                             issues.append(
-                                f"{config_label}: style '{style_name}' region '{region_name}' cycle.widgets must be a list"
+                                f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets must be a list"
                             )
                         elif isinstance(widgets, list):
                             if str(widget) != "cycle":
                                 issues.append(
-                                    f"{config_label}: style '{style_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
+                                    f"{config_label}: scene '{scene_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
                                 )
                             for idx, cycle_widget in enumerate(widgets):
                                 cycle_widget_name = str(cycle_widget)
                                 if not _supported_widget(cycle_widget_name):
                                     issues.append(
-                                        f"{config_label}: style '{style_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
+                                        f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
                                     )
                                 elif cycle_widget_name in {"cycle", "blank"}:
                                     issues.append(
-                                        f"{config_label}: style '{style_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
+                                        f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
                                     )
                     image_spec = region_cfg.get("image")
                     if image_spec is not None and not isinstance(image_spec, dict):
                         issues.append(
-                            f"{config_label}: style '{style_name}' region '{region_name}' image must be a mapping"
+                            f"{config_label}: scene '{scene_name}' region '{region_name}' image must be a mapping"
                         )
                     elif isinstance(image_spec, dict):
-                        _unknown_keys(image_spec, IMAGE_KEYS, f"styles.{style_name}.regions.{region_name}.image", issues)
+                        _unknown_keys(image_spec, IMAGE_KEYS, f"scenes.{scene_name}.regions.{region_name}.image", issues)
 
     widgets = catalog.get("widgets", {})
     if widgets is not None:
@@ -512,7 +512,7 @@ def _config_label(config_paths: tuple[str, ...] | None) -> str:
     normalized = _normalize_config_paths(config_paths)
     if len(normalized) == 1:
         return Path(normalized[0]).name
-    return "merged style config"
+    return "merged scene config"
 
 
 def _resolve_config_path(pathish: Any, base_dir: Path) -> str:
@@ -546,12 +546,12 @@ def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict
             if any(key in widget_cfg for key in ("paths", "path", "glob")):
                 _normalize_image_mapping(widget_cfg, base_dir)
             _normalize_image_mapping(widget_cfg.get("image"), base_dir)
-    styles = catalog.get("styles")
-    if isinstance(styles, dict):
-        for style_cfg in styles.values():
-            if not isinstance(style_cfg, dict):
+    scenes = catalog.get("scenes")
+    if isinstance(scenes, dict):
+        for scene_cfg in scenes.values():
+            if not isinstance(scene_cfg, dict):
                 continue
-            regions = style_cfg.get("regions")
+            regions = scene_cfg.get("regions")
             if not isinstance(regions, dict):
                 continue
             for region_cfg in regions.values():
@@ -591,42 +591,42 @@ def _region_colour(region_cfg: Any) -> str | None:
     return str(value) if value is not None else None
 
 
-def adapt_style_to_legacy(style_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
-    catalog = load_style_catalog(config_paths)
-    styles = catalog.get("styles", {})
+def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_scene_catalog(config_paths)
+    scenes = catalog.get("scenes", {})
     defaults = catalog.get("defaults", {})
 
-    if style_name not in styles:
-        raise KeyError(style_name)
+    if scene_name not in scenes:
+        raise KeyError(scene_name)
 
-    style_cfg = styles[style_name]
-    if not isinstance(style_cfg, dict):
-        parser.error(f"style '{style_name}' must be a mapping in {_config_label(config_paths)}")
+    scene_cfg = scenes[scene_name]
+    if not isinstance(scene_cfg, dict):
+        parser.error(f"scene '{scene_name}' must be a mapping in {_config_label(config_paths)}")
 
-    layout = style_cfg.get("layout")
-    regions = style_cfg.get("regions", {})
+    layout = scene_cfg.get("layout")
+    regions = scene_cfg.get("regions", {})
     if not isinstance(regions, dict):
-        parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
 
-    style_speed = style_cfg.get("speed", defaults.get("speed", 50))
-    vocab = style_cfg.get("vocab", defaults.get("vocab", "science"))
+    scene_speed = scene_cfg.get("speed", defaults.get("speed", 50))
+    vocab = scene_cfg.get("vocab", defaults.get("vocab", "science"))
 
     if layout == "full":
         full_cfg = regions.get("full")
         widget = _widget_name(full_cfg)
         if not widget:
-            parser.error(f"style '{style_name}' uses layout 'full' but has no 'full' widget assignment")
+            parser.error(f"scene '{scene_name}' uses layout 'full' but has no 'full' widget assignment")
         if not _supported_widget(widget) or widget in {"sparkline", "readouts"}:
-            parser.error(f"style '{style_name}' uses widget '{widget}', which is not supported by the legacy runtime")
+            parser.error(f"scene '{scene_name}' uses widget '{widget}', which is not supported by the legacy runtime")
         return {
-            "style_name": style_name,
+            "scene_name": scene_name,
             "vocab": vocab,
-            "speed": style_speed,
+            "speed": scene_speed,
             "main_mode": widget,
             "sidebar_mode": "none",
             "main_speed": full_cfg.get("speed") if isinstance(full_cfg, dict) else None,
             "sidebar_speed": None,
-            "text": style_cfg.get("text", ""),
+            "text": scene_cfg.get("text", ""),
             "image_paths": _expand_image_spec(full_cfg.get("image")) if isinstance(full_cfg, dict) else [],
         }
 
@@ -636,20 +636,20 @@ def adapt_style_to_legacy(style_name: str, parser, config_paths: tuple[str, ...]
         left_widget = _widget_name(left_cfg)
         right_widget = _widget_name(right_cfg)
         if not left_widget or not right_widget:
-            parser.error(f"style '{style_name}' uses layout 'split_left_right' but must define both 'left' and 'right'")
+            parser.error(f"scene '{scene_name}' uses layout 'split_left_right' but must define both 'left' and 'right'")
         if (not _supported_widget(left_widget) or left_widget in {"sparkline", "readouts"}
                 or not _supported_widget(right_widget) or right_widget in {"sparkline", "readouts"}):
             bad = left_widget if (not _supported_widget(left_widget) or left_widget in {"sparkline", "readouts"}) else right_widget
-            parser.error(f"style '{style_name}' uses widget '{bad}', which is not supported by the legacy runtime")
+            parser.error(f"scene '{scene_name}' uses widget '{bad}', which is not supported by the legacy runtime")
         return {
-            "style_name": style_name,
+            "scene_name": scene_name,
             "vocab": vocab,
-            "speed": style_speed,
+            "speed": scene_speed,
             "main_mode": left_widget,
             "sidebar_mode": right_widget,
             "main_speed": left_cfg.get("speed") if isinstance(left_cfg, dict) else None,
             "sidebar_speed": right_cfg.get("speed") if isinstance(right_cfg, dict) else None,
-            "text": style_cfg.get("text", ""),
+            "text": scene_cfg.get("text", ""),
             "image_paths": (
                 _expand_image_spec(left_cfg.get("image")) if left_widget == "image" and isinstance(left_cfg, dict) else
                 _expand_image_spec(right_cfg.get("image")) if right_widget == "image" and isinstance(right_cfg, dict) else
@@ -658,12 +658,12 @@ def adapt_style_to_legacy(style_name: str, parser, config_paths: tuple[str, ...]
         }
 
     parser.error(
-        f"style '{style_name}' uses layout '{layout}', which is not yet supported by the current runtime; "
+        f"scene '{scene_name}' uses layout '{layout}', which is not yet supported by the current runtime; "
         "currently supported config layouts: full, split_left_right"
     )
 
 
-def _parse_region_spec(layout_cfg: dict[str, Any], region_name: str, parser, style_name: str) -> list[str]:
+def _parse_region_spec(layout_cfg: dict[str, Any], region_name: str, parser, scene_name: str) -> list[str]:
     panels = layout_cfg.get("panels", {})
     aliases = layout_cfg.get("regions", {})
     if region_name in aliases:
@@ -672,14 +672,14 @@ def _parse_region_spec(layout_cfg: dict[str, Any], region_name: str, parser, sty
         spec = region_name
     panel_names = [part.strip() for part in str(spec).split("+") if part.strip()]
     if not panel_names:
-        parser.error(f"style '{style_name}' has empty region spec for '{region_name}'")
+        parser.error(f"scene '{scene_name}' has empty region spec for '{region_name}'")
     for panel_name in panel_names:
         if panel_name not in panels:
-            parser.error(f"style '{style_name}' references unknown panel '{panel_name}' in region '{region_name}'")
+            parser.error(f"scene '{scene_name}' references unknown panel '{panel_name}' in region '{region_name}'")
     return panel_names
 
 
-def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser, style_name: str, region_name: str) -> dict[str, float]:
+def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser, scene_name: str, region_name: str) -> dict[str, float]:
     panels = layout_cfg.get("panels", {})
     xs = [float(panels[name]["x"]) for name in panel_names]
     ys = [float(panels[name]["y"]) for name in panel_names]
@@ -695,18 +695,18 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
     bbox = (x1 - x0) * (y1 - y0)
     if abs(covered - bbox) > 0.0005:
         parser.error(
-            f"style '{style_name}' region '{region_name}' does not resolve to a single rectangle"
+            f"scene '{scene_name}' region '{region_name}' does not resolve to a single rectangle"
         )
     return {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
 
 
-def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[str, Any],
+def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[str, Any],
                            regions_cfg: dict[str, Any], parser, *,
                            vocab: str, speed: int | float, text: str,
                            default_widget: str | None = None, default_colour: str | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
-        parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
     widget_defaults = widget_defaults_catalog(config_paths)
@@ -717,12 +717,12 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
     for region_name, region_cfg in regions_cfg.items():
         widget = _widget_name(region_cfg)
         if not widget:
-            parser.error(f"style '{style_name}' region '{region_name}' has no widget")
+            parser.error(f"scene '{scene_name}' region '{region_name}' has no widget")
         if not _supported_widget(widget):
-            parser.error(f"style '{style_name}' uses unsupported widget '{widget}'")
+            parser.error(f"scene '{scene_name}' uses unsupported widget '{widget}'")
         widget_cfg = widget_defaults.get(widget, {})
-        panel_names = _parse_region_spec(layout_cfg, region_name, parser, style_name)
-        rect = _rect_for_panels(layout_cfg, panel_names, parser, style_name, region_name)
+        panel_names = _parse_region_spec(layout_cfg, region_name, parser, scene_name)
+        rect = _rect_for_panels(layout_cfg, panel_names, parser, scene_name, region_name)
         area_images = []
         if widget == "image" and isinstance(region_cfg, dict):
             area_images = _region_image_paths(region_cfg)
@@ -765,7 +765,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
         }
         overlap = set(panel_names) & set(seen)
         if overlap:
-            parser.error(f"style '{style_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
+            parser.error(f"scene '{scene_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
         seen.extend(panel_names)
         if widget == "image":
             image_paths.extend(area["image_paths"])
@@ -775,7 +775,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
     if uncovered:
         if not default_widget:
             parser.error(
-                f"style '{style_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
+                f"scene '{scene_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
             )
         if not _supported_widget(default_widget):
             parser.error(f"default widget '{default_widget}' is unsupported")
@@ -808,7 +808,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
                 image_paths.extend(area_images)
 
     return {
-        "style_name": style_name,
+        "scene_name": scene_name,
         "vocab": vocab,
         "speed": speed,
         "text": text,
@@ -819,45 +819,45 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
 
 
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
-                           style_name: str = "<cli>", vocab: str = "science",
+                           scene_name: str = "<cli>", vocab: str = "science",
                            speed: int | float = 50, text: str = "",
                            default_widget: str | None = None, default_colour: str | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
-    catalog = load_style_catalog(config_paths)
+    catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
     layout_cfg = layouts.get(layout_name)
     if not isinstance(layout_cfg, dict):
         parser.error(f"unknown layout '{layout_name}'")
-    return _resolve_runtime_style(
-        style_name, layout_name, layout_cfg, regions_cfg, parser,
+    return _resolve_runtime_scene(
+        scene_name, layout_name, layout_cfg, regions_cfg, parser,
         vocab=vocab, speed=speed, text=text,
         default_widget=default_widget, default_colour=default_colour,
         config_paths=config_paths,
     )
 
 
-def resolve_config_style(style_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
-    catalog = load_style_catalog(config_paths)
-    styles = catalog.get("styles", {})
+def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_scene_catalog(config_paths)
+    scenes = catalog.get("scenes", {})
     defaults = config_defaults(config_paths)
 
-    if style_name not in styles:
-        raise KeyError(style_name)
+    if scene_name not in scenes:
+        raise KeyError(scene_name)
 
-    style_cfg = styles[style_name]
-    if not isinstance(style_cfg, dict):
-        parser.error(f"style '{style_name}' must be a mapping in {_config_label(config_paths)}")
+    scene_cfg = scenes[scene_name]
+    if not isinstance(scene_cfg, dict):
+        parser.error(f"scene '{scene_name}' must be a mapping in {_config_label(config_paths)}")
 
-    layout_name = style_cfg.get("layout")
-    regions_cfg = style_cfg.get("regions", {})
+    layout_name = scene_cfg.get("layout")
+    regions_cfg = scene_cfg.get("regions", {})
     return resolve_runtime_layout(
         layout_name,
         regions_cfg,
         parser,
-        style_name=style_name,
-        vocab=style_cfg.get("vocab", defaults.get("vocab", "science")),
-        speed=style_cfg.get("speed", defaults.get("speed", 50)),
-        text=style_cfg.get("text", ""),
+        scene_name=scene_name,
+        vocab=scene_cfg.get("vocab", defaults.get("vocab", "science")),
+        speed=scene_cfg.get("speed", defaults.get("speed", 50)),
+        text=scene_cfg.get("text", ""),
         default_widget=defaults.get("widget"),
         default_colour=defaults.get("colour"),
         config_paths=config_paths,

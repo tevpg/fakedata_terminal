@@ -28,7 +28,7 @@ except ImportError:
     Image = None
 
 SCRIPT_NAME = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else os.path.basename(__file__)
-CONFIG_STYLE = None
+CONFIG_SCENE = None
 _showcase_state = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
 try:
@@ -105,14 +105,14 @@ except ImportError:
     )
 
 DEMO_SCENES = [
-    {"style": "hacker",     "main": "text_wide",     "sidebar": "bars",         "duration": 10.0},
-    {"style": "medicine",   "main": "readouts",      "sidebar": "text_scant",   "duration": 10.0},
-    {"style": "pharmacy",   "main": "text",          "sidebar": "sparkline",    "duration": 10.0},
-    {"style": "spaceteam",  "main": "bars",          "sidebar": "text_wide",    "duration": 10.0},
-    {"style": "science",    "main": "clock",         "sidebar": "matrix",       "duration": 10.0},
-    {"style": "finance",    "main": "oscilloscope",  "sidebar": "blocks",       "duration": 10.0},
-    {"style": "science",    "main": "sweep",         "sidebar": "none",         "duration": 10.0},
-    {"style": "navigation", "main": "readouts",      "sidebar": "none",         "duration": 10.0},
+    {"vocab": "hacker",     "main": "text_wide",     "sidebar": "bars",         "duration": 10.0},
+    {"vocab": "medicine",   "main": "readouts",      "sidebar": "text_scant",   "duration": 10.0},
+    {"vocab": "pharmacy",   "main": "text",          "sidebar": "sparkline",    "duration": 10.0},
+    {"vocab": "spaceteam",  "main": "bars",          "sidebar": "text_wide",    "duration": 10.0},
+    {"vocab": "science",    "main": "clock",         "sidebar": "matrix",       "duration": 10.0},
+    {"vocab": "finance",    "main": "oscilloscope",  "sidebar": "blocks",       "duration": 10.0},
+    {"vocab": "science",    "main": "sweep",         "sidebar": "none",         "duration": 10.0},
+    {"vocab": "navigation", "main": "readouts",      "sidebar": "none",         "duration": 10.0},
 ]
 
 SIDEBAR_CYCLE_MODES = [
@@ -142,7 +142,7 @@ COLOUR_PAIRS = build_colour_pairs(curses)
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(stdscr):
-    global MAIN_MODE, SIDEBAR_MODE, STYLE_ARG, CONFIG_STYLE, _showcase_state
+    global MAIN_MODE, SIDEBAR_MODE, VOCAB_ARG, CONFIG_SCENE, _showcase_state
     try:
         curses.curs_set(0)
     except curses.error:
@@ -176,7 +176,7 @@ def main(stdscr):
 
     TEXT_MODES = {"text", "text_wide", "text_scant", "text_spew"}
     STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life", "tunnel"}
-    STYLE_VOCAB_MODES = {"text", "text_wide", "text_scant", "bars"}
+    VOCAB_MODES = {"text", "text_wide", "text_scant", "bars"}
     MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>[]{}/*+-=."
     SWEEP_SYMBOLS = "∑∏∫∮√∞≈≠≤≥∂∇∈∉∩∪⊂⊃⊆⊇⊕⊗⊥∥∀∃∝∠∅∴∵≜≙⊢⊨"
     IMAGE_COLOUR_CYCLE = [1, 3, 2, 9, 8, 4]
@@ -194,7 +194,7 @@ def main(stdscr):
     text_widgets = TextWidgets(
         curses_module=curses,
         stdscr=stdscr,
-        style_arg_getter=lambda: STYLE_ARG,
+        vocab_arg_getter=lambda: VOCAB_ARG,
         build_pools=_build_pools,
         build_area_state=build_area_state,
         get_bar_config=get_bar_config,
@@ -269,8 +269,8 @@ def main(stdscr):
         frac = 0.30 + t * 0.70
         return max(10, int(frac * width))
 
-    _area_style = text_widgets.area_style
-    _style_pools = text_widgets.style_pools
+    _area_vocab = text_widgets.area_vocab
+    _vocab_pools = text_widgets.vocab_pools
     _make_area_state = text_widgets.make_area_state
     _dense_line = text_widgets.dense_line
     _new_area_text_entry = text_widgets.new_area_text_entry
@@ -293,7 +293,7 @@ def main(stdscr):
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
         leading_blank=_leading_blank,
-        area_style=_area_style,
+        area_vocab=_area_vocab,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
         colour_attr_from_spec=_colour_attr_from_spec,
@@ -326,7 +326,7 @@ def main(stdscr):
         curses_module=curses,
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
-        area_style=_area_style,
+        area_vocab=_area_vocab,
         new_area_text_entry=_new_area_text_entry,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
@@ -456,8 +456,8 @@ def main(stdscr):
             except curses.error:
                 pass
 
-    def _make_area(mode, style_name: str | None = None):
-        area = _make_area_state(style_name)
+    def _make_area(mode, vocab_name: str | None = None):
+        area = _make_area_state(vocab_name)
         area["mode"] = mode
         return area
 
@@ -599,7 +599,7 @@ def main(stdscr):
                     if len(hist) > 4:
                         hist.pop(0)
                 area["gauge_last_values"] = vals
-                if _area_style(area) == "pharmacy" and role == "sidebar":
+                if _area_vocab(area) == "pharmacy" and role == "sidebar":
                     area["gauge_next_reads_at"] = now + 0.80
                 elif role == "sidebar":
                     area["gauge_next_reads_at"] = now + 0.45
@@ -610,7 +610,7 @@ def main(stdscr):
                 area["gauge_tick"] = 0
                 area["gauge_feed"].pop(0)
                 area["gauge_feed"].append(
-                    _new_area_text_entry("text", width, {"text": area["feed_text"], "style_override": _area_style(area)}, role)
+                    _new_area_text_entry("text", width, {"text": area["feed_text"], "vocab_override": _area_vocab(area)}, role)
                 )
         elif mode == "image":
             _update_image(area, rows, width)
@@ -691,7 +691,7 @@ def main(stdscr):
         if not _demo_state["active"]:
             return
         side_mode = _effective_sidebar_mode()
-        style_val = STYLE_ARG if (MAIN_MODE in STYLE_VOCAB_MODES or side_mode in STYLE_VOCAB_MODES) else "-"
+        vocab_val = VOCAB_ARG if (MAIN_MODE in VOCAB_MODES or side_mode in VOCAB_MODES) else "-"
         line1 = " demo "
         line2 = f" --main {MAIN_MODE} "
         if SIDEBAR_MODE == "cycle" and side_mode != "none":
@@ -699,7 +699,7 @@ def main(stdscr):
         else:
             side_label = side_mode if side_mode != "none" else "(none)"
         line3 = f" --sidebar {side_label} "
-        line4 = f" --style {style_val} "
+        line4 = f" --vocab {vocab_val} "
         width = max(len(line1), len(line2), len(line3), len(line4)) + 1
         border_top = "┌" + "─" * (width - 1) + "┐"
         border_bot = "└" + "─" * (width - 1) + "┘"
@@ -723,9 +723,9 @@ def main(stdscr):
             pass
 
     def _draw_showcase_header():
-        if not _showcase_state["active"] or not CONFIG_STYLE:
+        if not _showcase_state["active"] or not CONFIG_SCENE:
             return
-        header_lines = CONFIG_STYLE.get("showcase_header_lines") or []
+        header_lines = CONFIG_SCENE.get("showcase_header_lines") or []
         if not header_lines:
             return
         width = max(len(line) for line in header_lines) + 1
@@ -756,7 +756,7 @@ def main(stdscr):
             pass
 
     def _set_showcase_scene(next_idx: int) -> None:
-        global CONFIG_STYLE, STYLE_ARG
+        global CONFIG_SCENE, VOCAB_ARG
         nonlocal area_specs, area_states
         scenes = _showcase_state.get("scenes", [])
         if not scenes:
@@ -764,9 +764,9 @@ def main(stdscr):
         next_idx %= len(scenes)
         _showcase_state["idx"] = next_idx
         _showcase_state["done"] = False
-        CONFIG_STYLE = scenes[next_idx]
-        STYLE_ARG = CONFIG_STYLE.get("vocab", STYLE_ARG)
-        GEN_POOL[:], RCOL_POOL[:] = _build_pools(STYLE_ARG)
+        CONFIG_SCENE = scenes[next_idx]
+        VOCAB_ARG = CONFIG_SCENE.get("vocab", VOCAB_ARG)
+        GEN_POOL[:], RCOL_POOL[:] = _build_pools(VOCAB_ARG)
         area_specs = _current_area_specs(rows, cols)
         area_states = _sync_areas(area_specs)
         _sync_cycle_start_modes(area_specs, area_states, time.time())
@@ -784,10 +784,10 @@ def main(stdscr):
         )
 
     def _config_area_specs(rows: int, cols: int):
-        return build_config_area_specs(CONFIG_STYLE, rows, cols)
+        return build_config_area_specs(CONFIG_SCENE, rows, cols)
 
     def _current_area_specs(rows: int, cols: int):
-        if CONFIG_STYLE and not _demo_state["active"]:
+        if CONFIG_SCENE and not _demo_state["active"]:
             return _config_area_specs(rows, cols)
         return _legacy_area_specs(cols)
 
@@ -917,7 +917,7 @@ def main(stdscr):
                 _draw_separator(rows, spec["width"])
             _paint_area(area, spec["height"], spec["y"], spec["x"], spec["width"], spec["role"])
             _draw_area_label(spec["y"], spec["x"], spec["width"], area.get("label"))
-        if CONFIG_STYLE and not _demo_state["active"]:
+        if CONFIG_SCENE and not _demo_state["active"]:
             _draw_config_separators(area_specs)
 
         primary_main = next((spec for spec in area_specs if spec["role"] == "main"), area_specs[0])
@@ -981,10 +981,10 @@ def main(stdscr):
                 break
             _demo_state["idx"] = next_idx
             _demo_state["scene"] = _demo_state["scenes"][next_idx]
-            STYLE_ARG = _demo_state["scene"]["style"]
+            VOCAB_ARG = _demo_state["scene"]["vocab"]
             MAIN_MODE = _demo_state["scene"]["main"]
             SIDEBAR_MODE = _demo_state["scene"]["sidebar"]
-            GEN_POOL[:], RCOL_POOL[:] = _build_pools(STYLE_ARG)
+            GEN_POOL[:], RCOL_POOL[:] = _build_pools(VOCAB_ARG)
             area_specs = _current_area_specs(rows, cols)
             area_states = _sync_areas(area_specs)
             _sync_cycle_start_modes(area_specs, area_states, time.time())
@@ -1000,8 +1000,8 @@ def main(stdscr):
 
 def run(argv=None) -> int:
     global IMAGE_PATHS, SPEED_ARG, MAIN_SPEED_ARG, SIDEBAR_SPEED_ARG
-    global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_STYLES
-    global STYLE_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_STYLE, _showcase_state
+    global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_VOCABS
+    global VOCAB_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCENE, _showcase_state
 
     config = prepare_runtime_config(
         argv=argv,
@@ -1017,15 +1017,15 @@ def run(argv=None) -> int:
     LIFE_MAX_ITERATIONS = config["life_max"]
     INJECT_TEXT = config["inject_text"]
     MAIN_MODE = config["main_mode"]
-    _ALL_STYLES = config["styles"]
-    STYLE_ARG = config["style"]
-    CONFIG_STYLE = config["config_style"]
+    _ALL_VOCABS = config["vocabs"]
+    VOCAB_ARG = config["vocab"]
+    CONFIG_SCENE = config["config_scene"]
     SIDEBAR_MODE = config["sidebar_mode"]
     _demo_state = config["demo_state"]
     _showcase_state = config["widget_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
 
-    GEN_POOL[:], RCOL_POOL[:] = _build_pools(STYLE_ARG)
+    GEN_POOL[:], RCOL_POOL[:] = _build_pools(VOCAB_ARG)
     if not _showcase_state["active"]:
         show_startup_banner(SCRIPT_NAME, config)
 

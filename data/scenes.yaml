@@ -1,12 +1,12 @@
-# Starter config sketch for a layout/region/style driven version of
+# Starter config sketch for a layout/region/scene driven version of
 # fakedata-terminal.py.
 #
 # Design rules captured here:
 # - layouts define panel geometry
 # - regions are named aliases for one or more panels
 # - widgets can define per-widget fallback attributes
-# - styles bind widgets/options to regions
-# - defaults < widget defaults < style < CLI override
+# - scenes bind widgets/options to regions
+# - defaults < widget defaults < scene < CLI override
 # - panel aggregation is explicit; no implicit expansion from "none"
 # - stable packaged layouts live in data/layouts.yaml
 
@@ -20,7 +20,7 @@ defaults:
   image:
     glob: "geom*.png"
 
-styles:
+scenes:
 
   clocks:
     note: >
@@ -96,7 +96,7 @@ styles:
 
   science:
     note: >
-      Derived from: --style science --main scroller --sidebar clock --sidebar-speed 80
+      Derived from: --scene science --main scroller --sidebar clock --sidebar-speed 80
     layout: grid_3x3
     vocab: science
     text: "*** DO NOT USE DOORBELL ***"
@@ -156,7 +156,7 @@ styles:
 
   geometries:
     note: >
-      Derived from: --style hacker --main image --image geom*png --sidebar gauges
+      Derived from: --scene hacker --main image --image geom*png --sidebar gauges
     layout: main_2x2_right_stack_3
     vocab: hacker
     regions:
@@ -188,7 +188,7 @@ styles:
 
   test1:
     note: >
-      Mixed 2x2 smoke-test style with one widget per panel/region.
+      Mixed 2x2 smoke-test scene with one widget per panel/region.
     layout: grid_2x2
     vocab: science
     regions:
@@ -204,7 +204,7 @@ styles:
 
   test2:
     note: >
-      Full-screen single-widget skeleton style.
+      Full-screen single-widget skeleton scene.
     layout: full
     vocab: finance
     regions:

@@ -6,31 +6,31 @@ import os
 import sys
 
 try:
-    from .style_config import (
+    from .scene_config import (
         config_defaults,
-        config_style_names,
+        config_scene_names,
         discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
         layout_names,
-        resolve_config_style,
+        resolve_config_scene,
         resolve_runtime_layout,
-        validate_style_catalog,
+        validate_scene_catalog,
         widget_names,
     )
 except ImportError:
-    from style_config import (
+    from scene_config import (
         config_defaults,
-        config_style_names,
+        config_scene_names,
         discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
         layout_names,
-        resolve_config_style,
+        resolve_config_scene,
         resolve_runtime_layout,
-        validate_style_catalog,
+        validate_scene_catalog,
         widget_names,
     )
 
@@ -70,8 +70,8 @@ def _ansi_colour_label(name: str) -> str:
     return f"{codes.get(name, '')}{name}{reset}"
 
 
-def _style_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    return config_style_names(config_paths)
+def _scene_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    return config_scene_names(config_paths)
 
 
 def _layout_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -83,8 +83,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         description=(
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
-            "Use --style for a preset, or --layout plus --panel-widget overrides to build a screen explicitly. "
-            "Run --demo for a quick tour of widgets, vocabs, layouts, and presets."
+            "Use --scene for a preset, or --layout plus --panel-widget overrides to build a screen explicitly. "
+            "Run --demo for a quick tour of widgets, vocabs, layouts, and scenes."
         ),
         epilog=(
             "Examples:\n"
@@ -92,10 +92,10 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --config ./lab.yaml --list\n"
             "  %(prog)s --layouts\n"
             "  %(prog)s --demo\n"
-            "  %(prog)s --style test1\n"
-            "  %(prog)s --config ~/.config/fakedata-terminal/styles.yaml --style lab\n"
+            "  %(prog)s --scene test1\n"
+            "  %(prog)s --config ~/.config/fakedata-terminal/scenes.yaml --scene lab\n"
             "  %(prog)s --layout grid_2x2 --panel-widget p1=life --panel-widget p2=blank --panel-widget p3=text --panel-widget p4=clock\n"
-            "  %(prog)s --style test1 --panel-widget p4=matrix --panel-speed p4=80\n"
+            "  %(prog)s --scene test1 --panel-widget p4=matrix --panel-speed p4=80\n"
             "  %(prog)s --layout grid_3x3 --panel-widget large_left=image --panel-widget right=clock "
             "--panel-image large_left=geom_07_diamond_lattice.png --panel-image large_left=geom_33_torus.png"
         ),
@@ -103,7 +103,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
     )
     parser.add_argument(
         "--list", action="store_true",
-        help="List configured styles, layouts, widgets, and colours in columns, then exit.")
+        help="List configured scenes, layouts, widgets, and colours in columns, then exit.")
     parser.add_argument(
         "--config", action="append", default=[], metavar="PATH",
         help=("Load an extra config overlay. Repeatable. Relative image paths inside that file are "
@@ -113,16 +113,16 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         help="Show configured layouts as fixed-size box diagrams, with their defined regions, then exit.")
     parser.add_argument(
         "--demo", action="store_true",
-        help="Browse a quick tour of widgets, vocabs, layouts, and configured presets.")
+        help="Browse a quick tour of widgets, vocabs, layouts, and configured scenes.")
     parser.add_argument(
-        "--style", type=str, default=None, choices=_style_choices(config_paths),
-        help="Config-defined style preset.")
+        "--scene", type=str, default=None, choices=_scene_choices(config_paths),
+        help="Config-defined scene preset.")
     parser.add_argument(
         "--layout", type=str, default=None, choices=_layout_choices(config_paths),
         help="Explicit layout for the generalized panel runtime.")
     parser.add_argument(
         "--vocab", type=str, default=None, choices=VOCAB_CHOICES,
-        help=f"Vocabulary style. Defaults to {DEFAULT_VOCAB} unless a style supplies one.")
+        help=f"Vocabulary theme. Defaults to {DEFAULT_VOCAB} unless a scene supplies one.")
     parser.add_argument(
         "--panel-widget", action="append", default=[], metavar="REGION=WIDGET",
         help="Assign a widget to a specific region or panel group. Repeatable.")
@@ -130,8 +130,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--panel-speed", action="append", default=[], metavar="REGION=N",
         help="Override speed for a specific region or panel group. Repeatable.")
     parser.add_argument(
-        "--panel-vocab", action="append", default=[], metavar="REGION=STYLE",
-        help="Override vocabulary style for a specific region or panel group. Repeatable.")
+        "--panel-vocab", action="append", default=[], metavar="REGION=THEME",
+        help="Override vocabulary theme for a specific region or panel group. Repeatable.")
     parser.add_argument(
         "--panel-colour", "--panel-color", action="append", default=[], metavar="REGION=VALUE",
         help=f"Override colour for a specific region or panel group. Repeatable. Recognized: {COLOUR_HELP}.")
@@ -193,10 +193,10 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     widgets = widget_names(config_paths)
     layouts = layout_names(config_paths)
     vocabs = VOCAB_CHOICES[:]
-    styles = config_style_names(config_paths)
+    scenes = config_scene_names(config_paths)
     colours = [_ansi_colour_label(name) for name in COLOUR_CHOICES] if colourize else COLOUR_CHOICES[:]
     columns = [
-        ("Styles", styles),
+        ("Scenes", scenes),
         ("Layouts", layouts),
         ("Widgets", widgets),
         ("Vocabs", vocabs),
@@ -239,7 +239,7 @@ def _build_intro_scene(vocab: str, speed: int, parser, config_paths: tuple[str, 
         "full",
         {"full": {"widget": "blank"}},
         parser,
-        style_name="<demo:intro>",
+        scene_name="<demo:intro>",
         vocab=vocab,
         speed=speed,
         text="",
@@ -247,7 +247,7 @@ def _build_intro_scene(vocab: str, speed: int, parser, config_paths: tuple[str, 
     )
     runtime["areas"][0]["static_lines"] = [
         "FakeData Terminal is a curses-based dashboard generator for animated, fake telemetry and operator screens.",
-        "This demo pages through the available widgets, vocabularies, layouts, styles, and active config files.",
+        "This demo pages through the available widgets, vocabularies, layouts, scenes, and active config files.",
         "",
         *_format_catalog_columns(config_paths),
     ]
@@ -278,7 +278,7 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
                 "cycle",
                 "",
                 "Rotates one panel through a configured widget list.",
-                "Use widget: cycle with cycle.widgets in style config",
+                "Use widget: cycle with cycle.widgets in scene config",
                 "or assign it to a region from the CLI.",
             ])
             regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
@@ -294,7 +294,7 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
             "grid_3x3",
             regions_cfg,
             parser,
-            style_name=f"<demo:widgets:{widget}>",
+            scene_name=f"<demo:widgets:{widget}>",
             vocab=vocab,
             speed=speed,
             text=text,
@@ -317,7 +317,7 @@ def _build_vocab_scenes(speed: int, text: str, parser, config_paths: tuple[str, 
                 "p8+p9": {"widget": "text_scant"},
             },
             parser,
-            style_name=f"<demo:vocab:{vocab_name}>",
+            scene_name=f"<demo:vocab:{vocab_name}>",
             vocab=vocab_name,
             speed=speed,
             text=text,
@@ -341,7 +341,7 @@ def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str
             layout_name,
             regions_cfg,
             parser,
-            style_name=f"<demo:layout:{layout_name}>",
+            scene_name=f"<demo:layout:{layout_name}>",
             vocab=vocab,
             speed=speed,
             text="",
@@ -355,11 +355,11 @@ def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str
     return scenes
 
 
-def _build_style_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
+def _build_scene_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
     scenes = []
-    for style_name in config_style_names(config_paths):
-        runtime = resolve_config_style(style_name, parser, config_paths)
-        runtime["showcase_header_lines"] = [f"style: {style_name}"]
+    for scene_name in config_scene_names(config_paths):
+        runtime = resolve_config_scene(scene_name, parser, config_paths)
+        runtime["showcase_header_lines"] = [f"scene: {scene_name}"]
         scenes.append(runtime)
     return scenes
 
@@ -372,7 +372,7 @@ def _build_demo_showcase(vocab: str, speed: int, text: str, image_paths: list[st
     scenes.extend(_build_widget_scenes(vocab, speed, text, image_paths, parser, image_module, image_checker, resolved_paths))
     scenes.extend(_build_vocab_scenes(speed, text, parser, resolved_paths))
     scenes.extend(_build_layout_scenes(vocab, speed, parser, resolved_paths))
-    scenes.extend(_build_style_scenes(parser, resolved_paths))
+    scenes.extend(_build_scene_scenes(parser, resolved_paths))
     initial = scenes[0]
     return {
         "active": True,
@@ -415,14 +415,14 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
     return "+".join(panel_names)
 
 
-def _apply_panel_widget_overrides(base_style: dict | None, panel_widgets: list[str], panel_speeds: list[str],
+def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[str], panel_speeds: list[str],
                             panel_vocabs: list[str], panel_colours: list[str], panel_images: list[str],
-                            parser, *, layout_name: str, style_name: str, vocab: str,
+                            parser, *, layout_name: str, scene_name: str, vocab: str,
                             speed: int, text: str, default_widget: str | None, default_colour: str | None,
                             config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
-    if base_style:
-        for area in base_style["areas"]:
+    if base_scene:
+        for area in base_scene["areas"]:
             region_key = "+".join(area["panels"])
             entry = {"widget": area["mode"]}
             if area.get("speed") is not None:
@@ -488,7 +488,7 @@ def _apply_panel_widget_overrides(base_style: dict | None, panel_widgets: list[s
         target, vocab_name = _parse_equals(item, parser, "--panel-vocab")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-vocab", config_paths)
         if vocab_name not in VOCAB_CHOICES:
-            parser.error(f"--panel-vocab style must be one of: {', '.join(VOCAB_CHOICES)}")
+            parser.error(f"--panel-vocab theme must be one of: {', '.join(VOCAB_CHOICES)}")
         if normalized_target not in regions_cfg:
             parser.error(f"--panel-vocab target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["source_vocab"] = vocab_name
@@ -514,7 +514,7 @@ def _apply_panel_widget_overrides(base_style: dict | None, panel_widgets: list[s
         layout_name,
         regions_cfg,
         parser,
-        style_name=style_name,
+        scene_name=scene_name,
         vocab=vocab,
         speed=speed,
         text=text,
@@ -548,9 +548,9 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     args = parser.parse_args(raw_argv)
 
-    issues = validate_style_catalog(config_paths)
+    issues = validate_scene_catalog(config_paths)
     if issues:
-        parser.error("styles.yaml validation failed:\n  " + "\n  ".join(issues))
+        parser.error("scenes.yaml validation failed:\n  " + "\n  ".join(issues))
 
     if args.list:
         _print_list(config_paths)
@@ -560,11 +560,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.demo and (args.style is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
-        parser.error("--demo is a standalone showcase mode; do not combine it with --style, --layout, or panel overrides")
+    if args.demo and (args.scene is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
+        parser.error("--demo is a standalone showcase mode; do not combine it with --scene, --layout, or panel overrides")
 
-    if not args.demo and args.style is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
-        parser.error("specify either --style, --layout, or --demo, or configure defaults.layout")
+    if not args.demo and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
+        parser.error("specify either --scene, --layout, or --demo, or configure defaults.layout")
 
     speed_explicit = any(a == "--default-speed" or a.startswith("--default-speed=") for a in raw_argv)
     colour_explicit = any(a in {"--default-colour", "--default-color"} or a.startswith("--default-colour=") or a.startswith("--default-color=") for a in raw_argv)
@@ -605,10 +605,10 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             image_checker,
             config_paths,
         )
-        config_style_runtime = widget_showcase["initial"]
-        runtime_layout_name = config_style_runtime["layout"]
+        config_scene_runtime = widget_showcase["initial"]
+        runtime_layout_name = config_scene_runtime["layout"]
     else:
-        base_runtime = resolve_config_style(args.style, parser, config_paths) if args.style else None
+        base_runtime = resolve_config_scene(args.scene, parser, config_paths) if args.scene else None
         runtime_layout_name = args.layout or (base_runtime["layout"] if base_runtime else configured_defaults.get("layout"))
         if not runtime_layout_name:
             parser.error("no layout available")
@@ -621,7 +621,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             args.layout or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.vocab or speed_explicit or colour_explicit or widget_explicit
         )
         if base_runtime is None or has_cli_overrides:
-            config_style_runtime = _apply_panel_widget_overrides(
+            config_scene_runtime = _apply_panel_widget_overrides(
                 base_runtime if (base_runtime and not args.layout) else None,
                 args.panel_widget,
                 args.panel_speed,
@@ -630,7 +630,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 args.panel_image,
                 parser,
                 layout_name=runtime_layout_name,
-                style_name=args.style or f"<cli:{runtime_layout_name}>",
+                scene_name=args.scene or f"<cli:{runtime_layout_name}>",
                 vocab=runtime_vocab,
                 speed=runtime_speed,
                 text=runtime_text,
@@ -639,15 +639,15 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 config_paths=config_paths,
             )
         else:
-            config_style_runtime = base_runtime
+            config_scene_runtime = base_runtime
 
     if runtime_default_colour is not None:
-        for area in config_style_runtime["areas"]:
+        for area in config_scene_runtime["areas"]:
             if not area.get("colour"):
                 area["colour"] = runtime_default_colour
 
     if runtime_speed is None:
-        runtime_speed = config_style_runtime["speed"]
+        runtime_speed = config_scene_runtime["speed"]
 
     if not 1 <= runtime_speed <= 100:
         parser.error("--default-speed must be between 1 and 100")
@@ -656,15 +656,15 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     if args.life_max < 1:
         parser.error("--life-max must be at least 1")
 
-    image_sources = config_style_runtime["image_paths"] if not image_explicit else image_paths
-    image_mode_active = any(area["mode"] == "image" for area in config_style_runtime["areas"])
+    image_sources = config_scene_runtime["image_paths"] if not image_explicit else image_paths
+    image_mode_active = any(area["mode"] == "image" for area in config_scene_runtime["areas"])
     if args.demo:
         image_mode_active = any(
             area["mode"] == "image"
             for scene in widget_showcase["scenes"]
             for area in scene["areas"]
         )
-    if image_mode_active and not image_paths and not any(area.get("image_paths") for area in config_style_runtime["areas"]):
+    if image_mode_active and not image_paths and not any(area.get("image_paths") for area in config_scene_runtime["areas"]):
         parser.error("image mode requires --image PATH [PATH ...] or --panel-image REGION=PATH")
     if image_mode_active and image_module is None:
         parser.error("image mode requires Pillow to be installed")
@@ -679,12 +679,12 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "inject_text": runtime_text,
         "main_mode": None,
         "sidebar_mode": None,
-        "style": config_style_runtime["vocab"],
-        "style_name": "<demo>" if args.demo else (args.style or f"<cli:{runtime_layout_name}>"),
-        "styles": VOCAB_CHOICES[:],
-        "config_style": config_style_runtime,
-        "layout_name": config_style_runtime["layout"],
-        "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_style_runtime["areas"]),
+        "vocab": config_scene_runtime["vocab"],
+        "scene_name": "<demo>" if args.demo else (args.scene or f"<cli:{runtime_layout_name}>"),
+        "vocabs": VOCAB_CHOICES[:],
+        "config_scene": config_scene_runtime,
+        "layout_name": config_scene_runtime["layout"],
+        "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_scene_runtime["areas"]),
         "demo_state": {"active": False, "scenes": [], "idx": 0, "scene": None, "next": float("inf"), "done": False},
         "widget_showcase": widget_showcase,
         "glitch_interval": max(0.0, args.glitch if args.glitch is not None else 0.0),
@@ -714,8 +714,8 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(f"  {dim}{'─' * 54}{reset}")
     print(f"  {bold}speed{reset}  : default {config['speed']}/100", end="")
     print(f"  ({_show_delay(config['speed'])})")
-    print(f"  {bold}style{reset}  : {config['style_name']}")
-    print(f"  {bold}vocab{reset}  : {config['style']}")
+    print(f"  {bold}scene{reset}  : {config['scene_name']}")
+    print(f"  {bold}vocab{reset}  : {config['vocab']}")
     if config.get("default_colour") is not None:
         print(f"  {bold}colour{reset} : default {config['default_colour']}")
     if config.get("default_widget") is not None:

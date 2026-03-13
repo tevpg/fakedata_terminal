@@ -87,7 +87,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
     synced = {}
     for spec in area_specs:
         area = area_states.get(spec["name"])
-        if area is None or area["mode"] != spec["mode"] or area.get("style_override") != spec.get("vocab"):
+        if area is None or area["mode"] != spec["mode"] or area.get("vocab_override") != spec.get("vocab"):
             area = make_area(spec["mode"], spec.get("vocab"))
             area["mode"] = spec["mode"]
             area["name"] = spec["name"]
@@ -96,7 +96,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
             area["role"] = spec["role"]
-            area["style_override"] = spec.get("vocab")
+            area["vocab_override"] = spec.get("vocab")
             area["image_paths"] = spec.get("image_paths") or []
             area["cycle_widgets"] = spec.get("cycle_widgets") or []
             area["unavailable_message"] = spec.get("unavailable_message")
@@ -109,7 +109,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
             area["role"] = spec["role"]
-            area["style_override"] = spec.get("vocab")
+            area["vocab_override"] = spec.get("vocab")
             area["image_paths"] = spec.get("image_paths") or []
             area["cycle_widgets"] = spec.get("cycle_widgets") or []
             area["unavailable_message"] = spec.get("unavailable_message")
