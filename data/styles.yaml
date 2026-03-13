@@ -10,7 +10,7 @@
 
 defaults:
   vocab: science
-  speed: 50
+  speed: 55
   panel_speed: {}
   image:
     glob: "geom*.png"
