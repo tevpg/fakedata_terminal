@@ -415,7 +415,6 @@ widgets:
     - blocks
     - sweep
     - tunnel
-    - boxes
     - cycle
 
   # Proposed names for the current "gauges" composite when split into regions.

@@ -60,7 +60,7 @@ DEMO_SCENES = [
 
 SIDEBAR_CYCLE_MODES = [
     "text", "text_wide", "text_spew", "bars", "text_scant",
-    "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel", "boxes",
+    "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel",
 ]
 
 # ── Colour pair indices ───────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ def main(stdscr):
         pass
 
     TEXT_MODES = {"text", "text_wide", "text_scant", "text_spew"}
-    STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life", "tunnel", "boxes"}
+    STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life", "tunnel"}
     STYLE_VOCAB_MODES = {"text", "text_wide", "text_scant", "bars"}
     MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>[]{}/*+-=."
     SWEEP_SYMBOLS = "∑∏∫∮√∞≈≠≤≥∂∇∈∉∩∪⊂⊃⊆⊇⊕⊗⊥∥∀∃∝∠∅∴∵≜≙⊢⊨"
@@ -277,7 +277,7 @@ def main(stdscr):
     def _cycle_widget_names(include_image: bool) -> list[str]:
         names = [
             "bars", "blocks", "clock", "image", "life", "matrix",
-            "oscilloscope", "readouts", "sparkline", "sweep", "tunnel", "boxes",
+            "oscilloscope", "readouts", "sparkline", "sweep", "tunnel",
             "text", "text_scant", "text_spew", "text_wide",
         ]
         if not include_image:
@@ -395,8 +395,6 @@ def main(stdscr):
             "sweep_cells": [],
             "sweep_pos": 0,
             "sweep_dir": 1,
-            "boxes_sig": None,
-            "boxes_layers": [],
             "tunnel_sig": None,
             "tunnel_layers": [],
             "tunnel_phase": random.random(),
@@ -1001,21 +999,8 @@ def main(stdscr):
             inset_x += step_x
         return layers
 
-    def _build_boxes_layers(rows: int, width: int):
-        return _build_nested_box_layers(rows, width, side_border_width=1)
-
     def _build_tunnel_layers(rows: int, width: int):
         return _build_nested_box_layers(rows, width, side_border_width=2)
-
-    def _ensure_boxes(area: dict, rows: int, width: int):
-        sig = (rows, width)
-        if area["boxes_sig"] == sig:
-            return
-        area["boxes_sig"] = sig
-        area["boxes_layers"] = _build_boxes_layers(rows, width)
-
-    def _update_boxes(area: dict, rows: int, width: int):
-        _ensure_boxes(area, rows, width)
 
     def _ensure_tunnel(area: dict, rows: int, width: int):
         sig = (rows, width)
@@ -1050,10 +1035,6 @@ def main(stdscr):
                         stdscr.addch(y + rr, x + cc, ch, attr)
                     except curses.error:
                         pass
-
-    def _repaint_boxes(area: dict, rows: int, y: int, x: int, width: int):
-        _ensure_boxes(area, rows, width)
-        _repaint_nested_layers(area.get("boxes_layers") or [], area, rows, y, x, width)
 
     def _ensure_sweep(area: dict, rows: int, width: int):
         cells = area["sweep_cells"]
@@ -1919,7 +1900,7 @@ def main(stdscr):
 
     def _steady_mode_delay(mode: str, speed: int) -> float:
         delay = _centre_delay(speed)
-        if mode in {"clock", "blocks", "sweep", "tunnel", "boxes"}:
+        if mode in {"clock", "blocks", "sweep", "tunnel"}:
             return delay / 1.5
         return delay
 
@@ -1944,8 +1925,6 @@ def main(stdscr):
             _ensure_text_buffer(area, rows, mode, width, role)
         elif mode == "blocks":
             _ensure_blocks(area, rows, width)
-        elif mode == "boxes":
-            _ensure_boxes(area, rows, width)
         elif mode == "sweep":
             _ensure_sweep(area, rows, width)
         elif mode == "tunnel":
@@ -2017,8 +1996,6 @@ def main(stdscr):
             _update_matrix(area, rows, width)
         elif mode == "blocks":
             _update_blocks(area, rows, width)
-        elif mode == "boxes":
-            _update_boxes(area, rows, width)
         elif mode == "sweep":
             _update_sweep(area, rows, width, role)
         elif mode == "tunnel":
@@ -2098,8 +2075,6 @@ def main(stdscr):
             _repaint_matrix(area, rows, y, x, width)
         elif mode == "blocks":
             _repaint_blocks(area, rows, y, x, width)
-        elif mode == "boxes":
-            _repaint_boxes(area, rows, y, x, width)
         elif mode == "sweep":
             _repaint_sweep(area, rows, y, x, width, role)
         elif mode == "tunnel":
