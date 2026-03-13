@@ -4,8 +4,9 @@
 # Design rules captured here:
 # - layouts define panel geometry
 # - regions are named aliases for one or more panels
+# - widgets can define per-widget fallback attributes
 # - styles bind widgets/options to regions
-# - defaults < style < CLI override
+# - defaults < widget defaults < style < CLI override
 # - panel aggregation is explicit; no implicit expansion from "none"
 # - stable packaged layouts live in data/layouts.yaml
 
@@ -305,6 +306,20 @@ styles:
         speed: 90
 
 widgets:
+  # Widget-specific fallback attributes use the same keys as region entries,
+  # except "widget" itself is implied by the mapping key. Supported here:
+  # speed, title, source_vocab, colour/color, image, and cycle.
+  #
+  # Example:
+  # sweep:
+  #   colour: cyan
+  # image:
+  #   image:
+  #     glob: "geom*.png"
+  # cycle:
+  #   cycle:
+  #     widgets: [text, bars, matrix, tunnel]
+
   # Existing single-region widgets
   atomic:
     - text

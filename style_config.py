@@ -32,6 +32,7 @@ STYLE_KEYS = {"note", "layout", "vocab", "speed", "text", "regions"}
 REGION_KEYS = {"widget", "speed", "title", "source_vocab", "image", "paths", "path", "glob", "cycle", "colour", "color"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
+WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
 
 
 def discover_config_paths() -> list[Path]:
@@ -117,15 +118,31 @@ def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     widgets = catalog.get("widgets", {})
     names = set()
     if isinstance(widgets, dict):
-        for value in widgets.values():
+        for key, value in widgets.items():
             if isinstance(value, list):
                 names.update(str(item) for item in value)
+            elif isinstance(value, dict) and _supported_widget(str(key)):
+                names.add(str(key))
     names.update({
         "text", "text_wide", "text_scant", "text_spew", "image", "life",
         "bars", "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel",
         "sparkline", "readouts", "blank", "cycle",
     })
     return sorted(names)
+
+
+def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
+    catalog = load_style_catalog(config_paths)
+    widgets = catalog.get("widgets", {})
+    defaults: dict[str, dict[str, Any]] = {}
+    if not isinstance(widgets, dict):
+        return defaults
+    for key, value in widgets.items():
+        widget_name = str(key)
+        if not isinstance(value, dict) or not _supported_widget(widget_name):
+            continue
+        defaults[widget_name] = value
+    return defaults
 
 
 def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -279,8 +296,49 @@ def validate_style_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         _unknown_keys(image_spec, IMAGE_KEYS, f"styles.{style_name}.regions.{region_name}.image", issues)
 
     widgets = catalog.get("widgets", {})
-    if widgets is not None and not isinstance(widgets, dict):
-        issues.append(f"{config_label}: widgets must be a mapping")
+    if widgets is not None:
+        if not isinstance(widgets, dict):
+            issues.append(f"{config_label}: widgets must be a mapping")
+        else:
+            for widget_name, widget_cfg in widgets.items():
+                widget_name = str(widget_name)
+                if isinstance(widget_cfg, list):
+                    continue
+                if not isinstance(widget_cfg, dict):
+                    issues.append(f"{config_label}: widgets.{widget_name} must be a mapping or list")
+                    continue
+                if not _supported_widget(widget_name):
+                    issues.append(f"{config_label}: widgets.{widget_name} is not a supported widget name")
+                    continue
+                _unknown_keys(widget_cfg, WIDGET_DEFAULT_KEYS, f"widgets.{widget_name}", issues)
+                cycle_spec = widget_cfg.get("cycle")
+                if cycle_spec is not None and not isinstance(cycle_spec, dict):
+                    issues.append(f"{config_label}: widgets.{widget_name}.cycle must be a mapping")
+                elif isinstance(cycle_spec, dict):
+                    _unknown_keys(cycle_spec, CYCLE_KEYS, f"widgets.{widget_name}.cycle", issues)
+                    cycle_widgets = cycle_spec.get("widgets")
+                    if cycle_widgets is not None and not isinstance(cycle_widgets, list):
+                        issues.append(f"{config_label}: widgets.{widget_name}.cycle.widgets must be a list")
+                    elif isinstance(cycle_widgets, list):
+                        if widget_name != "cycle":
+                            issues.append(
+                                f"{config_label}: widgets.{widget_name}.cycle is only valid for widget 'cycle'"
+                            )
+                        for idx, cycle_widget in enumerate(cycle_widgets):
+                            cycle_widget_name = str(cycle_widget)
+                            if not _supported_widget(cycle_widget_name):
+                                issues.append(
+                                    f"{config_label}: widgets.{widget_name}.cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
+                                )
+                            elif cycle_widget_name in {"cycle", "blank"}:
+                                issues.append(
+                                    f"{config_label}: widgets.{widget_name}.cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
+                                )
+                image_spec = widget_cfg.get("image")
+                if image_spec is not None and not isinstance(image_spec, dict):
+                    issues.append(f"{config_label}: widgets.{widget_name}.image must be a mapping")
+                elif isinstance(image_spec, dict):
+                    _unknown_keys(image_spec, IMAGE_KEYS, f"widgets.{widget_name}.image", issues)
 
     return issues
 
@@ -480,6 +538,14 @@ def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict
     defaults = catalog.get("defaults")
     if isinstance(defaults, dict):
         _normalize_image_mapping(defaults.get("image"), base_dir)
+    widgets = catalog.get("widgets")
+    if isinstance(widgets, dict):
+        for widget_cfg in widgets.values():
+            if not isinstance(widget_cfg, dict):
+                continue
+            if any(key in widget_cfg for key in ("paths", "path", "glob")):
+                _normalize_image_mapping(widget_cfg, base_dir)
+            _normalize_image_mapping(widget_cfg.get("image"), base_dir)
     styles = catalog.get("styles")
     if isinstance(styles, dict):
         for style_cfg in styles.values():
@@ -643,6 +709,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
         parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
+    widget_defaults = widget_defaults_catalog(config_paths)
     panel_map = layout_cfg.get("panels", {})
     seen = []
     areas = []
@@ -653,11 +720,14 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
             parser.error(f"style '{style_name}' region '{region_name}' has no widget")
         if not _supported_widget(widget):
             parser.error(f"style '{style_name}' uses unsupported widget '{widget}'")
+        widget_cfg = widget_defaults.get(widget, {})
         panel_names = _parse_region_spec(layout_cfg, region_name, parser, style_name)
         rect = _rect_for_panels(layout_cfg, panel_names, parser, style_name, region_name)
         area_images = []
         if widget == "image" and isinstance(region_cfg, dict):
             area_images = _region_image_paths(region_cfg)
+        if widget == "image" and not area_images:
+            area_images = _region_image_paths(widget_cfg)
         if widget == "image" and not area_images:
             area_images = default_images[:]
         area = {
@@ -668,12 +738,26 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
             "y": rect["y"],
             "w": rect["w"],
             "h": rect["h"],
-            "speed": region_cfg.get("speed") if isinstance(region_cfg, dict) else None,
-            "title": region_cfg.get("title") if isinstance(region_cfg, dict) else None,
-            "vocab": region_cfg.get("source_vocab") if isinstance(region_cfg, dict) else None,
-            "colour": _region_colour(region_cfg) or default_colour,
+            "speed": (
+                region_cfg.get("speed")
+                if isinstance(region_cfg, dict) and region_cfg.get("speed") is not None
+                else widget_cfg.get("speed")
+            ),
+            "title": (
+                region_cfg.get("title")
+                if isinstance(region_cfg, dict) and region_cfg.get("title") is not None
+                else widget_cfg.get("title")
+            ),
+            "vocab": (
+                region_cfg.get("source_vocab")
+                if isinstance(region_cfg, dict) and region_cfg.get("source_vocab") is not None
+                else widget_cfg.get("source_vocab")
+            ),
+            "colour": _region_colour(region_cfg) or _region_colour(widget_cfg) or default_colour,
             "image_paths": area_images,
-            "cycle_widgets": _region_cycle_widgets(region_cfg) if widget == "cycle" else [],
+            "cycle_widgets": (
+                _region_cycle_widgets(region_cfg) or _region_cycle_widgets(widget_cfg)
+            ) if widget == "cycle" else [],
             "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
             "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
             "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,
@@ -697,7 +781,10 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
             parser.error(f"default widget '{default_widget}' is unsupported")
         for panel_name in uncovered:
             panel_cfg = panel_map[panel_name]
-            area_images = default_images[:] if default_widget == "image" else []
+            widget_cfg = widget_defaults.get(default_widget, {})
+            area_images = _region_image_paths(widget_cfg) if default_widget == "image" else []
+            if default_widget == "image" and not area_images:
+                area_images = default_images[:]
             areas.append({
                 "name": panel_name,
                 "mode": default_widget,
@@ -706,12 +793,12 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
                 "y": float(panel_cfg["y"]),
                 "w": float(panel_cfg["w"]),
                 "h": float(panel_cfg["h"]),
-                "speed": None,
-                "title": None,
-                "vocab": None,
-                "colour": default_colour,
+                "speed": widget_cfg.get("speed"),
+                "title": widget_cfg.get("title"),
+                "vocab": widget_cfg.get("source_vocab"),
+                "colour": _region_colour(widget_cfg) or default_colour,
                 "image_paths": area_images,
-                "cycle_widgets": [],
+                "cycle_widgets": _region_cycle_widgets(widget_cfg) if default_widget == "cycle" else [],
                 "label": None,
                 "unavailable_message": None,
                 "static_lines": None,
