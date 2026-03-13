@@ -8,7 +8,7 @@ FakeData Terminal is a curses-based Python app that renders animated, fake telem
 - Drives text widgets from themed vocab pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and style presets from [`data/styles.yaml`](/home/tags/fakedata_terminal/data/styles.yaml)
 - Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
-- Lets you start from a preset style or build a screen explicitly with `--layout` and `--assign`
+- Lets you start from a preset style or build a screen explicitly with `--layout`, `--panel-widget`, and `--default-*`
 
 ## Requirements
 
@@ -28,6 +28,7 @@ This repository does not include packaging metadata, so the most direct entrypoi
 python3 app.py --list
 python3 app.py --style science
 python3 app.py --layouts
+python3 app.py --layout grid_2x2 --default-widget tunnel
 ```
 
 If you want image widgets, install the extra dependencies first:
@@ -67,20 +68,20 @@ python3 app.py --demo
 Build a layout manually:
 
 ```bash
-python3 app.py \
+  python3 app.py \
   --layout grid_2x2 \
-  --assign p1=life \
-  --assign p2=clock \
-  --assign p3=text \
-  --assign p4=matrix
+  --panel-widget p1=life \
+  --panel-widget p2=clock \
+  --panel-widget p3=text \
+  --panel-widget p4=matrix
 ```
 
 Override per-region behavior:
 
 ```bash
-python3 app.py \
+  python3 app.py \
   --style test1 \
-  --assign p4=matrix \
+  --panel-widget p4=matrix \
   --panel-speed p4=80 \
   --panel-vocab p4=hacker
 ```
@@ -88,12 +89,26 @@ python3 app.py \
 Run an image panel:
 
 ```bash
-python3 app.py \
+  python3 app.py \
   --layout grid_3x2 \
-  --assign p3+p4=image \
-  --assign p5=clock \
-  --assign p6=text \
+  --panel-widget p3+p4=image \
+  --panel-widget p5=clock \
+  --panel-widget p6=text \
   --panel-image p3+p4=data/geom_33_torus.png
+
+Set layout-wide defaults for unassigned panels:
+
+```bash
+python3 app.py \
+  --layout grid_3x3 \
+  --default-widget cycle \
+  --default-speed 70 \
+  --default-colour cyan \
+  --panel-widget large_left=image \
+  --panel-image large_left=data/geom_33_torus.png
+```
+
+If no `--style` or `--layout` is provided, the configured `defaults.layout` is used.
 ```
 
 Enable periodic glitch effects:
@@ -152,4 +167,5 @@ Overlay semantics:
 - Running `python3 app.py` with no arguments prints the CLI help and exits.
 - Image mode fails fast if `Pillow` or `jp2a` is unavailable.
 - `--config PATH` is repeatable and can add site, user, or project-specific overlays.
+- CLI defaults are `--default-speed`, `--default-colour`, and `--default-widget`.
 - Preset names currently include `clocks`, `cycle9`, `cycle4`, `science`, `science2`, `geometries`, `tunnel`, `test1` through `test7`, and `gauges`.

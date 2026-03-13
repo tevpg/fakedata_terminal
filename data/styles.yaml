@@ -10,8 +10,11 @@
 # - stable packaged layouts live in data/layouts.yaml
 
 defaults:
+  layout: grid_2x2
   vocab: science
   speed: 55
+  colour: green
+  widget: cycle
   panel_speed: {}
   image:
     glob: "geom*.png"

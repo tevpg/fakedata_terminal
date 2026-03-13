@@ -7,6 +7,7 @@ import sys
 
 try:
     from .style_config import (
+        config_defaults,
         config_style_names,
         discover_config_paths,
         default_image_paths,
@@ -20,6 +21,7 @@ try:
     )
 except ImportError:
     from style_config import (
+        config_defaults,
         config_style_names,
         discover_config_paths,
         default_image_paths,
@@ -81,7 +83,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         description=(
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
-            "Use --style for a preset, or --layout plus --assign overrides to build a screen explicitly. "
+            "Use --style for a preset, or --layout plus --panel-widget overrides to build a screen explicitly. "
             "Run --demo for a quick tour of widgets, vocabs, layouts, and presets."
         ),
         epilog=(
@@ -92,9 +94,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --demo\n"
             "  %(prog)s --style test1\n"
             "  %(prog)s --config ~/.config/fakedata-terminal/styles.yaml --style lab\n"
-            "  %(prog)s --layout grid_2x2 --assign p1=life --assign p2=blank --assign p3=text --assign p4=clock\n"
-            "  %(prog)s --style test1 --assign p4=matrix --panel-speed p4=80\n"
-            "  %(prog)s --layout grid_3x3 --assign large_left=image --assign right=clock "
+            "  %(prog)s --layout grid_2x2 --panel-widget p1=life --panel-widget p2=blank --panel-widget p3=text --panel-widget p4=clock\n"
+            "  %(prog)s --style test1 --panel-widget p4=matrix --panel-speed p4=80\n"
+            "  %(prog)s --layout grid_3x3 --panel-widget large_left=image --panel-widget right=clock "
             "--panel-image large_left=geom_07_diamond_lattice.png --panel-image large_left=geom_33_torus.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -122,8 +124,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--vocab", type=str, default=None, choices=VOCAB_CHOICES,
         help=f"Vocabulary style. Defaults to {DEFAULT_VOCAB} unless a style supplies one.")
     parser.add_argument(
-        "--assign", action="append", default=[], metavar="REGION=WIDGET",
-        help="Assign a widget to a region alias or explicit panel group. Repeatable.")
+        "--panel-widget", action="append", default=[], metavar="REGION=WIDGET",
+        help="Assign a widget to a specific region or panel group. Repeatable.")
     parser.add_argument(
         "--panel-speed", action="append", default=[], metavar="REGION=N",
         help="Override speed for a specific region or panel group. Repeatable.")
@@ -137,11 +139,14 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--panel-image", action="append", default=[], metavar="REGION=PATH",
         help="Add an image path for a specific image region. Repeatable.")
     parser.add_argument(
-        "--speed", type=int, default=None, metavar="N",
-        help="Global speed 1 (slowest) to 100 (no delay).")
+        "--default-speed", type=int, default=None, metavar="N",
+        help="Default speed 1 (slowest) to 100 (no delay) for panels without a panel-specific speed.")
     parser.add_argument(
-        "--colour", "--color", type=str, default=None, metavar="VALUE",
-        help=f"Global colour override for supported widgets. Recognized: {COLOUR_HELP}.")
+        "--default-colour", "--default-color", type=str, default=None, metavar="VALUE",
+        help=f"Default colour for panels without a panel-specific colour. Recognized: {COLOUR_HELP}.")
+    parser.add_argument(
+        "--default-widget", type=str, default=None, metavar="WIDGET",
+        help="Default widget for panels that are not assigned explicitly.")
     parser.add_argument(
         "--life-max", type=int, default=200, metavar="N",
         help="Maximum iterations before life mode reseeds. Default 200.")
@@ -214,6 +219,18 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
         lines.append("    ".join(parts).rstrip())
     lines.extend(["", "Config files:"])
     lines.extend(str(path) for path in config_paths)
+    defaults = config_defaults(config_paths)
+    default_colour = defaults.get("colour")
+    if colourize and default_colour:
+        default_colour = _ansi_colour_label(str(default_colour))
+    lines.extend([
+        "",
+        "Configured defaults:",
+        f"layout: {defaults.get('layout') if defaults.get('layout') is not None else '(none)'}",
+        f"speed: {defaults.get('speed', 50)}",
+        f"colour: {default_colour if default_colour is not None else '(none)'}",
+        f"widget: {defaults.get('widget') if defaults.get('widget') is not None else '(none)'}",
+    ])
     return lines
 
 
@@ -404,10 +421,11 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
     return "+".join(panel_names)
 
 
-def _apply_assign_overrides(base_style: dict | None, assignments: list[str], panel_speeds: list[str],
+def _apply_panel_widget_overrides(base_style: dict | None, panel_widgets: list[str], panel_speeds: list[str],
                             panel_vocabs: list[str], panel_colours: list[str], panel_images: list[str],
                             parser, *, layout_name: str, style_name: str, vocab: str,
-                            speed: int, text: str, config_paths: tuple[str, ...] | None = None) -> dict:
+                            speed: int, text: str, default_widget: str | None, default_colour: str | None,
+                            config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
     if base_style:
         for area in base_style["areas"]:
@@ -427,9 +445,9 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
                 entry["cycle"] = {"widgets": area["cycle_widgets"][:]}
             regions_cfg[region_key] = entry
 
-    for item in assignments:
-        target, widget = _parse_equals(item, parser, "--assign")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--assign", config_paths)
+    for item in panel_widgets:
+        target, widget = _parse_equals(item, parser, "--panel-widget")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-widget", config_paths)
         target_panels = set(normalized_target.split("+"))
         to_delete = []
         for existing_key in list(regions_cfg):
@@ -445,12 +463,12 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
                 continue
             if target_panels < existing_panels:
                 parser.error(
-                    f"--assign {target}={widget} partially overlaps existing region '{existing_key}'. "
+                    f"--panel-widget {target}={widget} partially overlaps existing region '{existing_key}'. "
                     "Overrides may replace whole regions or fully cover smaller ones."
                 )
             else:
                 parser.error(
-                    f"--assign {target}={widget} partially overlaps existing region '{existing_key}'. "
+                    f"--panel-widget {target}={widget} partially overlaps existing region '{existing_key}'. "
                     "Overrides may replace whole regions or fully cover smaller ones."
                 )
         for existing_key in to_delete:
@@ -498,9 +516,6 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
         image_cfg = regions_cfg[normalized_target].setdefault("image", {})
         image_cfg.setdefault("paths", []).append(image_path)
 
-    if not regions_cfg:
-        parser.error("generalized layouts require at least one assignment")
-
     return resolve_runtime_layout(
         layout_name,
         regions_cfg,
@@ -509,6 +524,8 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
         vocab=vocab,
         speed=speed,
         text=text,
+        default_widget=default_widget,
+        default_colour=default_colour,
         config_paths=config_paths,
     )
 
@@ -535,11 +552,6 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     config_paths = _resolve_config_paths(raw_argv)
     parser = _build_parser(config_paths)
 
-    if not raw_argv:
-        parser.print_help()
-        print()
-        raise SystemExit(0)
-
     args = parser.parse_args(raw_argv)
 
     issues = validate_style_catalog(config_paths)
@@ -554,17 +566,19 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.demo and (args.style is not None or args.layout is not None or args.assign or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image):
+    if args.demo and (args.style is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
         parser.error("--demo is a standalone showcase mode; do not combine it with --style, --layout, or panel overrides")
 
-    if not args.demo and args.style is None and args.layout is None:
-        parser.error("specify either --style, --layout, or --demo")
+    if not args.demo and args.style is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
+        parser.error("specify either --style, --layout, or --demo, or configure defaults.layout")
 
-    speed_explicit = any(a == "--speed" or a.startswith("--speed=") for a in raw_argv)
-    colour_explicit = any(a in {"--colour", "--color"} or a.startswith("--colour=") or a.startswith("--color=") for a in raw_argv)
+    speed_explicit = any(a == "--default-speed" or a.startswith("--default-speed=") for a in raw_argv)
+    colour_explicit = any(a in {"--default-colour", "--default-color"} or a.startswith("--default-colour=") or a.startswith("--default-color=") for a in raw_argv)
+    widget_explicit = any(a == "--default-widget" or a.startswith("--default-widget=") for a in raw_argv)
     text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
     image_explicit = any(a == "--image" or a.startswith("--image=") for a in raw_argv)
 
+    configured_defaults = config_defaults(config_paths)
     default_images = default_image_paths(config_paths)
     image_paths = []
     if args.image is not None and len(args.image) < 1:
@@ -576,9 +590,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 parser.error(f"image file not found: {raw_path}")
             image_paths.append(path)
 
-    runtime_speed = args.speed if speed_explicit and args.speed is not None else 50
+    runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else configured_defaults.get("speed", 50)
     runtime_text = args.text.strip() if text_explicit and args.text is not None else ""
-    runtime_vocab = args.vocab or DEFAULT_VOCAB
+    runtime_vocab = args.vocab or configured_defaults.get("vocab", DEFAULT_VOCAB)
+    runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("colour")
+    runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
     if not image_explicit:
@@ -599,21 +615,21 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_layout_name = config_style_runtime["layout"]
     else:
         base_runtime = resolve_config_style(args.style, parser, config_paths) if args.style else None
-        runtime_layout_name = args.layout or (base_runtime["layout"] if base_runtime else None)
+        runtime_layout_name = args.layout or (base_runtime["layout"] if base_runtime else configured_defaults.get("layout"))
         if not runtime_layout_name:
             parser.error("no layout available")
 
-        runtime_vocab = args.vocab or (base_runtime["vocab"] if base_runtime else DEFAULT_VOCAB)
-        runtime_speed = args.speed if speed_explicit and args.speed is not None else (base_runtime["speed"] if base_runtime else 50)
+        runtime_vocab = args.vocab or (base_runtime["vocab"] if base_runtime else configured_defaults.get("vocab", DEFAULT_VOCAB))
+        runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else (base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50))
         runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
 
         has_cli_overrides = bool(
-            args.layout or args.assign or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.vocab
+            args.layout or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.vocab or speed_explicit or colour_explicit or widget_explicit
         )
         if base_runtime is None or has_cli_overrides:
-            config_style_runtime = _apply_assign_overrides(
+            config_style_runtime = _apply_panel_widget_overrides(
                 base_runtime if (base_runtime and not args.layout) else None,
-                args.assign,
+                args.panel_widget,
                 args.panel_speed,
                 args.panel_vocab,
                 args.panel_colour,
@@ -624,21 +640,25 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 vocab=runtime_vocab,
                 speed=runtime_speed,
                 text=runtime_text,
+                default_widget=runtime_default_widget,
+                default_colour=runtime_default_colour,
                 config_paths=config_paths,
             )
         else:
             config_style_runtime = base_runtime
 
-    if colour_explicit and args.colour is not None:
+    if runtime_default_colour is not None:
         for area in config_style_runtime["areas"]:
             if not area.get("colour"):
-                area["colour"] = args.colour
+                area["colour"] = runtime_default_colour
 
     if runtime_speed is None:
         runtime_speed = config_style_runtime["speed"]
 
     if not 1 <= runtime_speed <= 100:
-        parser.error("--speed must be between 1 and 100")
+        parser.error("--default-speed must be between 1 and 100")
+    if runtime_default_widget is not None and runtime_default_widget not in widget_names(config_paths):
+        parser.error(f"--default-widget must be one of: {', '.join(widget_names(config_paths))}")
     if args.life_max < 1:
         parser.error("--life-max must be at least 1")
 
@@ -675,6 +695,9 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "widget_showcase": widget_showcase,
         "glitch_interval": max(0.0, args.glitch if args.glitch is not None else 0.0),
         "image_paths": image_sources,
+        "configured_defaults": configured_defaults,
+        "default_colour": runtime_default_colour,
+        "default_widget": runtime_default_widget,
     }
 
 
@@ -695,10 +718,14 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(reset)
     print(f"  {cyan}{script_name}{reset}  —  FakeData Terminal")
     print(f"  {dim}{'─' * 54}{reset}")
-    print(f"  {bold}speed{reset}  : global {config['speed']}/100", end="")
+    print(f"  {bold}speed{reset}  : default {config['speed']}/100", end="")
     print(f"  ({_show_delay(config['speed'])})")
     print(f"  {bold}style{reset}  : {config['style_name']}")
     print(f"  {bold}vocab{reset}  : {config['style']}")
+    if config.get("default_colour") is not None:
+        print(f"  {bold}colour{reset} : default {config['default_colour']}")
+    if config.get("default_widget") is not None:
+        print(f"  {bold}widget{reset} : default {config['default_widget']}")
     if config["image_paths"]:
         label = "image" if len(config["image_paths"]) == 1 else "images"
         print(f"  {bold}{label}{reset} : {', '.join(config['image_paths'])}")

@@ -25,7 +25,7 @@ PROJECT_CONFIG_NAMES = (
 )
 
 TOP_LEVEL_KEYS = {"defaults", "layouts", "styles", "widgets"}
-DEFAULT_KEYS = {"vocab", "speed", "panel_speed", "image"}
+DEFAULT_KEYS = {"layout", "vocab", "speed", "panel_speed", "image", "widget", "colour", "color"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 STYLE_KEYS = {"note", "layout", "vocab", "speed", "text", "regions"}
@@ -136,6 +136,24 @@ def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str
     return _expand_image_spec(defaults.get("image"))
 
 
+def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_style_catalog(config_paths)
+    defaults = catalog.get("defaults", {})
+    if not isinstance(defaults, dict):
+        defaults = {}
+    colour = defaults.get("colour")
+    if colour is None:
+        colour = defaults.get("color")
+    return {
+        "layout": defaults.get("layout"),
+        "vocab": defaults.get("vocab", "science"),
+        "speed": defaults.get("speed", 50),
+        "widget": defaults.get("widget"),
+        "colour": colour,
+        "image": defaults.get("image"),
+    }
+
+
 def validate_style_catalog(config_paths: tuple[str, ...] | None = None) -> list[str]:
     catalog = load_style_catalog(config_paths)
     issues: list[str] = []
@@ -151,6 +169,12 @@ def validate_style_catalog(config_paths: tuple[str, ...] | None = None) -> list[
             issues.append(f"{config_label}: defaults must be a mapping")
         else:
             _unknown_keys(defaults, DEFAULT_KEYS, "defaults", issues)
+            layout_name = defaults.get("layout")
+            if layout_name is not None and str(layout_name) not in layout_names(config_paths):
+                issues.append(f"{config_label}: defaults.layout references unknown layout '{layout_name}'")
+            widget = defaults.get("widget")
+            if widget is not None and not _supported_widget(str(widget)):
+                issues.append(f"{config_label}: defaults.widget uses unsupported widget '{widget}'")
             image_spec = defaults.get("image")
             if image_spec is not None and not isinstance(image_spec, dict):
                 issues.append(f"{config_label}: defaults.image must be a mapping")
@@ -613,11 +637,13 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
 def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[str, Any],
                            regions_cfg: dict[str, Any], parser, *,
                            vocab: str, speed: int | float, text: str,
+                           default_widget: str | None = None, default_colour: str | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
         parser.error(f"style '{style_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
+    panel_map = layout_cfg.get("panels", {})
     seen = []
     areas = []
     image_paths = []
@@ -645,7 +671,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
             "speed": region_cfg.get("speed") if isinstance(region_cfg, dict) else None,
             "title": region_cfg.get("title") if isinstance(region_cfg, dict) else None,
             "vocab": region_cfg.get("source_vocab") if isinstance(region_cfg, dict) else None,
-            "colour": _region_colour(region_cfg),
+            "colour": _region_colour(region_cfg) or default_colour,
             "image_paths": area_images,
             "cycle_widgets": _region_cycle_widgets(region_cfg) if widget == "cycle" else [],
         }
@@ -656,6 +682,35 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
         if widget == "image":
             image_paths.extend(area["image_paths"])
         areas.append(area)
+
+    uncovered = [panel_name for panel_name in panel_map if panel_name not in seen]
+    if uncovered:
+        if not default_widget:
+            parser.error(
+                f"style '{style_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
+            )
+        if not _supported_widget(default_widget):
+            parser.error(f"default widget '{default_widget}' is unsupported")
+        for panel_name in uncovered:
+            panel_cfg = panel_map[panel_name]
+            area_images = default_images[:] if default_widget == "image" else []
+            areas.append({
+                "name": panel_name,
+                "mode": default_widget,
+                "panels": [panel_name],
+                "x": float(panel_cfg["x"]),
+                "y": float(panel_cfg["y"]),
+                "w": float(panel_cfg["w"]),
+                "h": float(panel_cfg["h"]),
+                "speed": None,
+                "title": None,
+                "vocab": None,
+                "colour": default_colour,
+                "image_paths": area_images,
+                "cycle_widgets": [],
+            })
+            if default_widget == "image":
+                image_paths.extend(area_images)
 
     return {
         "style_name": style_name,
@@ -671,6 +726,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
                            style_name: str = "<cli>", vocab: str = "science",
                            speed: int | float = 50, text: str = "",
+                           default_widget: str | None = None, default_colour: str | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_style_catalog(config_paths)
     layouts = catalog.get("layouts", {})
@@ -680,6 +736,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     return _resolve_runtime_style(
         style_name, layout_name, layout_cfg, regions_cfg, parser,
         vocab=vocab, speed=speed, text=text,
+        default_widget=default_widget, default_colour=default_colour,
         config_paths=config_paths,
     )
 
@@ -687,7 +744,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
 def resolve_config_style(style_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_style_catalog(config_paths)
     styles = catalog.get("styles", {})
-    defaults = catalog.get("defaults", {})
+    defaults = config_defaults(config_paths)
 
     if style_name not in styles:
         raise KeyError(style_name)
@@ -706,5 +763,7 @@ def resolve_config_style(style_name: str, parser, config_paths: tuple[str, ...] 
         vocab=style_cfg.get("vocab", defaults.get("vocab", "science")),
         speed=style_cfg.get("speed", defaults.get("speed", 50)),
         text=style_cfg.get("text", ""),
+        default_widget=defaults.get("widget"),
+        default_colour=defaults.get("colour"),
         config_paths=config_paths,
     )
