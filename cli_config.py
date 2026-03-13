@@ -254,6 +254,14 @@ def _build_intro_scene(vocab: str, speed: int, parser, config_paths: tuple[str, 
     return runtime
 
 
+def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:
+    return {
+        "widget": "blank",
+        "static_lines": lines,
+        "static_align": align,
+    }
+
+
 def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[str], parser,
                          image_module, image_checker,
                          config_paths: tuple[str, ...]) -> list[dict]:
@@ -262,56 +270,39 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
         parser.error("--demo found no widgets to show")
 
     scenes = []
-    idx = 0
-    while idx < len(widgets):
-        left_widget = widgets[idx]
-        right_widget = widgets[idx + 1] if idx + 1 < len(widgets) else widgets[0]
-        left_unavailable = _widget_unavailable_reason(left_widget, image_paths, image_module, image_checker)
-        right_unavailable = _widget_unavailable_reason(right_widget, image_paths, image_module, image_checker)
-        regions_cfg = {
-            "left": _showcase_region_cfg(left_widget, left_unavailable),
-            "right": _showcase_region_cfg(right_widget, right_unavailable),
-        }
-        if left_widget == "image" and not left_unavailable:
-            regions_cfg["left"]["image"] = {"paths": image_paths[:]}
-        if right_widget == "image" and not right_unavailable:
-            regions_cfg["right"]["image"] = {"paths": image_paths[:]}
+    region_keys = ["p1+p2+p4+p5", "p3+p6", "p7", "p8+p9"]
+    for widget in widgets:
+        unavailable = _widget_unavailable_reason(widget, image_paths, image_module, image_checker)
+        if widget == "cycle":
+            region_cfg = _static_blank_region([
+                "cycle",
+                "",
+                "Rotates one panel through a configured widget list.",
+                "Use widget: cycle with cycle.widgets in style config",
+                "or assign it to a region from the CLI.",
+            ])
+            regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
+        elif unavailable:
+            region_cfg = _static_blank_region([widget, "", unavailable])
+            regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
+        else:
+            region_cfg = {"widget": widget}
+            if widget == "image":
+                region_cfg["image"] = {"paths": image_paths[:]}
+            regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
         runtime = resolve_runtime_layout(
-            "grid_2x2",
+            "grid_3x3",
             regions_cfg,
             parser,
-            style_name="<demo:widgets>",
+            style_name=f"<demo:widgets:{widget}>",
             vocab=vocab,
             speed=speed,
             text=text,
             config_paths=config_paths,
         )
-        widget_by_region = {"left": left_widget, "right": right_widget}
-        unavailable_by_region = {"left": left_unavailable, "right": right_unavailable}
-        for area in runtime["areas"]:
-            area["label"] = f"widget: {widget_by_region.get(area['name'], area['mode'])}"
-            if unavailable_by_region.get(area["name"]):
-                area["unavailable_message"] = unavailable_by_region[area["name"]]
-            if widget_by_region.get(area["name"]) == "cycle":
-                area["static_align"] = "center"
-                area["static_lines"] = [
-                    "cycle",
-                    "",
-                    "Rotates one panel through a configured widget list.",
-                    "Use widget: cycle with cycle.widgets in style config",
-                    "or assign it to a region from the CLI.",
-                ]
+        runtime["showcase_header_lines"] = [f"widget: {widget}"]
         scenes.append(runtime)
-        idx += 2
     return scenes
-
-
-def _showcase_region_cfg(widget: str, unavailable: str | None) -> dict:
-    if widget == "cycle":
-        return {"widget": "blank"}
-    if unavailable:
-        return {"widget": "blank"}
-    return {"widget": widget}
 
 
 def _build_vocab_scenes(speed: int, text: str, parser, config_paths: tuple[str, ...]) -> list[dict]:
@@ -342,7 +333,10 @@ def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str
     layouts = layout_catalog(config_paths)
     for layout_name, layout_cfg in layouts.items():
         panels = layout_cfg.get("panels", {})
-        regions_cfg = {panel_name: {"widget": "clock"} for panel_name in panels}
+        regions_cfg = {
+            panel_name: _static_blank_region([panel_name])
+            for panel_name in panels
+        }
         runtime = resolve_runtime_layout(
             layout_name,
             regions_cfg,

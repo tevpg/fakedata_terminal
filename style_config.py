@@ -674,6 +674,10 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
             "colour": _region_colour(region_cfg) or default_colour,
             "image_paths": area_images,
             "cycle_widgets": _region_cycle_widgets(region_cfg) if widget == "cycle" else [],
+            "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
+            "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
+            "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,
+            "static_align": region_cfg.get("static_align") if isinstance(region_cfg, dict) else None,
         }
         overlap = set(panel_names) & set(seen)
         if overlap:
@@ -708,6 +712,10 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
                 "colour": default_colour,
                 "image_paths": area_images,
                 "cycle_widgets": [],
+                "label": None,
+                "unavailable_message": None,
+                "static_lines": None,
+                "static_align": None,
             })
             if default_widget == "image":
                 image_paths.extend(area_images)
