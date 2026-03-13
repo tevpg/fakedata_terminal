@@ -1037,11 +1037,12 @@ def main(stdscr):
         if not layers:
             return
         cadence = 4
-        phase = (area["tick"] // cadence) % cadence
+        cycle_step = area["tick"] // cadence
+        phase = cycle_step % cadence
         for inner_offset, layer in enumerate(reversed(layers)):
             if (inner_offset - phase) % cadence != 0:
                 continue
-            band_idx = (inner_offset - phase) // cadence
+            band_idx = (inner_offset - cycle_step) // cadence
             attr = attr_for_band(band_idx) if attr_for_band is not None else (curses.color_pair(6) | curses.A_BOLD)
             for rr, cc, ch in layer:
                 if 0 <= rr < rows and 0 <= cc < width:
