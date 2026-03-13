@@ -395,6 +395,12 @@ class VisualWidgets:
                     if random.random() < 0.02:
                         cells[r][c] = (random.choice(self.sweep_symbols), random.choice(palette))
 
+    @staticmethod
+    def sweep_vertical(rows: int, width: int) -> bool:
+        # Terminal cells are typically about twice as tall as they are wide, so a
+        # panel looks roughly square around a 2:1 width:height ratio.
+        return width <= rows * 2
+
     def update_sweep(self, area: dict, rows: int, width: int, role: str):
         self.ensure_sweep(area, rows, width)
         cells = area["sweep_cells"]
@@ -405,7 +411,7 @@ class VisualWidgets:
             cp = random.choice(base_cp) if isinstance(base_cp, (list, tuple)) else base_cp
             return (random.choice(self.sweep_symbols), cp)
 
-        if role == "main":
+        if not self.sweep_vertical(rows, width):
             span = max(1, width)
             head_max = max(0, span - 3)
             pos = max(0, min(head_max, area["sweep_pos"]))
@@ -445,7 +451,7 @@ class VisualWidgets:
         self.ensure_sweep(area, nrows, width)
         sweep_attr = self.curses.color_pair(1)
         trail_attr = self.curses.color_pair(1) | self.curses.A_DIM
-        if role == "main":
+        if not self.sweep_vertical(nrows, width):
             head_max = max(0, width - 3)
             pos = max(0, min(head_max, area["sweep_pos"]))
             head_cols = {c for c in range(pos, min(width, pos + 3))}
