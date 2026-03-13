@@ -344,6 +344,15 @@ def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str
     return scenes
 
 
+def _build_style_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
+    scenes = []
+    for style_name in config_style_names(config_paths):
+        runtime = resolve_config_style(style_name, parser, config_paths)
+        runtime["showcase_header_lines"] = [f"style: {style_name}"]
+        scenes.append(runtime)
+    return scenes
+
+
 def _build_demo_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser,
                          image_module, image_checker,
                          config_paths: tuple[str, ...] | None = None) -> dict:
@@ -352,6 +361,7 @@ def _build_demo_showcase(vocab: str, speed: int, text: str, image_paths: list[st
     scenes.extend(_build_widget_scenes(vocab, speed, text, image_paths, parser, image_module, image_checker, resolved_paths))
     scenes.extend(_build_vocab_scenes(speed, text, parser, resolved_paths))
     scenes.extend(_build_layout_scenes(vocab, speed, parser, resolved_paths))
+    scenes.extend(_build_style_scenes(parser, resolved_paths))
     initial = scenes[0]
     return {
         "active": True,
