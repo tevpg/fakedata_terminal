@@ -60,7 +60,7 @@ DEMO_SCENES = [
 
 SIDEBAR_CYCLE_MODES = [
     "text", "text_wide", "text_spew", "bars", "text_scant",
-    "clock", "matrix", "oscilloscope", "blocks", "sweep",
+    "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel", "boxes",
 ]
 
 # ── Colour pair indices ───────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ def main(stdscr):
         pass
 
     TEXT_MODES = {"text", "text_wide", "text_scant", "text_spew"}
-    STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life"}
+    STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life", "tunnel", "boxes"}
     STYLE_VOCAB_MODES = {"text", "text_wide", "text_scant", "bars"}
     MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>[]{}/*+-=."
     SWEEP_SYMBOLS = "∑∏∫∮√∞≈≠≤≥∂∇∈∉∩∪⊂⊃⊆⊇⊕⊗⊥∥∀∃∝∠∅∴∵≜≙⊢⊨"
@@ -277,7 +277,7 @@ def main(stdscr):
     def _cycle_widget_names(include_image: bool) -> list[str]:
         names = [
             "bars", "blocks", "clock", "image", "life", "matrix",
-            "oscilloscope", "readouts", "sparkline", "sweep",
+            "oscilloscope", "readouts", "sparkline", "sweep", "tunnel", "boxes",
             "text", "text_scant", "text_spew", "text_wide",
         ]
         if not include_image:
@@ -395,6 +395,13 @@ def main(stdscr):
             "sweep_cells": [],
             "sweep_pos": 0,
             "sweep_dir": 1,
+            "boxes_sig": None,
+            "boxes_layers": [],
+            "tunnel_sig": None,
+            "tunnel_layers": [],
+            "tunnel_phase": random.random(),
+            "tunnel_palette_idx": random.randrange(6),
+            "tunnel_drift_phase": random.uniform(0.0, math.tau),
             "next_update": 0.0,
             "burst_fn": None,
             "burst_delay": 0.0,
@@ -951,6 +958,102 @@ def main(stdscr):
                 except curses.error:
                     pass
 
+    def _build_nested_box_layers(rows: int, width: int, side_border_width: int = 1):
+        layers = []
+        inset_y = 0
+        inset_x = 0
+        step_x = max(1, side_border_width)
+        while True:
+            top = inset_y
+            left = inset_x
+            bottom = rows - 1 - inset_y
+            right = width - 1 - inset_x
+            if top > bottom or left > right:
+                break
+            cells = []
+            for c in range(left + 1, right):
+                cells.append((top, c, "─"))
+            for r in range(top + 1, bottom):
+                cells.append((r, right, "│"))
+            if bottom > top:
+                for c in range(right - 1, left, -1):
+                    cells.append((bottom, c, "─"))
+            if right > left:
+                for r in range(bottom - 1, top, -1):
+                    cells.append((r, left, "│"))
+            if top == bottom and left == right:
+                cells.append((top, left, "•"))
+            elif top == bottom:
+                for c in range(left, right + 1):
+                    cells.append((top, c, "─"))
+            elif left == right:
+                for r in range(top, bottom + 1):
+                    cells.append((r, left, "│"))
+            else:
+                cells.extend([
+                    (top, left, "┌"),
+                    (top, right, "┐"),
+                    (bottom, left, "└"),
+                    (bottom, right, "┘"),
+                ])
+            layers.append(cells)
+            inset_y += 1
+            inset_x += step_x
+        return layers
+
+    def _build_boxes_layers(rows: int, width: int):
+        return _build_nested_box_layers(rows, width, side_border_width=1)
+
+    def _build_tunnel_layers(rows: int, width: int):
+        return _build_nested_box_layers(rows, width, side_border_width=2)
+
+    def _ensure_boxes(area: dict, rows: int, width: int):
+        sig = (rows, width)
+        if area["boxes_sig"] == sig:
+            return
+        area["boxes_sig"] = sig
+        area["boxes_layers"] = _build_boxes_layers(rows, width)
+
+    def _update_boxes(area: dict, rows: int, width: int):
+        _ensure_boxes(area, rows, width)
+
+    def _ensure_tunnel(area: dict, rows: int, width: int):
+        sig = (rows, width)
+        if area["tunnel_sig"] == sig:
+            return
+        area["tunnel_sig"] = sig
+        area["tunnel_layers"] = _build_tunnel_layers(rows, width)
+
+    def _repaint_nested_layers(layers, area: dict, rows: int, y: int, x: int, width: int, attr_for_band=None):
+        blank = " " * width
+        for r in range(rows):
+            safe_w = _safe_row_width(y, r, x, width)
+            if safe_w <= 0:
+                continue
+            try:
+                stdscr.addnstr(y + r, x, blank, safe_w, curses.color_pair(1))
+            except curses.error:
+                pass
+        if not layers:
+            return
+        cadence = 4
+        phase = (area["tick"] // cadence) % cadence
+        for inner_offset, layer in enumerate(reversed(layers)):
+            if (inner_offset - phase) % cadence != 0:
+                continue
+            band_idx = (inner_offset - phase) // cadence
+            attr = attr_for_band(band_idx) if attr_for_band is not None else (curses.color_pair(6) | curses.A_BOLD)
+            for rr, cc, ch in layer:
+                if 0 <= rr < rows and 0 <= cc < width:
+                    try:
+                        stdscr.addch(y + rr, x + cc, ch, attr)
+                    except curses.error:
+                        pass
+
+    def _repaint_boxes(area: dict, rows: int, y: int, x: int, width: int):
+        _ensure_boxes(area, rows, width)
+        _repaint_nested_layers(area.get("boxes_layers") or [], area, rows, y, x, width)
+
     def _ensure_sweep(area: dict, rows: int, width: int):
         cells = area["sweep_cells"]
         while len(cells) < rows:
@@ -1062,6 +1165,30 @@ def main(stdscr):
                         stdscr.addch(y + r, x + c, ch, attr)
                     except curses.error:
                         pass
+
+    def _update_tunnel(area: dict, rows: int, width: int):
+        _ensure_tunnel(area, rows, width)
+
+    def _repaint_tunnel(area: dict, rows: int, y: int, x: int, width: int):
+        _ensure_tunnel(area, rows, width)
+        tunnel_attrs = [
+            curses.color_pair(5) | curses.A_BOLD,
+            curses.color_pair(4) | curses.A_BOLD,
+            curses.color_pair(6) | curses.A_BOLD,
+            curses.color_pair(3) | curses.A_BOLD,
+            curses.color_pair(8) | curses.A_BOLD,
+            curses.color_pair(9) | curses.A_BOLD,
+            curses.color_pair(2) | curses.A_BOLD,
+        ]
+        _repaint_nested_layers(
+            area.get("tunnel_layers") or [],
+            area,
+            rows,
+            y,
+            x,
+            width,
+            attr_for_band=lambda band_idx: tunnel_attrs[band_idx % len(tunnel_attrs)],
+        )
 
     def _gauge_parse_num(s: str):
         try:
@@ -1791,7 +1918,7 @@ def main(stdscr):
 
     def _steady_mode_delay(mode: str, speed: int) -> float:
         delay = _centre_delay(speed)
-        if mode in {"clock", "blocks", "sweep"}:
+        if mode in {"clock", "blocks", "sweep", "tunnel", "boxes"}:
             return delay / 1.5
         return delay
 
@@ -1816,8 +1943,12 @@ def main(stdscr):
             _ensure_text_buffer(area, rows, mode, width, role)
         elif mode == "blocks":
             _ensure_blocks(area, rows, width)
+        elif mode == "boxes":
+            _ensure_boxes(area, rows, width)
         elif mode == "sweep":
             _ensure_sweep(area, rows, width)
+        elif mode == "tunnel":
+            return
         elif mode in {"gauges", "sparkline", "readouts"}:
             _ensure_gauges(area, rows, width, role, mode)
             if area.get("title"):
@@ -1885,8 +2016,12 @@ def main(stdscr):
             _update_matrix(area, rows, width)
         elif mode == "blocks":
             _update_blocks(area, rows, width)
+        elif mode == "boxes":
+            _update_boxes(area, rows, width)
         elif mode == "sweep":
             _update_sweep(area, rows, width, role)
+        elif mode == "tunnel":
+            _update_tunnel(area, rows, width)
         elif mode == "oscilloscope":
             _update_scope(area, width)
         elif mode in {"gauges", "sparkline", "readouts"}:
@@ -1962,8 +2097,12 @@ def main(stdscr):
             _repaint_matrix(area, rows, y, x, width)
         elif mode == "blocks":
             _repaint_blocks(area, rows, y, x, width)
+        elif mode == "boxes":
+            _repaint_boxes(area, rows, y, x, width)
         elif mode == "sweep":
             _repaint_sweep(area, rows, y, x, width, role)
+        elif mode == "tunnel":
+            _repaint_tunnel(area, rows, y, x, width)
         elif mode == "oscilloscope":
             _repaint_scope(area, rows, y, x, width)
         elif mode == "gauges":

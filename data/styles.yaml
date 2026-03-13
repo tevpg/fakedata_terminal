@@ -270,6 +270,16 @@ styles:
         title: "FEED"
         source_vocab: hacker
 
+  tunnel:
+    note: >
+      Full-screen endless tunnel prototype using expanding box outlines.
+    layout: full
+    vocab: science
+    speed: 75
+    regions:
+      full:
+        widget: tunnel
+
   test1:
     note: >
       Mixed 2x2 smoke-test style with one widget per panel/region.
@@ -404,6 +414,8 @@ widgets:
     - oscilloscope
     - blocks
     - sweep
+    - tunnel
+    - boxes
     - cycle
 
   # Proposed names for the current "gauges" composite when split into regions.

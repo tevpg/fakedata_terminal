@@ -7,7 +7,7 @@ FakeData Terminal is a curses-based Python app that renders animated, fake telem
 - Renders multi-panel terminal scenes using `curses`
 - Drives text widgets from themed vocab pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads layouts and style presets from [`data/styles.yaml`](/fs/sysbits/fakedata_terminal/data/styles.yaml)
-- Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, and `image`
+- Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset style or build a screen explicitly with `--layout` and `--assign`
 
 ## Requirements
@@ -151,4 +151,4 @@ Overlay semantics:
 - Running `python3 app.py` with no arguments prints the CLI help and exits.
 - Image mode fails fast if `Pillow` or `jp2a` is unavailable.
 - `--config PATH` is repeatable and can add site, user, or project-specific overlays.
-- Preset names currently include `clocks`, `cycle9`, `cycle4`, `science`, `science2`, `geometries`, `test1` through `test7`, and `gauges`.
+- Preset names currently include `clocks`, `cycle9`, `cycle4`, `science`, `science2`, `geometries`, `tunnel`, `test1` through `test7`, and `gauges`.
