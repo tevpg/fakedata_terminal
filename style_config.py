@@ -24,7 +24,7 @@ DEFAULT_KEYS = {"vocab", "speed", "panel_speed", "image"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 STYLE_KEYS = {"note", "layout", "vocab", "speed", "text", "regions"}
-REGION_KEYS = {"widget", "speed", "title", "source_vocab", "image", "paths", "path", "glob", "cycle"}
+REGION_KEYS = {"widget", "speed", "title", "source_vocab", "image", "paths", "path", "glob", "cycle", "colour", "color"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 
@@ -474,6 +474,15 @@ def _region_cycle_widgets(region_cfg: Any) -> list[str]:
     return [str(widget) for widget in widgets]
 
 
+def _region_colour(region_cfg: Any) -> str | None:
+    if not isinstance(region_cfg, dict):
+        return None
+    value = region_cfg.get("colour")
+    if value is None:
+        value = region_cfg.get("color")
+    return str(value) if value is not None else None
+
+
 def adapt_style_to_legacy(style_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_style_catalog(config_paths)
     styles = catalog.get("styles", {})
@@ -618,6 +627,7 @@ def _resolve_runtime_style(style_name: str, layout_name: str, layout_cfg: dict[s
             "speed": region_cfg.get("speed") if isinstance(region_cfg, dict) else None,
             "title": region_cfg.get("title") if isinstance(region_cfg, dict) else None,
             "vocab": region_cfg.get("source_vocab") if isinstance(region_cfg, dict) else None,
+            "colour": _region_colour(region_cfg),
             "image_paths": area_images,
             "cycle_widgets": _region_cycle_widgets(region_cfg) if widget == "cycle" else [],
         }

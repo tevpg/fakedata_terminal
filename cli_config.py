@@ -38,6 +38,34 @@ VOCAB_CHOICES = [
     "hacker", "science", "medicine", "pharmacy", "finance",
     "space", "military", "navigation", "spaceteam",
 ]
+COLOUR_CHOICES = [
+    "red", "orange", "amber", "yellow", "green", "lime", "cyan", "blue",
+    "magenta", "purple", "pink", "white", "grey", "multi",
+]
+COLOUR_HELP = ", ".join(COLOUR_CHOICES)
+
+
+def _ansi_colour_label(name: str) -> str:
+    if not sys.stdout.isatty():
+        return name
+    codes = {
+        "red": "\033[31m",
+        "orange": "\033[38;5;208m",
+        "amber": "\033[38;5;172m",
+        "yellow": "\033[93m",
+        "green": "\033[32m",
+        "lime": "\033[92m",
+        "cyan": "\033[36m",
+        "blue": "\033[34m",
+        "magenta": "\033[35m",
+        "purple": "\033[38;5;141m",
+        "pink": "\033[38;5;213m",
+        "white": "\033[97m",
+        "grey": "\033[38;5;245m",
+        "multi": "\033[1m",
+    }
+    reset = "\033[0m"
+    return f"{codes.get(name, '')}{name}{reset}"
 
 
 def _style_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -72,7 +100,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
     )
     parser.add_argument(
         "--list", action="store_true",
-        help="List configured styles, layouts, and available widgets, then exit.")
+        help="List configured styles, layouts, widgets, and colours in columns, then exit.")
     parser.add_argument(
         "--config", action="append", default=[], metavar="PATH",
         help=("Load an extra config overlay. Repeatable. Relative image paths inside that file are "
@@ -102,11 +130,17 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--panel-vocab", action="append", default=[], metavar="REGION=STYLE",
         help="Override vocabulary style for a specific region or panel group. Repeatable.")
     parser.add_argument(
+        "--panel-colour", "--panel-color", action="append", default=[], metavar="REGION=VALUE",
+        help=f"Override colour for a specific region or panel group. Repeatable. Recognized: {COLOUR_HELP}.")
+    parser.add_argument(
         "--panel-image", action="append", default=[], metavar="REGION=PATH",
         help="Add an image path for a specific image region. Repeatable.")
     parser.add_argument(
         "--speed", type=int, default=None, metavar="N",
         help="Global speed 1 (slowest) to 100 (no delay).")
+    parser.add_argument(
+        "--colour", "--color", type=str, default=None, metavar="VALUE",
+        help=f"Global colour override for supported widgets. Recognized: {COLOUR_HELP}.")
     parser.add_argument(
         "--life-max", type=int, default=200, metavar="N",
         help="Maximum iterations before life mode reseeds. Default 200.")
@@ -125,17 +159,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
 
 
 def _print_list(config_paths: tuple[str, ...] | None = None) -> None:
-    print("Styles:")
-    for name in _style_choices(config_paths):
-        print(f"  {name}")
-    print()
-    print("Layouts:")
-    for name in _layout_choices(config_paths):
-        print(f"  {name}")
-    print()
-    print("Widgets:")
-    for name in widget_names(config_paths):
-        print(f"  {name}")
+    for line in _format_catalog_columns(config_paths or ()):
+        print(line)
 
 
 def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
@@ -163,11 +188,13 @@ def _format_catalog_columns(config_paths: tuple[str, ...]) -> list[str]:
     layouts = layout_names(config_paths)
     vocabs = VOCAB_CHOICES[:]
     styles = config_style_names(config_paths)
+    colours = [_ansi_colour_label(name) for name in COLOUR_CHOICES]
     columns = [
         ("Widgets", widgets),
         ("Layouts", layouts),
         ("Vocabs", vocabs),
         ("Styles", styles),
+        ("Colours", colours),
     ]
     widths = []
     for heading, values in columns:
@@ -350,7 +377,7 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
 
 
 def _apply_assign_overrides(base_style: dict | None, assignments: list[str], panel_speeds: list[str],
-                            panel_vocabs: list[str], panel_images: list[str],
+                            panel_vocabs: list[str], panel_colours: list[str], panel_images: list[str],
                             parser, *, layout_name: str, style_name: str, vocab: str,
                             speed: int, text: str, config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
@@ -364,6 +391,8 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
                 entry["title"] = area["title"]
             if area.get("vocab"):
                 entry["source_vocab"] = area["vocab"]
+            if area.get("colour"):
+                entry["colour"] = area["colour"]
             if area.get("image_paths"):
                 entry["image"] = {"paths": area["image_paths"][:]}
             if area.get("cycle_widgets"):
@@ -423,6 +452,13 @@ def _apply_assign_overrides(base_style: dict | None, assignments: list[str], pan
         if normalized_target not in regions_cfg:
             parser.error(f"--panel-vocab target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["source_vocab"] = vocab_name
+
+    for item in panel_colours:
+        target, colour_name = _parse_equals(item, parser, "--panel-colour")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-colour", config_paths)
+        if normalized_target not in regions_cfg:
+            parser.error(f"--panel-colour target '{target}' has no matching assignment")
+        regions_cfg[normalized_target]["colour"] = colour_name
 
     for item in panel_images:
         target, image_path = _parse_equals(item, parser, "--panel-image")
@@ -490,13 +526,14 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.demo and (args.style is not None or args.layout is not None or args.assign or args.panel_speed or args.panel_vocab or args.panel_image):
+    if args.demo and (args.style is not None or args.layout is not None or args.assign or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image):
         parser.error("--demo is a standalone showcase mode; do not combine it with --style, --layout, or panel overrides")
 
     if not args.demo and args.style is None and args.layout is None:
         parser.error("specify either --style, --layout, or --demo")
 
     speed_explicit = any(a == "--speed" or a.startswith("--speed=") for a in raw_argv)
+    colour_explicit = any(a in {"--colour", "--color"} or a.startswith("--colour=") or a.startswith("--color=") for a in raw_argv)
     text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
     image_explicit = any(a == "--image" or a.startswith("--image=") for a in raw_argv)
 
@@ -543,7 +580,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
 
         has_cli_overrides = bool(
-            args.layout or args.assign or args.panel_speed or args.panel_vocab or args.panel_image or args.vocab
+            args.layout or args.assign or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.vocab
         )
         if base_runtime is None or has_cli_overrides:
             config_style_runtime = _apply_assign_overrides(
@@ -551,6 +588,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 args.assign,
                 args.panel_speed,
                 args.panel_vocab,
+                args.panel_colour,
                 args.panel_image,
                 parser,
                 layout_name=runtime_layout_name,
@@ -562,6 +600,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             )
         else:
             config_style_runtime = base_runtime
+
+    if colour_explicit and args.colour is not None:
+        for area in config_style_runtime["areas"]:
+            if not area.get("colour"):
+                area["colour"] = args.colour
 
     if runtime_speed is None:
         runtime_speed = config_style_runtime["speed"]

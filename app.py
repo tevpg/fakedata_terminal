@@ -74,6 +74,11 @@ SIDEBAR_CYCLE_MODES = [
 #  7  Cyan          right-column default (dim)
 #  8  Blue          image mode accent
 #  9  Magenta       image mode accent
+# 10  Orange        256-colour; falls back to yellow
+# 11  Amber         256-colour; falls back to yellow
+# 12  Purple        256-colour; falls back to magenta
+# 13  Pink          256-colour; falls back to magenta
+# 14  Grey          256-colour; falls back to white
 
 COLOUR_PAIRS = {
     1: (curses.COLOR_GREEN,  curses.COLOR_BLACK),
@@ -85,6 +90,11 @@ COLOUR_PAIRS = {
     7: (curses.COLOR_CYAN,   curses.COLOR_BLACK),
     8: (curses.COLOR_BLUE,   curses.COLOR_BLACK),
     9: (curses.COLOR_MAGENTA, curses.COLOR_BLACK),
+    10: (208,                curses.COLOR_BLACK),
+    11: (172,                curses.COLOR_BLACK),
+    12: (141,                curses.COLOR_BLACK),
+    13: (213,                curses.COLOR_BLACK),
+    14: (245,                curses.COLOR_BLACK),
 }
 
 # ── Paragraph colour state machine (left column) ──────────────────────────────
@@ -134,6 +144,47 @@ def _rcol_colour(_line: str) -> tuple:
     if random.random() < 0.07: return 6, True
     if random.random() < 0.09: return 3, False
     return 7, False
+
+def _normalize_colour_spec(spec: str | None) -> str | None:
+    if spec is None:
+        return None
+    normalized = str(spec).strip().lower().replace("-", " ").replace("_", " ")
+    aliases = {
+        "brightgreen": "lime",
+        "bright green": "lime",
+        "light green": "lime",
+        "lightblue": "cyan",
+        "light blue": "cyan",
+        "gray": "grey",
+        "brown": "amber",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _colour_attr_from_spec(spec: str | None, *, default: str, bold: bool = False):
+    resolved = _normalize_colour_spec(spec) or _normalize_colour_spec(default)
+    if resolved == "multi":
+        return None
+    mapping = {
+        "green": curses.color_pair(1),
+        "lime": curses.color_pair(6),
+        "red": curses.color_pair(5),
+        "yellow": curses.color_pair(4),
+        "orange": curses.color_pair(10),
+        "amber": curses.color_pair(11),
+        "cyan": curses.color_pair(3),
+        "blue": curses.color_pair(8),
+        "magenta": curses.color_pair(9),
+        "purple": curses.color_pair(12),
+        "pink": curses.color_pair(13),
+        "white": curses.color_pair(2),
+        "grey": curses.color_pair(14),
+        "gray": curses.color_pair(14),
+    }
+    attr = mapping.get(resolved, mapping[_normalize_colour_spec(default) or "white"])
+    if bold:
+        attr |= curses.A_BOLD
+    return attr
 
 # ── Speed helpers (1-100 scale) ───────────────────────────────────────────────
 #
@@ -378,6 +429,7 @@ def main(stdscr):
             "gauge_tick": 0,
             "gauge_signal": None,
             "gauge_title": "",
+            "colour_override": None,
             "gauge_base_reads": [],
             "gauge_reads": [],
             "gauge_scroll_title": "",
@@ -854,6 +906,17 @@ def main(stdscr):
     def _repaint_radar(area: dict, nrows: int, y: int, x: int, width: int):
         canvas = [[" " for _ in range(width)] for _ in range(nrows)]
         attrs = [[curses.color_pair(1) for _ in range(width)] for _ in range(nrows)]
+        face_spec = _normalize_colour_spec(area.get("colour_override")) or "cyan"
+        face_attr = _colour_attr_from_spec(face_spec, default="cyan")
+        face_multi_attrs = [
+            curses.color_pair(5) | curses.A_BOLD,
+            curses.color_pair(4) | curses.A_BOLD,
+            curses.color_pair(6) | curses.A_BOLD,
+            curses.color_pair(3) | curses.A_BOLD,
+            curses.color_pair(8) | curses.A_BOLD,
+            curses.color_pair(9) | curses.A_BOLD,
+            curses.color_pair(2) | curses.A_BOLD,
+        ]
         cx = (width - 1) / 2.0
         cy = (nrows - 1) / 2.0
         # Assume conventional terminal cells are roughly twice as tall as they are wide.
@@ -872,10 +935,14 @@ def main(stdscr):
                 dx = (c - cx) / max(1.0, xrad)
                 dy = (r - cy) / max(1.0, yrad)
                 dist = math.sqrt(dx * dx + dy * dy)
+                ang = math.atan2(dy, dx)
                 if abs(dist - 1.0) < 0.08:
                     canvas[r][c] = "•"
-                    attrs[r][c] = curses.color_pair(3)
-                ang = math.atan2(dy, dx)
+                    if face_spec == "multi":
+                        sector = int((((ang + math.pi) / (math.pi * 2)) * len(face_multi_attrs)))
+                        attrs[r][c] = face_multi_attrs[sector % len(face_multi_attrs)]
+                    else:
+                        attrs[r][c] = face_attr
                 delta = abs((ang - area["radar_angle"] + math.pi) % (math.pi * 2) - math.pi)
                 if dist <= 1.0 and delta < 0.08:
                     if delta < 0.02:
@@ -1153,6 +1220,7 @@ def main(stdscr):
 
     def _repaint_tunnel(area: dict, rows: int, y: int, x: int, width: int):
         _ensure_tunnel(area, rows, width)
+        colour_spec = _normalize_colour_spec(area.get("colour_override")) or "multi"
         tunnel_attrs = [
             curses.color_pair(5) | curses.A_BOLD,
             curses.color_pair(4) | curses.A_BOLD,
@@ -1162,6 +1230,7 @@ def main(stdscr):
             curses.color_pair(9) | curses.A_BOLD,
             curses.color_pair(2) | curses.A_BOLD,
         ]
+        single_attr = _colour_attr_from_spec(colour_spec, default="green", bold=True)
         _repaint_nested_layers(
             area.get("tunnel_layers") or [],
             area,
@@ -1169,7 +1238,8 @@ def main(stdscr):
             y,
             x,
             width,
-            attr_for_band=lambda band_idx: tunnel_attrs[band_idx % len(tunnel_attrs)],
+            attr_for_band=(lambda _band_idx: single_attr) if colour_spec != "multi"
+            else (lambda band_idx: tunnel_attrs[band_idx % len(tunnel_attrs)]),
         )
 
     def _gauge_parse_num(s: str):
@@ -1361,7 +1431,7 @@ def main(stdscr):
         feed_start = div2 + 1
         return spark_rows, div1, reads_start, div2, feed_start
 
-    def _draw_divider(y: int, row: int, x: int, width: int, label, cp=3):
+    def _draw_divider(y: int, row: int, x: int, width: int, label, cp=3, attr=None):
         inner = f"[ {label} ]"
         dashes = max(0, width - len(inner) - 2)
         left = dashes // 2
@@ -1371,7 +1441,8 @@ def main(stdscr):
         if safe_w <= 0:
             return
         try:
-            stdscr.addnstr(y + row, x, txt[:safe_w].ljust(safe_w), safe_w, curses.color_pair(cp) | curses.A_DIM)
+            draw_attr = attr if attr is not None else (curses.color_pair(cp) | curses.A_DIM)
+            stdscr.addnstr(y + row, x, txt[:safe_w].ljust(safe_w), safe_w, draw_attr)
         except curses.error:
             pass
 
@@ -1474,6 +1545,17 @@ def main(stdscr):
         blank = " " * width
         title = area["gauge_title"]
         use_title = _readout_use_title(rows)
+        colour_spec = _normalize_colour_spec(area.get("colour_override")) or "white"
+        multi_attrs = [
+            curses.color_pair(2),
+            curses.color_pair(3),
+            curses.color_pair(6),
+            curses.color_pair(4),
+            curses.color_pair(5),
+            curses.color_pair(8),
+            curses.color_pair(9),
+        ]
+        single_attr = _colour_attr_from_spec(colour_spec, default="white")
         data_rows = min(len(area["gauge_reads"]), max(1, rows - (1 if use_title else 0)))
         content_rows = min(rows, data_rows + (1 if use_title else 0))
         top_pad = max(0, (rows - content_rows) // 2)
@@ -1486,7 +1568,8 @@ def main(stdscr):
             except curses.error:
                 pass
         if use_title:
-            _draw_divider(y, top_pad, x, width, title)
+            title_attr = multi_attrs[0] if colour_spec == "multi" else single_attr
+            _draw_divider(y, top_pad, x, width, title, attr=title_attr | curses.A_DIM)
         for i, (label, val_fn, unit) in enumerate(area["gauge_reads"]):
             row = start_row + i
             if row >= rows:
@@ -1503,7 +1586,8 @@ def main(stdscr):
             if safe_w <= 0:
                 continue
             try:
-                stdscr.addnstr(y + row, x, line[:safe_w].ljust(safe_w), safe_w, curses.color_pair(2))
+                line_attr = multi_attrs[(i + (1 if use_title else 0)) % len(multi_attrs)] if colour_spec == "multi" else single_attr
+                stdscr.addnstr(y + row, x, line[:safe_w].ljust(safe_w), safe_w, line_attr)
             except curses.error:
                 pass
 
@@ -2272,6 +2356,7 @@ def main(stdscr):
                 area["title"] = spec.get("title")
                 area["label"] = spec.get("label")
                 area["speed_override"] = spec.get("speed")
+                area["colour_override"] = spec.get("colour")
                 area["role"] = spec["role"]
                 area["style_override"] = spec.get("vocab")
                 area["image_paths"] = spec.get("image_paths") or []
@@ -2283,6 +2368,7 @@ def main(stdscr):
                 area["title"] = spec.get("title")
                 area["label"] = spec.get("label")
                 area["speed_override"] = spec.get("speed")
+                area["colour_override"] = spec.get("colour")
                 area["role"] = spec["role"]
                 area["style_override"] = spec.get("vocab")
                 area["image_paths"] = spec.get("image_paths") or []
