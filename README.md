@@ -84,7 +84,8 @@ Override per-region behavior:
   --scene test1 \
   --panel-widget p4=matrix \
   --panel-speed p4=80 \
-  --panel-theme p4=hacker
+  --panel-theme p4=hacker \
+  --panel-title p2=SIGNAL
 ```
 
 Run an image panel:

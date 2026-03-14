@@ -130,6 +130,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--panel-speed", action="append", default=[], metavar="REGION=N",
         help="Override speed for a specific region or panel group. Repeatable.")
     parser.add_argument(
+        "--panel-title", action="append", default=[], metavar="REGION=TEXT",
+        help="Override title for a specific region or panel group. Repeatable.")
+    parser.add_argument(
         "--panel-theme", action="append", default=[], metavar="REGION=THEME",
         help="Override theme for a specific region or panel group. Repeatable.")
     parser.add_argument(
@@ -189,8 +192,36 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
     return None
 
 
+def _widget_attribute_names(widget: str) -> list[str]:
+    widget_attrs = {
+        "bars": ["speed", "theme"],
+        "blank": [],
+        "blocks": ["speed"],
+        "clock": ["speed", "colour"],
+        "cycle": ["speed", "theme", "colour", "cycle"],
+        "image": ["speed", "image"],
+        "life": ["speed"],
+        "matrix": ["speed"],
+        "oscilloscope": ["speed", "theme"],
+        "readouts": ["theme", "title", "colour"],
+        "sparkline": ["speed", "theme", "colour"],
+        "sweep": ["speed"],
+        "text": ["speed", "theme", "theme-text"],
+        "text_scant": ["speed", "theme", "theme-text"],
+        "text_spew": ["speed", "theme", "theme-text"],
+        "text_wide": ["speed", "theme", "theme-text"],
+        "tunnel": ["speed", "colour"],
+    }
+    return widget_attrs.get(widget, ["speed"])
+
+
+def _format_widget_catalog_entry(widget: str) -> str:
+    attrs = ",".join(_widget_attribute_names(widget))
+    return f"{widget} [{attrs}]"
+
+
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
-    widgets = widget_names(config_paths)
+    widgets = [_format_widget_catalog_entry(name) for name in widget_names(config_paths)]
     layouts = layout_names(config_paths)
     themes = THEME_CHOICES[:]
     scenes = config_scene_names(config_paths)
@@ -416,7 +447,7 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
 
 
 def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[str], panel_speeds: list[str],
-                            panel_themes: list[str], panel_colours: list[str], panel_images: list[str],
+                            panel_titles: list[str], panel_themes: list[str], panel_colours: list[str], panel_images: list[str],
                             parser, *, layout_name: str, scene_name: str, theme: str,
                             speed: int, text: str, default_widget: str | None, default_colour: str | None,
                             config_paths: tuple[str, ...] | None = None) -> dict:
@@ -483,6 +514,13 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
         if normalized_target not in regions_cfg:
             parser.error(f"--panel-speed target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["speed"] = panel_speed
+
+    for item in panel_titles:
+        target, title_text = _parse_equals(item, parser, "--panel-title")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-title", config_paths)
+        if normalized_target not in regions_cfg:
+            parser.error(f"--panel-title target '{target}' has no matching assignment")
+        regions_cfg[normalized_target]["title"] = title_text
 
     for item in panel_themes:
         target, theme_name = _parse_equals(item, parser, "--panel-theme")
@@ -560,7 +598,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.demo and (args.scene is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_theme or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
+    if args.demo and (args.scene is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_title or args.panel_theme or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
         parser.error("--demo is a standalone showcase mode; do not combine it with --scene, --layout, or panel overrides")
 
     if not args.demo and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
@@ -618,13 +656,14 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_text = args.theme_text.strip() if text_explicit and args.theme_text is not None else (base_runtime["text"] if base_runtime else "")
 
         has_cli_overrides = bool(
-            args.layout or args.panel_widget or args.panel_speed or args.panel_theme or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit
+            args.layout or args.panel_widget or args.panel_speed or args.panel_title or args.panel_theme or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit
         )
         if base_runtime is None or has_cli_overrides:
             config_scene_runtime = _apply_panel_widget_overrides(
                 base_runtime if (base_runtime and not args.layout) else None,
                 args.panel_widget,
                 args.panel_speed,
+                args.panel_title,
                 args.panel_theme,
                 args.panel_colour,
                 args.panel_image,
