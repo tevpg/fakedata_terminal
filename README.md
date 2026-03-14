@@ -29,7 +29,7 @@ This repository does not include packaging metadata, so the most direct entrypoi
 python3 fakedata_terminal.py --list
 python3 fakedata_terminal.py --scene science
 python3 fakedata_terminal.py --layouts
-python3 fakedata_terminal.py --layout grid_2x2 --default-widget tunnel
+python3 fakedata_terminal.py --layout 2x2 --default-widget tunnel
 ```
 
 If you want image widgets, install the extra dependencies first:
@@ -71,11 +71,11 @@ Build a layout manually:
 
 ```bash
   python3 fakedata_terminal.py \
-  --layout grid_2x2 \
-  --panel-widget p1=life \
-  --panel-widget p2=clock \
-  --panel-widget p3=text \
-  --panel-widget p4=matrix
+  --layout 2x2 \
+  --panel-widget P1=life \
+  --panel-widget P2=clock \
+  --panel-widget P3=text \
+  --panel-widget P4=matrix
 ```
 
 Override per-region behavior:
@@ -83,33 +83,33 @@ Override per-region behavior:
 ```bash
   python3 fakedata_terminal.py \
   --scene test1 \
-  --panel-widget p4=matrix \
-  --panel-speed p4=80 \
-  --panel-theme p4=hacker \
-  --panel-text p2=SIGNAL
+  --panel-widget P4=matrix \
+  --panel-speed P4=80 \
+  --panel-theme P4=hacker \
+  --panel-text P2=SIGNAL
 ```
 
 Run an image panel:
 
 ```bash
   python3 fakedata_terminal.py \
-  --layout grid_3x2 \
-  --panel-widget p3+p4=image \
-  --panel-widget p5=clock \
-  --panel-widget p6=text \
-  --panel-image p3+p4=data/geom_33_torus.png
+  --layout 3x2 \
+  --panel-widget P3+P4=image \
+  --panel-widget P5=clock \
+  --panel-widget P6=text \
+  --panel-image P3+P4=data/geom_33_torus.png
 ```
 
 Set layout-wide defaults for unassigned panels:
 
 ```bash
 python3 fakedata_terminal.py \
-  --layout grid_3x3 \
+  --layout 3x3 \
   --default-widget cycle \
   --default-speed 70 \
   --default-colour cyan \
-  --panel-widget large_left=image \
-  --panel-image large_left=data/geom_33_torus.png
+  --panel-widget L2=image \
+  --panel-image L2=data/geom_33_torus.png
 ```
 
 If no `--scene` or `--layout` is provided, the configured `defaults.layout` is used.
@@ -195,9 +195,9 @@ Supported widget-default keys are:
 
 These pieces fit together in a specific order:
 
-- `Panel`: a single rectangular tile in a layout, usually named `p1`, `p2`, and so on.
+- `Panel`: a single rectangular tile in a layout, usually named `P1`, `P2`, and so on.
 - `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
-- `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `p2` or `p1+p2+p3`, or by an alias defined in the layout such as `main`, `left`, or `large_left`. Each region is assigned exactly one widget.
+- `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `P2` or `P1+P2+P3`, or by an alias defined in the layout such as `L`, `R`, `C`, `UR`, or `L2`. Each region is assigned exactly one widget.
 - `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `clock`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
 - `Region attributes`: options attached to one region assignment, such as `speed`, `text`, `source_theme`, `colour`, `image`, and `cycle`.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.

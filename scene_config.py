@@ -34,6 +34,97 @@ IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
 
+LEGACY_LAYOUT_ALIASES = {
+    "grid_2x2": "2x2",
+    "grid_3x3": "3x3",
+    "grid_4x3": "4x3",
+    "grid_3x2": "3x2",
+    "main_2x2_right_stack_3": "L2x2_R3",
+    "main_2x2_left_stack_3": "L3_R2x2",
+    "left_stack_2_right_grid_3x3": "L2_R3x3",
+    "left_stack_3_middle_stack_3_right_stack_2": "L3_M3_R2",
+    "left_grid_3x3_right_stack_2": "L3x3_R2",
+}
+
+LEGACY_REGION_ALIASES = {
+    "2x2": {
+        "left": "L",
+        "right": "R",
+        "top": "T",
+        "bottom": "B",
+    },
+    "3x3": {
+        "left": "L",
+        "center": "C",
+        "right": "R",
+        "large_left": "L2",
+        "large_right": "R2",
+        "top": "T",
+        "middle": "M",
+        "bottom": "B",
+    },
+    "4x3": {
+        "left": "L",
+        "center_left": "C1",
+        "center_right": "C2",
+        "right": "R",
+        "top": "T",
+        "middle": "M",
+        "bottom": "B",
+    },
+    "L2x2_R3": {
+        "main": "L2x2",
+        "right": "R",
+        "right_top": "UR",
+        "right_mid": "RM",
+        "right_bottom": "LR",
+    },
+    "L3_R2x2": {
+        "left": "L",
+        "left_top": "UL",
+        "left_mid": "LM",
+        "left_bottom": "LL",
+        "main": "R2x2",
+    },
+    "L2_R3x3": {
+        "left": "L",
+        "left_top": "UL",
+        "left_bottom": "LL",
+        "right": "R",
+        "right_left": "R1",
+        "right_center": "RC",
+        "right_right": "R2",
+    },
+    "L3_M3_R2": {
+        "left": "L",
+        "left_top": "UL",
+        "left_mid": "LM",
+        "left_bottom": "LL",
+        "middle": "M",
+        "middle_top": "MT",
+        "middle_mid": "C",
+        "middle_bottom": "MB",
+        "right": "R",
+        "right_top": "UR",
+        "right_bottom": "LR",
+    },
+    "L3x3_R2": {
+        "left": "L",
+        "left_left": "L1",
+        "left_center": "LC",
+        "left_right": "L2",
+        "right": "R",
+        "right_top": "UR",
+        "right_bottom": "LR",
+    },
+    "3x2": {
+        "main": "L2x2",
+        "right": "R",
+        "right_top": "UR",
+        "right_bottom": "LR",
+    },
+}
+
 
 def discover_config_paths() -> list[Path]:
     paths = [path for path in PACKAGE_CONFIG_PATHS if path.is_file()]
@@ -107,6 +198,78 @@ def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     return list(layouts.keys())
 
 
+def _match_name(value: Any, names: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    if text in names:
+        return text
+    folded = text.casefold()
+    for name in names:
+        name_text = str(name)
+        if name_text.casefold() == folded:
+            return name_text
+    return None
+
+
+def canonical_layout_name(layout_name: Any, config_paths: tuple[str, ...] | None = None) -> str | None:
+    layouts = layout_catalog(config_paths)
+    matched = _match_name(layout_name, layouts)
+    if matched is not None:
+        return matched
+    legacy_name = _match_name(layout_name, LEGACY_LAYOUT_ALIASES)
+    if legacy_name is None:
+        return None
+    canonical = LEGACY_LAYOUT_ALIASES[legacy_name]
+    return canonical if canonical in layouts else None
+
+
+def _canonical_panel_name(panel_name: Any, panels: dict[str, Any]) -> str | None:
+    return _match_name(panel_name, panels)
+
+
+def _canonical_region_alias(layout_name: str, region_name: Any, aliases: dict[str, Any]) -> str | None:
+    matched = _match_name(region_name, aliases)
+    if matched is not None:
+        return matched
+    legacy_aliases = LEGACY_REGION_ALIASES.get(layout_name, {})
+    legacy_name = _match_name(region_name, legacy_aliases)
+    if legacy_name is None:
+        return None
+    canonical = legacy_aliases[legacy_name]
+    return canonical if canonical in aliases else None
+
+
+def normalize_region_expr(layout_name: Any, region_expr: Any,
+                          config_paths: tuple[str, ...] | None = None) -> str | None:
+    canonical_layout = canonical_layout_name(layout_name, config_paths)
+    if canonical_layout is None:
+        return None
+    layouts = layout_catalog(config_paths)
+    layout_cfg = layouts.get(canonical_layout)
+    if not isinstance(layout_cfg, dict):
+        return None
+    return _normalize_region_expr_in_layout(canonical_layout, layout_cfg, region_expr)
+
+
+def _normalize_region_expr_in_layout(layout_name: str, layout_cfg: dict[str, Any], region_expr: Any) -> str | None:
+    panels = layout_cfg.get("panels", {})
+    aliases = layout_cfg.get("regions", {})
+    alias_name = _canonical_region_alias(layout_name, region_expr, aliases)
+    spec = aliases[alias_name] if alias_name is not None else region_expr
+    panel_names = [part.strip() for part in str(spec).split("+") if part.strip()]
+    if not panel_names:
+        return None
+
+    canonical_panels = []
+    for panel_name in panel_names:
+        canonical_panel = _canonical_panel_name(panel_name, panels)
+        if canonical_panel is None:
+            return None
+        canonical_panels.append(canonical_panel)
+    return "+".join(canonical_panels)
+
+
 def layout_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
@@ -161,8 +324,9 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
     colour = defaults.get("colour")
     if colour is None:
         colour = defaults.get("color")
+    layout_name = defaults.get("layout")
     return {
-        "layout": defaults.get("layout"),
+        "layout": canonical_layout_name(layout_name, config_paths) if layout_name is not None else None,
         "theme": defaults.get("theme", "science"),
         "speed": defaults.get("speed", 50),
         "widget": defaults.get("widget"),
@@ -187,7 +351,7 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
         else:
             _unknown_keys(defaults, DEFAULT_KEYS, "defaults", issues)
             layout_name = defaults.get("layout")
-            if layout_name is not None and str(layout_name) not in layout_names(config_paths):
+            if layout_name is not None and canonical_layout_name(layout_name, config_paths) is None:
                 issues.append(f"{config_label}: defaults.layout references unknown layout '{layout_name}'")
             widget = defaults.get("widget")
             if widget is not None and not _supported_widget(str(widget)):
@@ -238,7 +402,7 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                     continue
                 _unknown_keys(scene_cfg, SCENE_KEYS, f"scenes.{scene_name}", issues)
                 layout_name = scene_cfg.get("layout")
-                if layout_name and layout_name not in layout_names_set:
+                if layout_name and canonical_layout_name(layout_name, config_paths) is None:
                     issues.append(f"{config_label}: scene '{scene_name}' references unknown layout '{layout_name}'")
                 regions = scene_cfg.get("regions", {})
                 if not isinstance(regions, dict):
@@ -663,19 +827,13 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
     )
 
 
-def _parse_region_spec(layout_cfg: dict[str, Any], region_name: str, parser, scene_name: str) -> list[str]:
-    panels = layout_cfg.get("panels", {})
-    aliases = layout_cfg.get("regions", {})
-    if region_name in aliases:
-        spec = aliases[region_name]
-    else:
-        spec = region_name
-    panel_names = [part.strip() for part in str(spec).split("+") if part.strip()]
+def _parse_region_spec(layout_name: str, layout_cfg: dict[str, Any], region_name: str, parser, scene_name: str) -> list[str]:
+    normalized = _normalize_region_expr_in_layout(layout_name, layout_cfg, region_name)
+    if normalized is None:
+        parser.error(f"scene '{scene_name}' references unknown region '{region_name}'")
+    panel_names = normalized.split("+")
     if not panel_names:
         parser.error(f"scene '{scene_name}' has empty region spec for '{region_name}'")
-    for panel_name in panel_names:
-        if panel_name not in panels:
-            parser.error(f"scene '{scene_name}' references unknown panel '{panel_name}' in region '{region_name}'")
     return panel_names
 
 
@@ -721,7 +879,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
         if not _supported_widget(widget):
             parser.error(f"scene '{scene_name}' uses unsupported widget '{widget}'")
         widget_cfg = widget_defaults.get(widget, {})
-        panel_names = _parse_region_spec(layout_cfg, region_name, parser, scene_name)
+        panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, scene_name)
         rect = _rect_for_panels(layout_cfg, panel_names, parser, scene_name, region_name)
         area_images = []
         if widget == "image" and isinstance(region_cfg, dict):
@@ -825,11 +983,12 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
-    layout_cfg = layouts.get(layout_name)
+    canonical_name = canonical_layout_name(layout_name, config_paths)
+    layout_cfg = layouts.get(canonical_name) if canonical_name is not None else None
     if not isinstance(layout_cfg, dict):
         parser.error(f"unknown layout '{layout_name}'")
     return _resolve_runtime_scene(
-        scene_name, layout_name, layout_cfg, regions_cfg, parser,
+        scene_name, canonical_name, layout_cfg, regions_cfg, parser,
         theme=theme, speed=speed, text=text,
         default_widget=default_widget, default_colour=default_colour,
         config_paths=config_paths,

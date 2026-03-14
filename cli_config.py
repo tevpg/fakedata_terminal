@@ -8,12 +8,14 @@ import sys
 try:
     from .scene_config import (
         config_defaults,
+        canonical_layout_name,
         config_scene_names,
         discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
         layout_names,
+        normalize_region_expr,
         resolve_config_scene,
         resolve_runtime_layout,
         validate_scene_catalog,
@@ -22,12 +24,14 @@ try:
 except ImportError:
     from scene_config import (
         config_defaults,
+        canonical_layout_name,
         config_scene_names,
         discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
         layout_names,
+        normalize_region_expr,
         resolve_config_scene,
         resolve_runtime_layout,
         validate_scene_catalog,
@@ -96,10 +100,10 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --scenes\n"
             "  %(prog)s --scene test1\n"
             "  %(prog)s --config ~/.config/fakedata-terminal/scenes.yaml --scene lab\n"
-            "  %(prog)s --layout grid_2x2 --panel-widget p1=life --panel-widget p2=blank --panel-widget p3=text --panel-widget p4=clock\n"
-            "  %(prog)s --scene test1 --panel-widget p4=matrix --panel-speed p4=80\n"
-            "  %(prog)s --layout grid_3x3 --panel-widget large_left=image --panel-widget right=clock "
-            "--panel-image large_left=geom_07_diamond_lattice.png --panel-image large_left=geom_33_torus.png"
+            "  %(prog)s --layout 2x2 --panel-widget P1=life --panel-widget P2=blank --panel-widget P3=text --panel-widget P4=clock\n"
+            "  %(prog)s --scene test1 --panel-widget P4=matrix --panel-speed P4=80\n"
+            "  %(prog)s --layout 3x3 --panel-widget L2=image --panel-widget R=clock "
+            "--panel-image L2=geom_07_diamond_lattice.png --panel-image L2=geom_33_torus.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -123,7 +127,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--scene", type=str, default=None, choices=_scene_choices(config_paths),
         help="Config-defined scene preset.")
     parser.add_argument(
-        "--layout", type=str, default=None, choices=_layout_choices(config_paths),
+        "--layout", type=str, default=None,
         help="Explicit layout for the generalized panel runtime.")
     parser.add_argument(
         "--theme", type=str, default=None, choices=THEME_CHOICES,
@@ -447,10 +451,10 @@ def _build_widget_scenes(theme: str, speed: int, text: str, image_paths: list[st
             if widget == "image":
                 right_cfg["image"] = {"paths": image_paths[:]}
         runtime = resolve_runtime_layout(
-            "grid_2x2",
+            "2x2",
             {
-                "left": left_cfg,
-                "right": right_cfg,
+                "L": left_cfg,
+                "R": right_cfg,
             },
             parser,
             scene_name=f"<widgets:{widget}>",
@@ -519,21 +523,13 @@ def _parse_equals(expr: str, parser, flag_name: str) -> tuple[str, str]:
 
 def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name: str,
                           config_paths: tuple[str, ...] | None = None) -> str:
-    layouts = layout_catalog(config_paths)
-    layout_cfg = layouts.get(layout_name)
-    if not isinstance(layout_cfg, dict):
+    canonical_layout = canonical_layout_name(layout_name, config_paths)
+    if canonical_layout is None:
         parser.error(f"unknown layout '{layout_name}'")
-    panels = layout_cfg.get("panels", {})
-    aliases = layout_cfg.get("regions", {})
-
-    spec = aliases.get(region_expr, region_expr)
-    panel_names = [part.strip() for part in str(spec).split("+") if part.strip()]
-    if not panel_names:
-        parser.error(f"{flag_name} references an empty region '{region_expr}'")
-    for panel_name in panel_names:
-        if panel_name not in panels:
-            parser.error(f"{flag_name} references unknown panel '{panel_name}' in region '{region_expr}'")
-    return "+".join(panel_names)
+    normalized = normalize_region_expr(canonical_layout, region_expr, config_paths)
+    if normalized is None:
+        parser.error(f"{flag_name} references unknown region or panel spec '{region_expr}'")
+    return normalized
 
 
 def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[str], panel_speeds: list[str],
@@ -760,6 +756,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     else:
         base_runtime = resolve_config_scene(args.scene, parser, config_paths) if args.scene else None
         runtime_layout_name = args.layout or (base_runtime["layout"] if base_runtime else configured_defaults.get("layout"))
+        if runtime_layout_name is not None:
+            runtime_layout_name = canonical_layout_name(runtime_layout_name, config_paths)
         if not runtime_layout_name:
             parser.error("no layout available")
 
