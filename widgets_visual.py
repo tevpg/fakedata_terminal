@@ -15,7 +15,7 @@ class VisualWidgets:
         stdscr,
         safe_row_width,
         leading_blank,
-        area_style,
+        area_vocab,
         get_gauge_config,
         normalize_colour_spec,
         colour_attr_from_spec,
@@ -26,7 +26,7 @@ class VisualWidgets:
         self.stdscr = stdscr
         self.safe_row_width = safe_row_width
         self.leading_blank = leading_blank
-        self.area_style = area_style
+        self.area_vocab = area_vocab
         self.get_gauge_config = get_gauge_config
         self.normalize_colour_spec = normalize_colour_spec
         self.colour_attr_from_spec = colour_attr_from_spec
@@ -34,7 +34,7 @@ class VisualWidgets:
         self.sweep_symbols = sweep_symbols
 
     def update_scope(self, area: dict, width: int):
-        cfg = self.get_gauge_config(self.area_style(area))
+        cfg = self.get_gauge_config(self.area_vocab(area))
         area["scope_signal"] = cfg[1]
         raw = area["scope_signal"]()
         phase = area.get("scope_phase", 0.0)
