@@ -197,7 +197,7 @@ These pieces fit together in a specific order:
 
 - `Panel`: a single rectangular tile in a layout, usually named `P1`, `P2`, and so on.
 - `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
-- `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `P2` or `P1+P2+P3`, or by an alias defined in the layout such as `L`, `R`, `C`, `UR`, or `L2`. Each region is assigned exactly one widget.
+- `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `P2` or `P1+P2+P3`, or by an alias defined in the layout such as `L`, `R`, `C`, or `L2`. Each region is assigned exactly one widget.
 - `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `clock`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
 - `Region attributes`: options attached to one region assignment, such as `speed`, `text`, `source_theme`, `colour`, `image`, and `cycle`.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.

@@ -78,9 +78,6 @@ layouts:
     regions:
       L2x2: P1+P2+P3+P4
       R: P5+P6+P7
-      UR: P5
-      RM: P6
-      LR: P7
       full: P1+P2+P3+P4+P5+P6+P7
 
   L3_R2x2:
@@ -94,9 +91,6 @@ layouts:
       P7: {x: 0.6667, y: 0.50, w: 0.3333, h: 0.50}
     regions:
       L: P1+P2+P3
-      UL: P1
-      LM: P2
-      LL: P3
       R2x2: P4+P5+P6+P7
       full: P1+P2+P3+P4+P5+P6+P7
 
@@ -115,8 +109,6 @@ layouts:
       P11: {x: 0.75, y: 0.6667, w: 0.25, h: 0.3333}
     regions:
       L: P1+P2
-      UL: P1
-      LL: P2
       R: P3+P4+P5+P6+P7+P8+P9+P10+P11
       R1: P3+P4+P5
       RC: P6+P7+P8
@@ -135,16 +127,8 @@ layouts:
       P8: {x: 0.6667, y: 0.50, w: 0.3333, h: 0.50}
     regions:
       L: P1+P2+P3
-      UL: P1
-      LM: P2
-      LL: P3
       M: P4+P5+P6
-      MT: P4
-      C: P5
-      MB: P6
       R: P7+P8
-      UR: P7
-      LR: P8
       full: P1+P2+P3+P4+P5+P6+P7+P8
 
   L3x3_R2:
@@ -166,8 +150,6 @@ layouts:
       LC: P4+P5+P6
       L2: P7+P8+P9
       R: P10+P11
-      UR: P10
-      LR: P11
       full: P1+P2+P3+P4+P5+P6+P7+P8+P9+P10+P11
 
   3x2:
@@ -181,6 +163,4 @@ layouts:
     regions:
       L2x2: P1+P2+P3+P4
       R: P5+P6
-      UR: P5
-      LR: P6
       full: P1+P2+P3+P4+P5+P6

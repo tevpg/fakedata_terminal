@@ -11,9 +11,9 @@ tests=(
   "python3 fakedata_terminal.py --layout 3x3 --default-widget cycle --default-speed 70 --default-colour cyan --panel-widget L2=image --panel-image L2=${ROOT_DIR}/data/geom_33_torus.png"
   "python3 fakedata_terminal.py --layout 2x2 --theme science --panel-widget P1=text_wide --panel-widget P2=readouts --panel-widget P3=matrix --panel-widget P4=clock"
   "python3 fakedata_terminal.py --layout 3x3 --theme hacker --panel-widget L2=cycle --panel-widget R=readouts --panel-colour L2=multi --panel-speed R=80"
-  "python3 fakedata_terminal.py --layout L2x2_R3 --theme pharmacy --panel-widget L2x2=text --panel-widget UR=bars --panel-widget RM=sparkline --panel-widget LR=life --text \"VERIFY RX QUEUE\""
+  "python3 fakedata_terminal.py --layout L2x2_R3 --theme pharmacy --panel-widget L2x2=text --panel-widget P5=bars --panel-widget P6=sparkline --panel-widget P7=life --text \"VERIFY RX QUEUE\""
   "python3 fakedata_terminal.py --layout L2_R3x3 --theme science --panel-widget L=image --panel-widget RC=tunnel --panel-widget R2=clock --panel-image L=${ROOT_DIR}/data/geom_33_torus.png --panel-image L=${ROOT_DIR}/data/geom_40_geodesic_dome.png"
-  "python3 fakedata_terminal.py --layout 3x2 --theme navigation --panel-widget L2x2=sweep --panel-widget UR=readouts --panel-widget LR=blocks --glitch 4"
+  "python3 fakedata_terminal.py --layout 3x2 --theme navigation --panel-widget L2x2=sweep --panel-widget P5=readouts --panel-widget P6=blocks --glitch 4"
   "python3 fakedata_terminal.py --scenes"
   "python3 fakedata_terminal.py --widgets"
 )

@@ -165,13 +165,13 @@ scenes:
         image:
           glob: "geom*png"
         speed: 70
-      UR:
+      P5:
         widget: sparkline
         text: "SIGNAL"
-      RM:
+      P6:
         widget: readouts
         text: "READOUTS"
-      LR:
+      P7:
         widget: text_scant
         text: "FEED"
         source_theme: hacker
@@ -231,10 +231,10 @@ scenes:
     regions:
       L2x2:
         widget: text_scant
-      UR:
+      P5:
         widget: bars
         text: "LEVELS"
-      LR:
+      P6:
         widget: clock
         speed: 70
 
@@ -272,12 +272,12 @@ scenes:
     regions:
       L2x2:
         widget: blocks
-      UR:
+      P5:
         widget: text_spew
-      RM:
+      P6:
         widget: readouts
         text: "DOSING"
-      LR:
+      P7:
         widget: clock
 
   gauges:

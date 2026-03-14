@@ -622,9 +622,10 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
     if not regions:
         return "\n".join(diagram_lines)
 
+    name_width = max((len(str(region_name)) for region_name in regions), default=0)
     region_lines = ["Regions:"]
     for region_name, region_spec in regions.items():
-        region_lines.append(f"  {region_name}: {region_spec}")
+        region_lines.append(f"  {str(region_name):<{name_width}}  {region_spec}")
 
     left_width = max(len(line) for line in diagram_lines)
     row_count = max(len(diagram_lines), len(region_lines))
