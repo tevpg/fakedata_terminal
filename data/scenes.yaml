@@ -105,6 +105,7 @@ scenes:
         widget: text_wide
       p7:
         widget: readouts
+        text: "TIMEFLUX REDUCTIONS"
       p8:
         widget: text_spew
       p9:
@@ -167,13 +168,13 @@ scenes:
         speed: 70
       right_top:
         widget: sparkline
-        title: "SIGNAL"
+        text: "SIGNAL"
       right_mid:
         widget: readouts
-        title: "READOUTS"
+        text: "READOUTS"
       right_bottom:
         widget: text_scant
-        title: "FEED"
+        text: "FEED"
         source_theme: hacker
 
   tunnel:
@@ -196,7 +197,7 @@ scenes:
         widget: life
       p2:
         widget: sparkline
-        title: "SIGNAL"
+        text: "SIGNAL"
       p3:
         widget: text
       p4:
@@ -233,7 +234,7 @@ scenes:
         widget: text_scant
       right_top:
         widget: bars
-        title: "LEVELS"
+        text: "LEVELS"
       right_bottom:
         widget: clock
         speed: 70
@@ -248,7 +249,7 @@ scenes:
         widget: oscilloscope
       bottom:
         widget: readouts
-        title: "SYSTEMS"
+        text: "SYSTEMS"
 
   test6:
     note: >
@@ -258,7 +259,7 @@ scenes:
     regions:
       left:
         widget: sparkline
-        title: "SIGNAL"
+        text: "SIGNAL"
       center:
         widget: text
       right:
@@ -276,7 +277,7 @@ scenes:
         widget: text_spew
       right_mid:
         widget: readouts
-        title: "DOSING"
+        text: "DOSING"
       right_bottom:
         widget: clock
 
@@ -308,7 +309,7 @@ scenes:
 widgets:
   # Widget-specific fallback attributes use the same keys as region entries,
   # except "widget" itself is implied by the mapping key. Supported here:
-  # speed, title, source_theme, colour/color, image, and cycle.
+  # speed, text, source_theme, colour/color, image, and cycle.
   #
   # Example:
   # sweep:

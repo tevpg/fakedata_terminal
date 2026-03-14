@@ -502,13 +502,11 @@ def main(stdscr):
             return
         elif mode in {"gauges", "sparkline", "readouts"}:
             _ensure_gauges(area, rows, width, role, mode)
-            if area.get("title"):
-                if mode == "sparkline":
-                    area["gauge_title"] = area["title"]
-                elif mode == "readouts":
-                    area["gauge_title"] = area["title"]
+            if area.get("text_override"):
+                if mode == "readouts":
+                    area["gauge_title"] = area["text_override"]
                 else:
-                    area["gauge_scroll_title"] = area["title"]
+                    area["gauge_scroll_title"] = area["text_override"]
         elif mode == "image":
             _ensure_image(area, rows, width)
         elif mode == "blank":
@@ -663,7 +661,7 @@ def main(stdscr):
         elif mode == "life":
             _repaint_life(area, rows, y, x, width)
         elif mode == "blank":
-            if area.get("static_lines"):
+            if area.get("static_lines") or area.get("text_override"):
                 _repaint_static_lines(area, rows, y, x, width)
             elif area.get("unavailable_message"):
                 _repaint_unavailable(area, rows, y, x, width)
@@ -1015,7 +1013,7 @@ def run(argv=None) -> int:
     MAIN_SPEED_ARG = config["main_speed"]
     SIDEBAR_SPEED_ARG = config["sidebar_speed"]
     LIFE_MAX_ITERATIONS = config["life_max"]
-    INJECT_TEXT = config["theme_text"]
+    INJECT_TEXT = config["text"]
     MAIN_MODE = config["main_mode"]
     _ALL_THEMES = config["themes"]
     THEME_ARG = config["theme"]

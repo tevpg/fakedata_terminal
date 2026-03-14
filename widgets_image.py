@@ -295,6 +295,8 @@ class ImageWidgets:
     def repaint_static_lines(self, area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width
         lines = area.get("static_lines") or []
+        if not lines and area.get("text_override"):
+            lines = str(area["text_override"]).splitlines() or [str(area["text_override"])]
         align = area.get("static_align") or "top"
         top = max(0, (rows - len(lines)) // 2) if align == "center" else (1 if rows > 2 else 0)
         for r in range(rows):

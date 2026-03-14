@@ -269,6 +269,7 @@ def make_area_state(vocab_name: str | None, default_vocab: str, get_bar_config) 
         "textwall_pause_until": 0.0,
         "textwall_reverse_left": 0,
         "vocab_override": vocab_name,
+        "text_override": None,
         "unavailable_message": None,
         "static_lines": [],
         "static_align": "top",

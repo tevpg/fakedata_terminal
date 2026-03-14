@@ -29,7 +29,7 @@ DEFAULT_KEYS = {"layout", "theme", "speed", "panel_speed", "image", "widget", "c
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions"}
-REGION_KEYS = {"widget", "speed", "title", "source_theme", "image", "paths", "path", "glob", "cycle", "colour", "color"}
+REGION_KEYS = {"widget", "speed", "text", "source_theme", "image", "paths", "path", "glob", "cycle", "colour", "color"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
@@ -743,10 +743,10 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 if isinstance(region_cfg, dict) and region_cfg.get("speed") is not None
                 else widget_cfg.get("speed")
             ),
-            "title": (
-                region_cfg.get("title")
-                if isinstance(region_cfg, dict) and region_cfg.get("title") is not None
-                else widget_cfg.get("title")
+            "text": (
+                region_cfg.get("text")
+                if isinstance(region_cfg, dict) and region_cfg.get("text") is not None
+                else widget_cfg.get("text")
             ),
             "theme": (
                 region_cfg.get("source_theme")
@@ -794,7 +794,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 "w": float(panel_cfg["w"]),
                 "h": float(panel_cfg["h"]),
                 "speed": widget_cfg.get("speed"),
-                "title": widget_cfg.get("title"),
+                "text": widget_cfg.get("text"),
                 "theme": widget_cfg.get("source_theme"),
                 "colour": _region_colour(widget_cfg) or default_colour,
                 "image_paths": area_images,

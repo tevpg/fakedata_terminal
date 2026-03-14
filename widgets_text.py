@@ -162,7 +162,7 @@ class TextWidgets:
                 txt_state["theme"], txt_state["left"] = self.new_paragraph()
             vis = width if mode == "text_wide" else self.rand_line_len(width)
 
-        inject_text = self.inject_text_getter()
+        inject_text = state.get("text_override") or self.inject_text_getter()
         if inject_text:
             txt_state["countdown"] -= 1
             if txt_state["countdown"] <= 0:

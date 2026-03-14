@@ -91,7 +91,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area = make_area(spec["mode"], spec.get("theme"))
             area["mode"] = spec["mode"]
             area["name"] = spec["name"]
-            area["title"] = spec.get("title")
+            area["text_override"] = spec.get("text")
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
@@ -104,7 +104,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["static_align"] = spec.get("static_align") or "top"
             reset_area_timing(area)
         else:
-            area["title"] = spec.get("title")
+            area["text_override"] = spec.get("text")
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
