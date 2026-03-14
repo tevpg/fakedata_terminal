@@ -1,11 +1,11 @@
 # FakeData Terminal
 
-FakeData Terminal renders animated, fake telemetry screens in the terminal. It combines configurable layouts, widget assignments, themed vocabularies, and optional image-to-ASCII rendering to produce cinematic dashboard displays.
+FakeData Terminal renders animated, fake telemetry screens in the terminal. It combines configurable layouts, widget assignments, named themes, and optional image-to-ASCII rendering to produce cinematic dashboard displays.
 
 ## What It Does
 
 - Renders multi-panel terminal scenes using `curses`
-- Drives text widgets from themed vocab pools such as `science`, `hacker`, `medicine`, and `finance`
+- Drives text widgets from named theme pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and scene presets from [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml)
 - Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset scene or build a screen explicitly with `--layout`, `--panel-widget`, and `--default-*`
@@ -84,7 +84,7 @@ Override per-region behavior:
   --scene test1 \
   --panel-widget p4=matrix \
   --panel-speed p4=80 \
-  --panel-vocab p4=hacker
+  --panel-theme p4=hacker
 ```
 
 Run an image panel:
@@ -134,7 +134,7 @@ The runtime is config-first:
 - Regions alias one or more panels
 - Scenes bind widgets and options to regions
 - Config precedence is: packaged config, then local overlays, then CLI flags
-- Widget defaults can supply fallback `speed`, `colour`, `source_vocab`, `image`, and `cycle` settings per widget type
+- Widget defaults can supply fallback `speed`, `colour`, `source_theme`, `image`, and `cycle` settings per widget type
 
 The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml). Validation, overlay merging, and runtime adaptation are handled in [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
 
@@ -164,7 +164,7 @@ widgets:
     speed: 65
 
   readouts:
-    source_vocab: finance
+    source_theme: finance
 
   image:
     image:
@@ -179,7 +179,7 @@ Supported widget-default keys are:
 
 - `speed`
 - `title`
-- `source_vocab`
+- `source_theme`
 - `colour` or `color`
 - `image`
 - `cycle`
@@ -192,9 +192,9 @@ These pieces fit together in a specific order:
 - `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
 - `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `p2` or `p1+p2+p3`, or by an alias defined in the layout such as `main`, `left`, or `large_left`. Each region is assigned exactly one widget.
 - `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `clock`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
-- `Region attributes`: options attached to one region assignment, such as `speed`, `source_vocab`, `colour`, `title`, `image`, and `cycle`.
+- `Region attributes`: options attached to one region assignment, such as `speed`, `source_theme`, `colour`, `title`, `image`, and `cycle`.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.
-- `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide vocab/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, and `python3 fakedata_terminal.py --demo` to browse sample scenes, widgets, layouts, and vocabs.
+- `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide theme/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, and `python3 fakedata_terminal.py --demo` to browse sample scenes, widgets, layouts, and themes.
 
 In short:
 
@@ -220,7 +220,7 @@ Within the merged config, area attributes resolve in this order:
 - widget-specific defaults from `widgets.<widget>.*`
 - scene region settings in `scenes.<scene>.regions.*`
 - CLI defaults such as `--default-colour`, `--default-speed`, and `--default-widget` for values still not set by the config/scene layer
-- CLI per-panel overrides such as `--panel-colour`, `--panel-speed`, `--panel-vocab`, `--panel-image`, and `--panel-widget`
+- CLI per-panel overrides such as `--panel-colour`, `--panel-speed`, `--panel-theme`, `--panel-image`, and `--panel-widget`
 - built-in code fallback inside the widget implementation if an attribute is still unset
 
 ## Project Structure
@@ -229,7 +229,7 @@ Within the merged config, area attributes resolve in this order:
 - [`cli.py`](/home/tags/fakedata_terminal/cli.py): launcher wrapper
 - [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py): argument parsing and runtime config assembly
 - [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py): YAML loading, overlay merging, and validation
-- [`vocab.py`](/home/tags/fakedata_terminal/vocab.py): themed fake-data generators
+- [`vocab.py`](/home/tags/fakedata_terminal/vocab.py): theme data generators
 - [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml): packaged layout geometry and region aliases
 - [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml): defaults, widget fallbacks, and scene presets
 - [`data/`](/home/tags/fakedata_terminal/data): image assets used by image panels

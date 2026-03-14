@@ -25,11 +25,11 @@ PROJECT_CONFIG_NAMES = (
 )
 
 TOP_LEVEL_KEYS = {"defaults", "layouts", "scenes", "widgets"}
-DEFAULT_KEYS = {"layout", "vocab", "speed", "panel_speed", "image", "widget", "colour", "color"}
+DEFAULT_KEYS = {"layout", "theme", "speed", "panel_speed", "image", "widget", "colour", "color"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
-SCENE_KEYS = {"note", "layout", "vocab", "speed", "text", "regions"}
-REGION_KEYS = {"widget", "speed", "title", "source_vocab", "image", "paths", "path", "glob", "cycle", "colour", "color"}
+SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions"}
+REGION_KEYS = {"widget", "speed", "title", "source_theme", "image", "paths", "path", "glob", "cycle", "colour", "color"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
@@ -163,7 +163,7 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
         colour = defaults.get("color")
     return {
         "layout": defaults.get("layout"),
-        "vocab": defaults.get("vocab", "science"),
+        "theme": defaults.get("theme", "science"),
         "speed": defaults.get("speed", 50),
         "widget": defaults.get("widget"),
         "colour": colour,
@@ -609,7 +609,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
         parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     scene_speed = scene_cfg.get("speed", defaults.get("speed", 50))
-    vocab = scene_cfg.get("vocab", defaults.get("vocab", "science"))
+    theme = scene_cfg.get("theme", defaults.get("theme", "science"))
 
     if layout == "full":
         full_cfg = regions.get("full")
@@ -620,7 +620,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             parser.error(f"scene '{scene_name}' uses widget '{widget}', which is not supported by the legacy runtime")
         return {
             "scene_name": scene_name,
-            "vocab": vocab,
+            "theme": theme,
             "speed": scene_speed,
             "main_mode": widget,
             "sidebar_mode": "none",
@@ -643,7 +643,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             parser.error(f"scene '{scene_name}' uses widget '{bad}', which is not supported by the legacy runtime")
         return {
             "scene_name": scene_name,
-            "vocab": vocab,
+            "theme": theme,
             "speed": scene_speed,
             "main_mode": left_widget,
             "sidebar_mode": right_widget,
@@ -702,7 +702,7 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
 
 def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[str, Any],
                            regions_cfg: dict[str, Any], parser, *,
-                           vocab: str, speed: int | float, text: str,
+                           theme: str, speed: int | float, text: str,
                            default_widget: str | None = None, default_colour: str | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
@@ -748,10 +748,10 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 if isinstance(region_cfg, dict) and region_cfg.get("title") is not None
                 else widget_cfg.get("title")
             ),
-            "vocab": (
-                region_cfg.get("source_vocab")
-                if isinstance(region_cfg, dict) and region_cfg.get("source_vocab") is not None
-                else widget_cfg.get("source_vocab")
+            "theme": (
+                region_cfg.get("source_theme")
+                if isinstance(region_cfg, dict) and region_cfg.get("source_theme") is not None
+                else widget_cfg.get("source_theme")
             ),
             "colour": _region_colour(region_cfg) or _region_colour(widget_cfg) or default_colour,
             "image_paths": area_images,
@@ -795,7 +795,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 "h": float(panel_cfg["h"]),
                 "speed": widget_cfg.get("speed"),
                 "title": widget_cfg.get("title"),
-                "vocab": widget_cfg.get("source_vocab"),
+                "theme": widget_cfg.get("source_theme"),
                 "colour": _region_colour(widget_cfg) or default_colour,
                 "image_paths": area_images,
                 "cycle_widgets": _region_cycle_widgets(widget_cfg) if default_widget == "cycle" else [],
@@ -809,7 +809,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
 
     return {
         "scene_name": scene_name,
-        "vocab": vocab,
+        "theme": theme,
         "speed": speed,
         "text": text,
         "layout": layout_name,
@@ -819,7 +819,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
 
 
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
-                           scene_name: str = "<cli>", vocab: str = "science",
+                           scene_name: str = "<cli>", theme: str = "science",
                            speed: int | float = 50, text: str = "",
                            default_widget: str | None = None, default_colour: str | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
@@ -830,7 +830,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
         parser.error(f"unknown layout '{layout_name}'")
     return _resolve_runtime_scene(
         scene_name, layout_name, layout_cfg, regions_cfg, parser,
-        vocab=vocab, speed=speed, text=text,
+        theme=theme, speed=speed, text=text,
         default_widget=default_widget, default_colour=default_colour,
         config_paths=config_paths,
     )
@@ -855,7 +855,7 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
         regions_cfg,
         parser,
         scene_name=scene_name,
-        vocab=scene_cfg.get("vocab", defaults.get("vocab", "science")),
+        theme=scene_cfg.get("theme", defaults.get("theme", "science")),
         speed=scene_cfg.get("speed", defaults.get("speed", 50)),
         text=scene_cfg.get("text", ""),
         default_widget=defaults.get("widget"),

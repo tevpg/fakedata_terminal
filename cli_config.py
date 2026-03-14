@@ -35,8 +35,8 @@ except ImportError:
     )
 
 
-DEFAULT_VOCAB = "science"
-VOCAB_CHOICES = [
+DEFAULT_THEME = "science"
+THEME_CHOICES = [
     "hacker", "science", "medicine", "pharmacy", "finance",
     "space", "military", "navigation", "spaceteam",
 ]
@@ -84,7 +84,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
             "Use --scene for a preset, or --layout plus --panel-widget overrides to build a screen explicitly. "
-            "Run --demo for a quick tour of widgets, vocabs, layouts, and scenes."
+            "Run --demo for a quick tour of widgets, themes, layouts, and scenes."
         ),
         epilog=(
             "Examples:\n"
@@ -113,7 +113,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         help="Show configured layouts as fixed-size box diagrams, with their defined regions, then exit.")
     parser.add_argument(
         "--demo", action="store_true",
-        help="Browse a quick tour of widgets, vocabs, layouts, and configured scenes.")
+        help="Browse a quick tour of widgets, themes, layouts, and configured scenes.")
     parser.add_argument(
         "--scene", type=str, default=None, choices=_scene_choices(config_paths),
         help="Config-defined scene preset.")
@@ -121,8 +121,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--layout", type=str, default=None, choices=_layout_choices(config_paths),
         help="Explicit layout for the generalized panel runtime.")
     parser.add_argument(
-        "--vocab", type=str, default=None, choices=VOCAB_CHOICES,
-        help=f"Vocabulary theme. Defaults to {DEFAULT_VOCAB} unless a scene supplies one.")
+        "--theme", type=str, default=None, choices=THEME_CHOICES,
+        help=f"Theme. Defaults to {DEFAULT_THEME} unless a scene supplies one.")
     parser.add_argument(
         "--panel-widget", action="append", default=[], metavar="REGION=WIDGET",
         help="Assign a widget to a specific region or panel group. Repeatable.")
@@ -130,8 +130,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--panel-speed", action="append", default=[], metavar="REGION=N",
         help="Override speed for a specific region or panel group. Repeatable.")
     parser.add_argument(
-        "--panel-vocab", action="append", default=[], metavar="REGION=THEME",
-        help="Override vocabulary theme for a specific region or panel group. Repeatable.")
+        "--panel-theme", action="append", default=[], metavar="REGION=THEME",
+        help="Override theme for a specific region or panel group. Repeatable.")
     parser.add_argument(
         "--panel-colour", "--panel-color", action="append", default=[], metavar="REGION=VALUE",
         help=f"Override colour for a specific region or panel group. Repeatable. Recognized: {COLOUR_HELP}.")
@@ -151,7 +151,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--life-max", type=int, default=200, metavar="N",
         help="Maximum iterations before life mode reseeds. Default 200.")
     parser.add_argument(
-        "--text", type=str, default=None, metavar="MSG",
+        "--theme-text", type=str, default=None, metavar="MSG",
         help="Message to inject into text-based widgets.")
     parser.add_argument(
         "--image", nargs="+", default=None, metavar="PATH",
@@ -192,14 +192,14 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
     widgets = widget_names(config_paths)
     layouts = layout_names(config_paths)
-    vocabs = VOCAB_CHOICES[:]
+    themes = THEME_CHOICES[:]
     scenes = config_scene_names(config_paths)
     colours = [_ansi_colour_label(name) for name in COLOUR_CHOICES] if colourize else COLOUR_CHOICES[:]
     columns = [
         ("Scenes", scenes),
         ("Layouts", layouts),
         ("Widgets", widgets),
-        ("Vocabs", vocabs),
+        ("Themes", themes),
         ("Colours", colours),
     ]
     widths = []
@@ -234,20 +234,20 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     return lines
 
 
-def _build_intro_scene(vocab: str, speed: int, parser, config_paths: tuple[str, ...]) -> dict:
+def _build_intro_scene(theme: str, speed: int, parser, config_paths: tuple[str, ...]) -> dict:
     runtime = resolve_runtime_layout(
         "full",
         {"full": {"widget": "blank"}},
         parser,
         scene_name="<demo:intro>",
-        vocab=vocab,
+        theme=theme,
         speed=speed,
         text="",
         config_paths=config_paths,
     )
     runtime["areas"][0]["static_lines"] = [
         "FakeData Terminal is a curses-based dashboard generator for animated, fake telemetry and operator screens.",
-        "This demo pages through the available widgets, vocabularies, layouts, scenes, and active config files.",
+        "This demo pages through the available widgets, themes, layouts, scenes, and active config files.",
         "",
         *_format_catalog_columns(config_paths),
     ]
@@ -262,7 +262,7 @@ def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:
     }
 
 
-def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[str], parser,
+def _build_widget_scenes(theme: str, speed: int, text: str, image_paths: list[str], parser,
                          image_module, image_checker,
                          config_paths: tuple[str, ...]) -> list[dict]:
     widgets = _showcase_widget_names(config_paths)
@@ -295,7 +295,7 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
             regions_cfg,
             parser,
             scene_name=f"<demo:widgets:{widget}>",
-            vocab=vocab,
+            theme=theme,
             speed=speed,
             text=text,
             config_paths=config_paths,
@@ -305,9 +305,9 @@ def _build_widget_scenes(vocab: str, speed: int, text: str, image_paths: list[st
     return scenes
 
 
-def _build_vocab_scenes(speed: int, text: str, parser, config_paths: tuple[str, ...]) -> list[dict]:
+def _build_theme_scenes(speed: int, text: str, parser, config_paths: tuple[str, ...]) -> list[dict]:
     scenes = []
-    for vocab_name in VOCAB_CHOICES:
+    for theme_name in THEME_CHOICES:
         runtime = resolve_runtime_layout(
             "grid_3x3",
             {
@@ -317,18 +317,18 @@ def _build_vocab_scenes(speed: int, text: str, parser, config_paths: tuple[str, 
                 "p8+p9": {"widget": "text_scant"},
             },
             parser,
-            scene_name=f"<demo:vocab:{vocab_name}>",
-            vocab=vocab_name,
+            scene_name=f"<demo:theme:{theme_name}>",
+            theme=theme_name,
             speed=speed,
             text=text,
             config_paths=config_paths,
         )
-        runtime["showcase_header_lines"] = [f"vocab: {vocab_name}"]
+        runtime["showcase_header_lines"] = [f"theme: {theme_name}"]
         scenes.append(runtime)
     return scenes
 
 
-def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str, ...]) -> list[dict]:
+def _build_layout_scenes(theme: str, speed: int, parser, config_paths: tuple[str, ...]) -> list[dict]:
     scenes = []
     layouts = layout_catalog(config_paths)
     for layout_name, layout_cfg in layouts.items():
@@ -342,7 +342,7 @@ def _build_layout_scenes(vocab: str, speed: int, parser, config_paths: tuple[str
             regions_cfg,
             parser,
             scene_name=f"<demo:layout:{layout_name}>",
-            vocab=vocab,
+            theme=theme,
             speed=speed,
             text="",
             config_paths=config_paths,
@@ -364,14 +364,14 @@ def _build_scene_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
     return scenes
 
 
-def _build_demo_showcase(vocab: str, speed: int, text: str, image_paths: list[str], parser,
+def _build_demo_showcase(theme: str, speed: int, text: str, image_paths: list[str], parser,
                          image_module, image_checker,
                          config_paths: tuple[str, ...] | None = None) -> dict:
     resolved_paths = config_paths or ()
-    scenes = [_build_intro_scene(vocab, speed, parser, resolved_paths)]
-    scenes.extend(_build_widget_scenes(vocab, speed, text, image_paths, parser, image_module, image_checker, resolved_paths))
-    scenes.extend(_build_vocab_scenes(speed, text, parser, resolved_paths))
-    scenes.extend(_build_layout_scenes(vocab, speed, parser, resolved_paths))
+    scenes = [_build_intro_scene(theme, speed, parser, resolved_paths)]
+    scenes.extend(_build_widget_scenes(theme, speed, text, image_paths, parser, image_module, image_checker, resolved_paths))
+    scenes.extend(_build_theme_scenes(speed, text, parser, resolved_paths))
+    scenes.extend(_build_layout_scenes(theme, speed, parser, resolved_paths))
     scenes.extend(_build_scene_scenes(parser, resolved_paths))
     initial = scenes[0]
     return {
@@ -416,8 +416,8 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
 
 
 def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[str], panel_speeds: list[str],
-                            panel_vocabs: list[str], panel_colours: list[str], panel_images: list[str],
-                            parser, *, layout_name: str, scene_name: str, vocab: str,
+                            panel_themes: list[str], panel_colours: list[str], panel_images: list[str],
+                            parser, *, layout_name: str, scene_name: str, theme: str,
                             speed: int, text: str, default_widget: str | None, default_colour: str | None,
                             config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
@@ -429,8 +429,8 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
                 entry["speed"] = area["speed"]
             if area.get("title"):
                 entry["title"] = area["title"]
-            if area.get("vocab"):
-                entry["source_vocab"] = area["vocab"]
+            if area.get("theme"):
+                entry["source_theme"] = area["theme"]
             if area.get("colour"):
                 entry["colour"] = area["colour"]
             if area.get("image_paths"):
@@ -484,14 +484,14 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
             parser.error(f"--panel-speed target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["speed"] = panel_speed
 
-    for item in panel_vocabs:
-        target, vocab_name = _parse_equals(item, parser, "--panel-vocab")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-vocab", config_paths)
-        if vocab_name not in VOCAB_CHOICES:
-            parser.error(f"--panel-vocab theme must be one of: {', '.join(VOCAB_CHOICES)}")
+    for item in panel_themes:
+        target, theme_name = _parse_equals(item, parser, "--panel-theme")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-theme", config_paths)
+        if theme_name not in THEME_CHOICES:
+            parser.error(f"--panel-theme must be one of: {', '.join(THEME_CHOICES)}")
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-vocab target '{target}' has no matching assignment")
-        regions_cfg[normalized_target]["source_vocab"] = vocab_name
+            parser.error(f"--panel-theme target '{target}' has no matching assignment")
+        regions_cfg[normalized_target]["source_theme"] = theme_name
 
     for item in panel_colours:
         target, colour_name = _parse_equals(item, parser, "--panel-colour")
@@ -515,7 +515,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
         regions_cfg,
         parser,
         scene_name=scene_name,
-        vocab=vocab,
+        theme=theme,
         speed=speed,
         text=text,
         default_widget=default_widget,
@@ -560,7 +560,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.demo and (args.scene is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
+    if args.demo and (args.scene is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_theme or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
         parser.error("--demo is a standalone showcase mode; do not combine it with --scene, --layout, or panel overrides")
 
     if not args.demo and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
@@ -569,7 +569,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     speed_explicit = any(a == "--default-speed" or a.startswith("--default-speed=") for a in raw_argv)
     colour_explicit = any(a in {"--default-colour", "--default-color"} or a.startswith("--default-colour=") or a.startswith("--default-color=") for a in raw_argv)
     widget_explicit = any(a == "--default-widget" or a.startswith("--default-widget=") for a in raw_argv)
-    text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
+    text_explicit = any(a == "--theme-text" or a.startswith("--theme-text=") for a in raw_argv)
     image_explicit = any(a == "--image" or a.startswith("--image=") for a in raw_argv)
 
     configured_defaults = config_defaults(config_paths)
@@ -585,8 +585,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             image_paths.append(path)
 
     runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else configured_defaults.get("speed", 50)
-    runtime_text = args.text.strip() if text_explicit and args.text is not None else ""
-    runtime_vocab = args.vocab or configured_defaults.get("vocab", DEFAULT_VOCAB)
+    runtime_text = args.theme_text.strip() if text_explicit and args.theme_text is not None else ""
+    runtime_theme = args.theme or configured_defaults.get("theme", DEFAULT_THEME)
     runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("colour")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
@@ -596,7 +596,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     if args.demo:
         widget_showcase = _build_demo_showcase(
-            runtime_vocab,
+            runtime_theme,
             runtime_speed,
             runtime_text,
             image_paths,
@@ -613,25 +613,25 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         if not runtime_layout_name:
             parser.error("no layout available")
 
-        runtime_vocab = args.vocab or (base_runtime["vocab"] if base_runtime else configured_defaults.get("vocab", DEFAULT_VOCAB))
+        runtime_theme = args.theme or (base_runtime["theme"] if base_runtime else configured_defaults.get("theme", DEFAULT_THEME))
         runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else (base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50))
-        runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
+        runtime_text = args.theme_text.strip() if text_explicit and args.theme_text is not None else (base_runtime["text"] if base_runtime else "")
 
         has_cli_overrides = bool(
-            args.layout or args.panel_widget or args.panel_speed or args.panel_vocab or args.panel_colour or args.panel_image or args.vocab or speed_explicit or colour_explicit or widget_explicit
+            args.layout or args.panel_widget or args.panel_speed or args.panel_theme or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit
         )
         if base_runtime is None or has_cli_overrides:
             config_scene_runtime = _apply_panel_widget_overrides(
                 base_runtime if (base_runtime and not args.layout) else None,
                 args.panel_widget,
                 args.panel_speed,
-                args.panel_vocab,
+                args.panel_theme,
                 args.panel_colour,
                 args.panel_image,
                 parser,
                 layout_name=runtime_layout_name,
                 scene_name=args.scene or f"<cli:{runtime_layout_name}>",
-                vocab=runtime_vocab,
+                theme=runtime_theme,
                 speed=runtime_speed,
                 text=runtime_text,
                 default_widget=runtime_default_widget,
@@ -676,12 +676,12 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "main_speed": runtime_speed,
         "sidebar_speed": runtime_speed,
         "life_max": args.life_max,
-        "inject_text": runtime_text,
+        "theme_text": runtime_text,
         "main_mode": None,
         "sidebar_mode": None,
-        "vocab": config_scene_runtime["vocab"],
+        "theme": config_scene_runtime["theme"],
         "scene_name": "<demo>" if args.demo else (args.scene or f"<cli:{runtime_layout_name}>"),
-        "vocabs": VOCAB_CHOICES[:],
+        "themes": THEME_CHOICES[:],
         "config_scene": config_scene_runtime,
         "layout_name": config_scene_runtime["layout"],
         "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_scene_runtime["areas"]),
@@ -715,7 +715,7 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(f"  {bold}speed{reset}  : default {config['speed']}/100", end="")
     print(f"  ({_show_delay(config['speed'])})")
     print(f"  {bold}scene{reset}  : {config['scene_name']}")
-    print(f"  {bold}vocab{reset}  : {config['vocab']}")
+    print(f"  {bold}theme{reset}  : {config['theme']}")
     if config.get("default_colour") is not None:
         print(f"  {bold}colour{reset} : default {config['default_colour']}")
     if config.get("default_widget") is not None:
@@ -723,10 +723,10 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     if config["image_paths"]:
         label = "image" if len(config["image_paths"]) == 1 else "images"
         print(f"  {bold}{label}{reset} : {', '.join(config['image_paths'])}")
-    if config["inject_text"]:
-        print(f"  {bold}text{reset}   : '{config['inject_text']}'")
+    if config["theme_text"]:
+        print(f"  {bold}theme text{reset} : '{config['theme_text']}'")
     else:
-        print(f"  {bold}text{reset}   : (none)")
+        print(f"  {bold}theme text{reset} : (none)")
     print(f"  {dim}{'─' * 54}{reset}")
     print(f"  {bold}layout{reset} : {config['layout_name']}")
     if config["area_summary"]:

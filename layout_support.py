@@ -51,8 +51,8 @@ def config_area_specs(config_style: dict, rows: int, cols: int) -> list[dict]:
     specs = []
     for area_spec in sorted(config_style["areas"], key=lambda item: (item["x"], item["y"], item["name"])):
         rect = scaled_rect(area_spec, rows, cols)
-        if rect.get("vocab") is None and config_style.get("vocab") is not None:
-            rect["vocab"] = config_style["vocab"]
+        if rect.get("theme") is None and config_style.get("theme") is not None:
+            rect["theme"] = config_style["theme"]
         specs.append(rect)
     return specs
 
@@ -87,8 +87,8 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
     synced = {}
     for spec in area_specs:
         area = area_states.get(spec["name"])
-        if area is None or area["mode"] != spec["mode"] or area.get("vocab_override") != spec.get("vocab"):
-            area = make_area(spec["mode"], spec.get("vocab"))
+        if area is None or area["mode"] != spec["mode"] or area.get("vocab_override") != spec.get("theme"):
+            area = make_area(spec["mode"], spec.get("theme"))
             area["mode"] = spec["mode"]
             area["name"] = spec["name"]
             area["title"] = spec.get("title")
@@ -96,7 +96,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
             area["role"] = spec["role"]
-            area["vocab_override"] = spec.get("vocab")
+            area["vocab_override"] = spec.get("theme")
             area["image_paths"] = spec.get("image_paths") or []
             area["cycle_widgets"] = spec.get("cycle_widgets") or []
             area["unavailable_message"] = spec.get("unavailable_message")
@@ -109,7 +109,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
             area["role"] = spec["role"]
-            area["vocab_override"] = spec.get("vocab")
+            area["vocab_override"] = spec.get("theme")
             area["image_paths"] = spec.get("image_paths") or []
             area["cycle_widgets"] = spec.get("cycle_widgets") or []
             area["unavailable_message"] = spec.get("unavailable_message")

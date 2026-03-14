@@ -105,14 +105,14 @@ except ImportError:
     )
 
 DEMO_SCENES = [
-    {"vocab": "hacker",     "main": "text_wide",     "sidebar": "bars",         "duration": 10.0},
-    {"vocab": "medicine",   "main": "readouts",      "sidebar": "text_scant",   "duration": 10.0},
-    {"vocab": "pharmacy",   "main": "text",          "sidebar": "sparkline",    "duration": 10.0},
-    {"vocab": "spaceteam",  "main": "bars",          "sidebar": "text_wide",    "duration": 10.0},
-    {"vocab": "science",    "main": "clock",         "sidebar": "matrix",       "duration": 10.0},
-    {"vocab": "finance",    "main": "oscilloscope",  "sidebar": "blocks",       "duration": 10.0},
-    {"vocab": "science",    "main": "sweep",         "sidebar": "none",         "duration": 10.0},
-    {"vocab": "navigation", "main": "readouts",      "sidebar": "none",         "duration": 10.0},
+    {"theme": "hacker",     "main": "text_wide",     "sidebar": "bars",         "duration": 10.0},
+    {"theme": "medicine",   "main": "readouts",      "sidebar": "text_scant",   "duration": 10.0},
+    {"theme": "pharmacy",   "main": "text",          "sidebar": "sparkline",    "duration": 10.0},
+    {"theme": "spaceteam",  "main": "bars",          "sidebar": "text_wide",    "duration": 10.0},
+    {"theme": "science",    "main": "clock",         "sidebar": "matrix",       "duration": 10.0},
+    {"theme": "finance",    "main": "oscilloscope",  "sidebar": "blocks",       "duration": 10.0},
+    {"theme": "science",    "main": "sweep",         "sidebar": "none",         "duration": 10.0},
+    {"theme": "navigation", "main": "readouts",      "sidebar": "none",         "duration": 10.0},
 ]
 
 SIDEBAR_CYCLE_MODES = [
@@ -142,7 +142,7 @@ COLOUR_PAIRS = build_colour_pairs(curses)
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(stdscr):
-    global MAIN_MODE, SIDEBAR_MODE, VOCAB_ARG, CONFIG_SCENE, _showcase_state
+    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCENE, _showcase_state
     try:
         curses.curs_set(0)
     except curses.error:
@@ -176,7 +176,7 @@ def main(stdscr):
 
     TEXT_MODES = {"text", "text_wide", "text_scant", "text_spew"}
     STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life", "tunnel"}
-    VOCAB_MODES = {"text", "text_wide", "text_scant", "bars"}
+    THEME_MODES = {"text", "text_wide", "text_scant", "bars"}
     MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>[]{}/*+-=."
     SWEEP_SYMBOLS = "∑∏∫∮√∞≈≠≤≥∂∇∈∉∩∪⊂⊃⊆⊇⊕⊗⊥∥∀∃∝∠∅∴∵≜≙⊢⊨"
     IMAGE_COLOUR_CYCLE = [1, 3, 2, 9, 8, 4]
@@ -194,7 +194,7 @@ def main(stdscr):
     text_widgets = TextWidgets(
         curses_module=curses,
         stdscr=stdscr,
-        vocab_arg_getter=lambda: VOCAB_ARG,
+        vocab_arg_getter=lambda: THEME_ARG,
         build_pools=_build_pools,
         build_area_state=build_area_state,
         get_bar_config=get_bar_config,
@@ -691,7 +691,7 @@ def main(stdscr):
         if not _demo_state["active"]:
             return
         side_mode = _effective_sidebar_mode()
-        vocab_val = VOCAB_ARG if (MAIN_MODE in VOCAB_MODES or side_mode in VOCAB_MODES) else "-"
+        vocab_val = THEME_ARG if (MAIN_MODE in THEME_MODES or side_mode in THEME_MODES) else "-"
         line1 = " demo "
         line2 = f" --main {MAIN_MODE} "
         if SIDEBAR_MODE == "cycle" and side_mode != "none":
@@ -699,7 +699,7 @@ def main(stdscr):
         else:
             side_label = side_mode if side_mode != "none" else "(none)"
         line3 = f" --sidebar {side_label} "
-        line4 = f" --vocab {vocab_val} "
+        line4 = f" --theme {vocab_val} "
         width = max(len(line1), len(line2), len(line3), len(line4)) + 1
         border_top = "┌" + "─" * (width - 1) + "┐"
         border_bot = "└" + "─" * (width - 1) + "┘"
@@ -756,7 +756,7 @@ def main(stdscr):
             pass
 
     def _set_showcase_scene(next_idx: int) -> None:
-        global CONFIG_SCENE, VOCAB_ARG
+        global CONFIG_SCENE, THEME_ARG
         nonlocal area_specs, area_states
         scenes = _showcase_state.get("scenes", [])
         if not scenes:
@@ -765,8 +765,8 @@ def main(stdscr):
         _showcase_state["idx"] = next_idx
         _showcase_state["done"] = False
         CONFIG_SCENE = scenes[next_idx]
-        VOCAB_ARG = CONFIG_SCENE.get("vocab", VOCAB_ARG)
-        GEN_POOL[:], RCOL_POOL[:] = _build_pools(VOCAB_ARG)
+        THEME_ARG = CONFIG_SCENE.get("theme", THEME_ARG)
+        GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
         area_specs = _current_area_specs(rows, cols)
         area_states = _sync_areas(area_specs)
         _sync_cycle_start_modes(area_specs, area_states, time.time())
@@ -981,10 +981,10 @@ def main(stdscr):
                 break
             _demo_state["idx"] = next_idx
             _demo_state["scene"] = _demo_state["scenes"][next_idx]
-            VOCAB_ARG = _demo_state["scene"]["vocab"]
+            THEME_ARG = _demo_state["scene"]["theme"]
             MAIN_MODE = _demo_state["scene"]["main"]
             SIDEBAR_MODE = _demo_state["scene"]["sidebar"]
-            GEN_POOL[:], RCOL_POOL[:] = _build_pools(VOCAB_ARG)
+            GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
             area_specs = _current_area_specs(rows, cols)
             area_states = _sync_areas(area_specs)
             _sync_cycle_start_modes(area_specs, area_states, time.time())
@@ -1000,8 +1000,8 @@ def main(stdscr):
 
 def run(argv=None) -> int:
     global IMAGE_PATHS, SPEED_ARG, MAIN_SPEED_ARG, SIDEBAR_SPEED_ARG
-    global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_VOCABS
-    global VOCAB_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCENE, _showcase_state
+    global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_THEMES
+    global THEME_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCENE, _showcase_state
 
     config = prepare_runtime_config(
         argv=argv,
@@ -1015,17 +1015,17 @@ def run(argv=None) -> int:
     MAIN_SPEED_ARG = config["main_speed"]
     SIDEBAR_SPEED_ARG = config["sidebar_speed"]
     LIFE_MAX_ITERATIONS = config["life_max"]
-    INJECT_TEXT = config["inject_text"]
+    INJECT_TEXT = config["theme_text"]
     MAIN_MODE = config["main_mode"]
-    _ALL_VOCABS = config["vocabs"]
-    VOCAB_ARG = config["vocab"]
+    _ALL_THEMES = config["themes"]
+    THEME_ARG = config["theme"]
     CONFIG_SCENE = config["config_scene"]
     SIDEBAR_MODE = config["sidebar_mode"]
     _demo_state = config["demo_state"]
     _showcase_state = config["widget_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
 
-    GEN_POOL[:], RCOL_POOL[:] = _build_pools(VOCAB_ARG)
+    GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
     if not _showcase_state["active"]:
         show_startup_banner(SCRIPT_NAME, config)
 

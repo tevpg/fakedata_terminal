@@ -12,7 +12,7 @@
 
 defaults:
   layout: grid_2x2
-  vocab: science
+  theme: science
   speed: 55
   colour: green
   widget: cycle
@@ -57,7 +57,7 @@ scenes:
     note: >
       Cycle everything through 9 panels
     layout: grid_3x3
-    vocab: science
+    theme: science
     regions:
       p1:
         widget: cycle
@@ -82,7 +82,7 @@ scenes:
     note: >
       Cycle everything through 4 panels
     layout: grid_2x2
-    vocab: science
+    theme: science
     regions:
       p1:
         widget: cycle
@@ -98,7 +98,7 @@ scenes:
     note: >
       Derived from: --scene science --main scroller --sidebar clock --sidebar-speed 80
     layout: grid_3x3
-    vocab: science
+    theme: science
     text: "*** DO NOT USE DOORBELL ***"
     regions:
       large_left:
@@ -114,7 +114,7 @@ scenes:
     note: >
       grid_3x2 science layout with image centre, fast clock, and life.
     layout: grid_3x2
-    vocab: science
+    theme: science
     regions:
       p3+p4:
         widget: image
@@ -158,7 +158,7 @@ scenes:
     note: >
       Derived from: --scene hacker --main image --image geom*png --sidebar gauges
     layout: main_2x2_right_stack_3
-    vocab: hacker
+    theme: hacker
     regions:
       main:
         widget: image
@@ -174,13 +174,13 @@ scenes:
       right_bottom:
         widget: text_scant
         title: "FEED"
-        source_vocab: hacker
+        source_theme: hacker
 
   tunnel:
     note: >
       Full-screen endless tunnel prototype using expanding box outlines.
     layout: full
-    vocab: science
+    theme: science
     speed: 75
     regions:
       full:
@@ -190,7 +190,7 @@ scenes:
     note: >
       Mixed 2x2 smoke-test scene with one widget per panel/region.
     layout: grid_2x2
-    vocab: science
+    theme: science
     regions:
       p1:
         widget: life
@@ -206,7 +206,7 @@ scenes:
     note: >
       Full-screen single-widget skeleton scene.
     layout: full
-    vocab: finance
+    theme: finance
     regions:
       full:
         widget: text_wide
@@ -215,7 +215,7 @@ scenes:
     note: >
       3x3 split using a large-left region and narrow right column.
     layout: grid_3x3
-    vocab: navigation
+    theme: navigation
     regions:
       large_left:
         widget: matrix
@@ -227,7 +227,7 @@ scenes:
     note: >
       Main-plus-sidebar stack with one large text region and two smaller instruments.
     layout: grid_3x2
-    vocab: medicine
+    theme: medicine
     regions:
       main:
         widget: text_scant
@@ -242,7 +242,7 @@ scenes:
     note: >
       2x2 layout merged into top and bottom bands.
     layout: grid_2x2
-    vocab: military
+    theme: military
     regions:
       top:
         widget: oscilloscope
@@ -254,7 +254,7 @@ scenes:
     note: >
       3x3 layout split into left, center, and right columns.
     layout: grid_3x3
-    vocab: spaceteam
+    theme: spaceteam
     regions:
       left:
         widget: sparkline
@@ -268,7 +268,7 @@ scenes:
     note: >
       Main-plus-sidebar stack with a large visual field and three smaller panels.
     layout: main_2x2_right_stack_3
-    vocab: pharmacy
+    theme: pharmacy
     regions:
       main:
         widget: blocks
@@ -284,7 +284,7 @@ scenes:
     note: >
       Three clocks + three sparklines
     layout: grid_3x3
-    vocab: pharmacy
+    theme: pharmacy
     regions:
       p1+p2:
         widget: clock
@@ -308,7 +308,7 @@ scenes:
 widgets:
   # Widget-specific fallback attributes use the same keys as region entries,
   # except "widget" itself is implied by the mapping key. Supported here:
-  # speed, title, source_vocab, colour/color, image, and cycle.
+  # speed, title, source_theme, colour/color, image, and cycle.
   #
   # Example:
   # sweep:
