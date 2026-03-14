@@ -15,6 +15,7 @@ class VisualWidgets:
         stdscr,
         safe_row_width,
         leading_blank,
+        inject_text_getter,
         area_vocab,
         get_gauge_config,
         normalize_colour_spec,
@@ -26,12 +27,56 @@ class VisualWidgets:
         self.stdscr = stdscr
         self.safe_row_width = safe_row_width
         self.leading_blank = leading_blank
+        self.inject_text_getter = inject_text_getter
         self.area_vocab = area_vocab
         self.get_gauge_config = get_gauge_config
         self.normalize_colour_spec = normalize_colour_spec
         self.colour_attr_from_spec = colour_attr_from_spec
         self.matrix_chars = matrix_chars
         self.sweep_symbols = sweep_symbols
+
+    def overlay_text(self, area: dict) -> str:
+        text = area.get("text_override") or self.inject_text_getter()
+        if not text:
+            return ""
+        return str(text).replace("\\n", "\n")
+
+    def draw_centered_overlay(self, area: dict, row: int, y: int, x: int, width: int, *,
+                              rows: int | None = None, anchor: str = "center"):
+        overlay = self.overlay_text(area)
+        if not overlay:
+            return
+        if row < 0:
+            return
+        lines = overlay.splitlines() or [overlay]
+        if rows is None:
+            rows = row + len(lines)
+        if anchor == "top":
+            start_row = row
+        elif anchor == "bottom":
+            start_row = row - len(lines) + 1
+        else:
+            start_row = row - ((len(lines) - 1) // 2)
+        start_row = max(0, min(start_row, max(0, rows - len(lines))))
+        for idx, source in enumerate(lines):
+            draw_row = start_row + idx
+            if draw_row < 0 or draw_row >= rows:
+                continue
+            safe_w = self.safe_row_width(y, draw_row, x, width)
+            if safe_w <= 0:
+                continue
+            draw = source[:safe_w]
+            start_x = x + max(0, (safe_w - len(draw)) // 2)
+            try:
+                self.stdscr.addnstr(
+                    y + draw_row,
+                    start_x,
+                    draw,
+                    min(len(draw), safe_w),
+                    self.curses.color_pair(2) | self.curses.A_BOLD,
+                )
+            except self.curses.error:
+                pass
 
     def update_scope(self, area: dict, width: int):
         cfg = self.get_gauge_config(self.area_vocab(area))
@@ -79,6 +124,7 @@ class VisualWidgets:
                 self.stdscr.addnstr(y + r, x, "".join(canvas[r])[:safe_w], safe_w, self.curses.color_pair(cp))
             except self.curses.error:
                 pass
+        self.draw_centered_overlay(area, 1 if nrows > 1 else 0, y, x, width, rows=nrows, anchor="top")
 
     def update_bars(self, area: dict):
         for i in range(len(area["bars_values"])):
@@ -260,6 +306,8 @@ class VisualWidgets:
                     self.stdscr.addch(y + r, x + c, canvas[r][c], attrs[r][c])
                 except self.curses.error:
                     pass
+        clock_text_row = min(nrows - 1, max(0, int(round(cy + max(1.0, yrad * 0.72)))))
+        self.draw_centered_overlay(area, clock_text_row, y, x, width, rows=nrows, anchor="center")
 
     def ensure_blocks(self, area: dict, rows: int, width: int):
         bg = area["blocks_bg"]
@@ -512,3 +560,4 @@ class VisualWidgets:
             width,
             attr_for_band=(lambda _band_idx: single_attr) if colour_spec != "multi" else (lambda band_idx: tunnel_attrs[band_idx % len(tunnel_attrs)]),
         )
+        self.draw_centered_overlay(area, max(0, rows // 2), y, x, width, rows=rows, anchor="center")

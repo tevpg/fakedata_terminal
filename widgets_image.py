@@ -17,6 +17,7 @@ class ImageWidgets:
         safe_row_width,
         image_module,
         image_paths_getter,
+        inject_text_getter,
         life_max_getter,
         image_colour_cycle,
         image_trail_attrs,
@@ -26,10 +27,17 @@ class ImageWidgets:
         self.safe_row_width = safe_row_width
         self.Image = image_module
         self.image_paths_getter = image_paths_getter
+        self.inject_text_getter = inject_text_getter
         self.life_max_getter = life_max_getter
         self.image_colour_cycle = image_colour_cycle
         self.image_trail_attrs = image_trail_attrs
         self.jp2a_cache = {}
+
+    def overlay_text(self, area: dict) -> str:
+        text = area.get("text_override") or self.inject_text_getter()
+        if not text:
+            return ""
+        return str(text).replace("\\n", "\n")
 
     @staticmethod
     def image_message(rows: int, width: int, text: str):
@@ -296,8 +304,11 @@ class ImageWidgets:
     def repaint_static_lines(self, area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width
         lines = area.get("static_lines") or []
-        if not lines and area.get("text_override"):
-            lines = str(area["text_override"]).splitlines() or [str(area["text_override"])]
+        text_only = False
+        overlay = self.overlay_text(area)
+        if not lines and overlay:
+            lines = overlay.splitlines() or [overlay]
+            text_only = True
         wrapped_lines = []
         wrap_width = max(1, width)
         for source_line in lines:
@@ -312,6 +323,8 @@ class ImageWidgets:
             ) or [""])
         lines = wrapped_lines
         align = area.get("static_align") or "top"
+        if text_only and align == "top":
+            align = "center"
         top = max(0, (rows - len(lines)) // 2) if align == "center" else (1 if rows > 2 else 0)
         for r in range(rows):
             safe_w = self.safe_row_width(y, r, x, width)

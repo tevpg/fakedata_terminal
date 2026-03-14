@@ -15,6 +15,7 @@ class GaugeWidgets:
         safe_row_width,
         area_vocab,
         new_area_text_entry,
+        inject_text_getter,
         get_gauge_config,
         normalize_colour_spec,
         colour_attr_from_spec,
@@ -25,10 +26,49 @@ class GaugeWidgets:
         self.safe_row_width = safe_row_width
         self.area_vocab = area_vocab
         self.new_area_text_entry = new_area_text_entry
+        self.inject_text_getter = inject_text_getter
         self.get_gauge_config = get_gauge_config
         self.normalize_colour_spec = normalize_colour_spec
         self.colour_attr_from_spec = colour_attr_from_spec
         self.prime_values = prime_values
+
+    def overlay_text(self, area: dict) -> str:
+        text = area.get("text_override") or self.inject_text_getter()
+        if not text:
+            return ""
+        return str(text).replace("\\n", "\n")
+
+    def draw_centered_overlay(self, overlay: str, row: int, y: int, x: int, width: int, rows: int, *,
+                              anchor: str = "center", pad: bool = False):
+        lines = overlay.splitlines() or [overlay]
+        if pad:
+            lines = [f" {line} " for line in lines]
+        if anchor == "top":
+            start_row = row
+        elif anchor == "bottom":
+            start_row = row - len(lines) + 1
+        else:
+            start_row = row - ((len(lines) - 1) // 2)
+        start_row = max(0, min(start_row, max(0, rows - len(lines))))
+        for idx, source in enumerate(lines):
+            draw_row = start_row + idx
+            if draw_row < 0 or draw_row >= rows:
+                continue
+            safe_w = self.safe_row_width(y, draw_row, x, width)
+            if safe_w <= 0:
+                continue
+            draw = source[:safe_w]
+            start_x = x + max(0, (safe_w - len(draw)) // 2)
+            try:
+                self.stdscr.addnstr(
+                    y + draw_row,
+                    start_x,
+                    draw,
+                    min(len(draw), safe_w),
+                    self.curses.color_pair(2) | self.curses.A_BOLD,
+                )
+            except self.curses.error:
+                pass
 
     @staticmethod
     def gauge_parse_num(s: str):
@@ -265,6 +305,9 @@ class GaugeWidgets:
                 self.stdscr.addnstr(y + r, x, "".join(chars)[:safe_w].ljust(safe_w), safe_w, self.curses.color_pair(cp))
             except self.curses.error:
                 pass
+        overlay = self.overlay_text(area)
+        if overlay:
+            self.draw_centered_overlay(overlay, max(0, rows - 2), y, x, width, rows, anchor="bottom", pad=True)
 
     def repaint_readouts(self, area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width

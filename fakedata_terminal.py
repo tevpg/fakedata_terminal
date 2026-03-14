@@ -394,6 +394,7 @@ def main(stdscr):
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
         leading_blank=_leading_blank,
+        inject_text_getter=lambda: INJECT_TEXT,
         area_vocab=_area_vocab,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
@@ -429,6 +430,7 @@ def main(stdscr):
         safe_row_width=_safe_row_width,
         area_vocab=_area_vocab,
         new_area_text_entry=_new_area_text_entry,
+        inject_text_getter=lambda: INJECT_TEXT,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
         colour_attr_from_spec=_colour_attr_from_spec,
@@ -455,6 +457,7 @@ def main(stdscr):
         safe_row_width=_safe_row_width,
         image_module=Image,
         image_paths_getter=lambda: IMAGE_PATHS,
+        inject_text_getter=lambda: INJECT_TEXT,
         life_max_getter=lambda: LIFE_MAX_ITERATIONS,
         image_colour_cycle=IMAGE_COLOUR_CYCLE,
         image_trail_attrs=IMAGE_TRAIL_ATTRS,
@@ -762,7 +765,7 @@ def main(stdscr):
         elif mode == "life":
             _repaint_life(area, rows, y, x, width)
         elif mode == "blank":
-            if area.get("static_lines") or area.get("text_override"):
+            if area.get("static_lines") or area.get("text_override") or INJECT_TEXT:
                 _repaint_static_lines(area, rows, y, x, width)
             elif area.get("unavailable_message"):
                 _repaint_unavailable(area, rows, y, x, width)
