@@ -5,6 +5,7 @@ from __future__ import annotations
 import collections
 import random
 import subprocess
+import textwrap
 
 
 class ImageWidgets:
@@ -297,6 +298,19 @@ class ImageWidgets:
         lines = area.get("static_lines") or []
         if not lines and area.get("text_override"):
             lines = str(area["text_override"]).splitlines() or [str(area["text_override"])]
+        wrapped_lines = []
+        wrap_width = max(1, width)
+        for source_line in lines:
+            if not source_line:
+                wrapped_lines.append("")
+                continue
+            wrapped_lines.extend(textwrap.wrap(
+                source_line,
+                width=wrap_width,
+                break_long_words=True,
+                break_on_hyphens=False,
+            ) or [""])
+        lines = wrapped_lines
         align = area.get("static_align") or "top"
         top = max(0, (rows - len(lines)) // 2) if align == "center" else (1 if rows > 2 else 0)
         for r in range(rows):
@@ -313,7 +327,7 @@ class ImageWidgets:
                         line = (" " * start + source_line).ljust(safe_w)
                     else:
                         line = source_line.ljust(safe_w)
-                    attr = self.curses.color_pair(2) if not line.endswith(":") else self.curses.color_pair(2) | self.curses.A_BOLD
+                    attr = self.curses.color_pair(2) if not source_line.endswith(":") else self.curses.color_pair(2) | self.curses.A_BOLD
                     self.stdscr.addnstr(y + r, x, line, safe_w, attr)
             except self.curses.error:
                 pass

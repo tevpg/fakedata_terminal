@@ -224,103 +224,137 @@ def _format_widget_catalog_entry(widget: str) -> str:
     return f"{widget} [{attrs}]"
 
 
+def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
+    config_map = {
+        "speed": "speed",
+        "theme": "source_theme",
+        "text": "text",
+        "colour": "colour",
+        "image": "image.paths",
+        "cycle": "cycle.widgets",
+    }
+    cli_map = {
+        "speed": "--default-speed, --panel-speed",
+        "theme": "--theme, --panel-theme",
+        "text": "--text, --panel-text",
+        "colour": "--default-colour, --panel-colour",
+        "image": "--image, --panel-image",
+    }
+    if not attrs:
+        return [
+            "Modifiers (in config files): (none)",
+            "Modifiers (on command line): (none)",
+        ]
+
+    config_items = [config_map.get(attr, attr) for attr in attrs]
+    cli_items = [cli_map[attr] for attr in attrs if attr in cli_map]
+    if widget == "image":
+        config_items.append("image.glob, image.path")
+    if widget == "cycle":
+        config_items.append("cycle.duration")
+
+    return [
+        f"Modifiers (in config files): {', '.join(config_items)}",
+        f"Modifiers (on command line): {', '.join(cli_items) if cli_items else '(none)'}",
+    ]
+
+
 def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str | None) -> list[str]:
-    attr_text = ", ".join(attrs) if attrs else "(none)"
+    modifier_lines = _widget_modifier_lines(widget, attrs)
     descriptions = {
         "bars": [
             "Animated vertical bars.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "blank": [
             "Empty region with optional static text.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "blocks": [
             "Random block-field activity.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "clock": [
             "Large digital clock display.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "cycle": [
             "Rotates a region through a configured widget list.",
             "",
-            f"modifiers: {attr_text}",
-            "cycle.widgets: ordered list of widget names.",
-            "cycle.duration: optional seconds per step.",
+            *modifier_lines,
+            "cycle.widgets is an ordered widget list.",
         ],
         "image": [
             "ASCII image renderer.",
             "",
-            f"modifiers: {attr_text}",
-            "image.paths: ordered list of image files.",
+            *modifier_lines,
+            "image.paths is an ordered image list.",
             "dependencies: Pillow and jp2a.",
         ],
         "life": [
             "Conway-style cellular automaton.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "matrix": [
             "Falling glyph rain.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "oscilloscope": [
             "Sweeping signal trace.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
             "theme selects the synthetic signal profile.",
         ],
         "readouts": [
             "Stacked telemetry readout lines.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "sparkline": [
             "Scrolling mini-chart.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
             "theme selects the synthetic signal profile.",
         ],
         "sweep": [
             "Single scan beam across the region.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
             "direction follows the host region shape.",
         ],
         "text": [
             "Dense scrolling text panel.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "text_scant": [
             "Sparse text panel.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "text_spew": [
             "Fast noisy text output.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "text_wide": [
             "Wide text panel with larger blocks.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
         "tunnel": [
             "Moving wireframe tunnel.",
             "",
-            f"modifiers: {attr_text}",
+            *modifier_lines,
         ],
     }
-    lines = [widget, ""] + descriptions.get(widget, [f"modifiers: {attr_text}"])
+    lines = [widget, ""] + descriptions.get(widget, modifier_lines)
     if unavailable:
         lines.extend(["", f"status: {unavailable}"])
     return lines
