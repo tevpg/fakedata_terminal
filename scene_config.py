@@ -682,9 +682,42 @@ def _config_label(config_paths: tuple[str, ...] | None) -> str:
 
 def _resolve_config_path(pathish: Any, base_dir: Path) -> str:
     path = Path(str(pathish)).expanduser()
-    if not path.is_absolute():
-        path = base_dir / path
-    return str(path.resolve())
+    if path.is_absolute():
+        return str(path.resolve())
+
+    cwd = Path.cwd()
+    if len(path.parts) > 1:
+        return str((cwd / path).resolve())
+
+    candidates = [
+        cwd / path,
+        base_dir / path,
+        PACKAGE_DIR / "data" / path,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate.resolve())
+    return str(candidates[0].resolve())
+
+
+def _resolve_config_glob(patternish: Any, base_dir: Path) -> str:
+    pattern = Path(str(patternish)).expanduser()
+    if pattern.is_absolute():
+        return str(pattern)
+
+    cwd = Path.cwd()
+    if len(pattern.parts) > 1:
+        return str(cwd / pattern)
+
+    candidates = [
+        cwd / pattern,
+        base_dir / pattern,
+        PACKAGE_DIR / "data" / pattern,
+    ]
+    for candidate in candidates:
+        if glob.glob(str(candidate)):
+            return str(candidate)
+    return str(candidates[0])
 
 
 def _normalize_image_mapping(image_spec: Any, base_dir: Path) -> None:
@@ -695,7 +728,7 @@ def _normalize_image_mapping(image_spec: Any, base_dir: Path) -> None:
     if image_spec.get("path") is not None:
         image_spec["path"] = _resolve_config_path(image_spec["path"], base_dir)
     if image_spec.get("glob") is not None:
-        image_spec["glob"] = _resolve_config_path(image_spec["glob"], base_dir)
+        image_spec["glob"] = _resolve_config_glob(image_spec["glob"], base_dir)
 
 
 def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict[str, Any]:

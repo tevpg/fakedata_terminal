@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 
 if sys.platform == "win32":
     try:
@@ -21,6 +22,8 @@ if sys.platform == "win32":
         import curses
 else:
     import curses
+
+import yaml
 
 try:
     from PIL import Image
@@ -138,6 +141,104 @@ SIDEBAR_CYCLE_MODES = [
 # 14  Grey          256-colour; falls back to white
 
 COLOUR_PAIRS = build_colour_pairs(curses)
+
+
+def _scene_name_for_export(now: datetime | None = None) -> str:
+    current = datetime.now() if now is None else now
+    return f"scene_{current.strftime('%Y%m%d-%H%M%S')}"
+
+
+def _shorten_export_image_path(path: str) -> str:
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    try:
+        resolved_path = os.path.realpath(os.path.expanduser(path))
+    except OSError:
+        return path
+    try:
+        if os.path.commonpath([resolved_path, data_dir]) == data_dir:
+            return os.path.basename(resolved_path)
+    except ValueError:
+        return path
+    return path
+
+
+def _annotate_exported_yaml(yaml_text: str, *, shortened_data_images: bool) -> str:
+    if not shortened_data_images:
+        return yaml_text
+
+    lines = yaml_text.splitlines()
+    for idx, line in enumerate(lines):
+        if line.strip() != "paths:":
+            continue
+        indent = line[: len(line) - len(line.lstrip())]
+        lines.insert(
+            idx,
+            f"{indent}# bare image filenames are assumed in the project data directory",
+        )
+        return "\n".join(lines) + ("\n" if yaml_text.endswith("\n") else "")
+    return yaml_text
+
+
+def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], current_base_speed: int,
+                             current_speed_for_role) -> str | None:
+    if not config_scene:
+        return None
+
+    scene_name = _scene_name_for_export()
+    shortened_data_images = False
+    scene_body = {
+        "layout": config_scene["layout"],
+        "theme": config_scene.get("theme"),
+        "speed": current_base_speed,
+        "text": config_scene.get("text", ""),
+        "regions": {},
+    }
+
+    for area in sorted(config_scene.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
+        state = area_states.get(area["name"], {})
+        role = state.get("role") or ("main" if area["x"] < 0.5 else "sidebar")
+        area_speed = state.get("speed_override") or current_speed_for_role(role)
+        region_body = {
+            "widget": area["mode"],
+            "speed": area_speed,
+        }
+
+        area_theme = area.get("theme")
+        if area_theme is not None:
+            region_body["source_theme"] = area_theme
+
+        area_text = area.get("text")
+        if area_text is not None:
+            region_body["text"] = area_text
+
+        area_colour = area.get("colour")
+        if area_colour is not None:
+            region_body["colour"] = area_colour
+
+        image_paths = area.get("image_paths") or []
+        if image_paths:
+            exported_paths = [_shorten_export_image_path(path) for path in image_paths]
+            shortened_data_images = shortened_data_images or exported_paths != image_paths
+            region_body["image"] = {"paths": exported_paths}
+
+        cycle_widgets = area.get("cycle_widgets") or []
+        if cycle_widgets:
+            region_body["cycle"] = {"widgets": cycle_widgets[:]}
+
+        if area.get("label") is not None:
+            region_body["label"] = area["label"]
+        if area.get("unavailable_message") is not None:
+            region_body["unavailable_message"] = area["unavailable_message"]
+        if area.get("static_lines") is not None:
+            region_body["static_lines"] = area["static_lines"]
+        if area.get("static_align") is not None:
+            region_body["static_align"] = area["static_align"]
+
+        scene_body["regions"][area["name"]] = region_body
+
+    export_doc = {"scenes": {scene_name: scene_body}}
+    dumped = yaml.safe_dump(export_doc, sort_keys=False, allow_unicode=False)
+    return _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -947,6 +1048,13 @@ def main(stdscr):
 
         key = stdscr.getch()
         if key in (ord('q'), ord('Q'), 27):
+            if CONFIG_SCENE and not _demo_state["active"] and not _showcase_state["active"]:
+                return _export_scene_definition(
+                    CONFIG_SCENE,
+                    area_states,
+                    current_base_speed,
+                    _current_speed_for_role,
+                )
             break
         if _showcase_state["active"] and key in (curses.KEY_LEFT, ord('h'), ord('H')):
             _set_showcase_scene(_showcase_state["idx"] - 1)
@@ -1033,8 +1141,9 @@ def run(argv=None) -> int:
         print(" " * 30, end="\r")
 
     while True:
+        exported_scene_yaml = None
         try:
-            curses.wrapper(main)
+            exported_scene_yaml = curses.wrapper(main)
             break
         except KeyboardInterrupt:
             break
@@ -1061,6 +1170,8 @@ def run(argv=None) -> int:
                 raise
             time.sleep(0.05)
     print(f"\n[{SCRIPT_NAME}] terminated.")
+    if exported_scene_yaml:
+        print(exported_scene_yaml, end="" if exported_scene_yaml.endswith("\n") else "\n")
     return 0
 
 

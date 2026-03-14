@@ -153,7 +153,8 @@ Overlay semantics:
 - mappings merge recursively, so local config can redefine only the keys it needs
 - scalar values replace earlier values
 - lists replace earlier lists rather than appending
-- relative image paths inside a config file are resolved relative to that file
+- image references with path components are resolved relative to the current working directory unless absolute
+- bare image names are resolved in this order: current working directory, the YAML file's directory, then the packaged `data/` directory
 
 ### Widget Defaults
 
