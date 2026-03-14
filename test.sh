@@ -14,7 +14,8 @@ tests=(
   "python3 fakedata_terminal.py --layout main_2x2_right_stack_3 --theme pharmacy --panel-widget main=text --panel-widget right_top=bars --panel-widget right_mid=sparkline --panel-widget right_bottom=life --theme-text \"VERIFY RX QUEUE\""
   "python3 fakedata_terminal.py --layout left_stack_2_right_grid_3x3 --theme science --panel-widget left=image --panel-widget right_center=tunnel --panel-widget right_right=clock --panel-image left=${ROOT_DIR}/data/geom_33_torus.png --panel-image left=${ROOT_DIR}/data/geom_40_geodesic_dome.png"
   "python3 fakedata_terminal.py --layout grid_3x2 --theme navigation --panel-widget main=sweep --panel-widget right_top=readouts --panel-widget right_bottom=blocks --glitch 4"
-  "python3 fakedata_terminal.py --demo"
+  "python3 fakedata_terminal.py --scenes"
+  "python3 fakedata_terminal.py --widgets"
 )
 
 run_test() {

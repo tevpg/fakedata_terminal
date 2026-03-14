@@ -84,14 +84,16 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
             "Use --scene for a preset, or --layout plus --panel-widget overrides to build a screen explicitly. "
-            "Run --demo for a quick tour of widgets, themes, layouts, and scenes."
+            "Run --widgets to browse the widget showcase, "
+            "or --scenes to browse only the configured scene pages."
         ),
         epilog=(
             "Examples:\n"
             "  %(prog)s --list\n"
             "  %(prog)s --config ./lab.yaml --list\n"
             "  %(prog)s --layouts\n"
-            "  %(prog)s --demo\n"
+            "  %(prog)s --widgets\n"
+            "  %(prog)s --scenes\n"
             "  %(prog)s --scene test1\n"
             "  %(prog)s --config ~/.config/fakedata-terminal/scenes.yaml --scene lab\n"
             "  %(prog)s --layout grid_2x2 --panel-widget p1=life --panel-widget p2=blank --panel-widget p3=text --panel-widget p4=clock\n"
@@ -112,8 +114,11 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--layouts", action="store_true",
         help="Show configured layouts as fixed-size box diagrams, with their defined regions, then exit.")
     parser.add_argument(
-        "--demo", action="store_true",
-        help="Browse a quick tour of widgets, themes, layouts, and configured scenes.")
+        "--widgets", action="store_true",
+        help="Browse the widget showcase.")
+    parser.add_argument(
+        "--scenes", action="store_true",
+        help="Browse only the configured scene pages.")
     parser.add_argument(
         "--scene", type=str, default=None, choices=_scene_choices(config_paths),
         help="Config-defined scene preset.")
@@ -176,8 +181,7 @@ def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
     print(format_layout_diagrams(config_paths))
 
 def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    names = [name for name in widget_names(config_paths) if name != "blank"]
-    return names
+    return widget_names(config_paths)
 
 
 def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module, image_checker) -> str | None:
@@ -218,6 +222,114 @@ def _widget_attribute_names(widget: str) -> list[str]:
 def _format_widget_catalog_entry(widget: str) -> str:
     attrs = ",".join(_widget_attribute_names(widget))
     return f"{widget} [{attrs}]"
+
+
+def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str | None) -> list[str]:
+    attr_text = ", ".join(attrs) if attrs else "(none)"
+    descriptions = {
+        "bars": [
+            "Animated vertical bars.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "blank": [
+            "Empty region with optional static text.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "blocks": [
+            "Random block-field activity.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "clock": [
+            "Large digital clock display.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "cycle": [
+            "Rotates a region through a configured widget list.",
+            "",
+            f"modifiers: {attr_text}",
+            "cycle.widgets: ordered list of widget names.",
+            "cycle.duration: optional seconds per step.",
+        ],
+        "image": [
+            "ASCII image renderer.",
+            "",
+            f"modifiers: {attr_text}",
+            "image.paths: ordered list of image files.",
+            "dependencies: Pillow and jp2a.",
+        ],
+        "life": [
+            "Conway-style cellular automaton.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "matrix": [
+            "Falling glyph rain.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "oscilloscope": [
+            "Sweeping signal trace.",
+            "",
+            f"modifiers: {attr_text}",
+            "theme selects the synthetic signal profile.",
+        ],
+        "readouts": [
+            "Stacked telemetry readout lines.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "sparkline": [
+            "Scrolling mini-chart.",
+            "",
+            f"modifiers: {attr_text}",
+            "theme selects the synthetic signal profile.",
+        ],
+        "sweep": [
+            "Single scan beam across the region.",
+            "",
+            f"modifiers: {attr_text}",
+            "direction follows the host region shape.",
+        ],
+        "text": [
+            "Dense scrolling text panel.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "text_scant": [
+            "Sparse text panel.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "text_spew": [
+            "Fast noisy text output.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "text_wide": [
+            "Wide text panel with larger blocks.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+        "tunnel": [
+            "Moving wireframe tunnel.",
+            "",
+            f"modifiers: {attr_text}",
+        ],
+    }
+    lines = [widget, ""] + descriptions.get(widget, [f"modifiers: {attr_text}"])
+    if unavailable:
+        lines.extend(["", f"status: {unavailable}"])
+    return lines
+
+
+def _pad_showcase_description(lines: list[str], header_lines: int) -> list[str]:
+    # Showcase headers are drawn directly onto the screen, so reserve that space
+    # in the left-hand static panel to avoid painting underneath the header box.
+    return ([""] * (header_lines + 2)) + lines
 
 
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
@@ -264,27 +376,6 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     ])
     return lines
 
-
-def _build_intro_scene(theme: str, speed: int, parser, config_paths: tuple[str, ...]) -> dict:
-    runtime = resolve_runtime_layout(
-        "full",
-        {"full": {"widget": "blank"}},
-        parser,
-        scene_name="<demo:intro>",
-        theme=theme,
-        speed=speed,
-        text="",
-        config_paths=config_paths,
-    )
-    runtime["areas"][0]["static_lines"] = [
-        "FakeData Terminal is a curses-based dashboard generator for animated, fake telemetry and operator screens.",
-        "This demo pages through the available widgets, themes, layouts, scenes, and active config files.",
-        "",
-        *_format_catalog_columns(config_paths),
-    ]
-    return runtime
-
-
 def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:
     return {
         "widget": "blank",
@@ -298,90 +389,43 @@ def _build_widget_scenes(theme: str, speed: int, text: str, image_paths: list[st
                          config_paths: tuple[str, ...]) -> list[dict]:
     widgets = _showcase_widget_names(config_paths)
     if not widgets:
-        parser.error("--demo found no widgets to show")
+        parser.error("--widgets found no widgets to show")
 
     scenes = []
-    region_keys = ["p1+p2+p4+p5", "p3+p6", "p7", "p8+p9"]
     for widget in widgets:
+        attrs = _widget_attribute_names(widget)
         unavailable = _widget_unavailable_reason(widget, image_paths, image_module, image_checker)
-        if widget == "cycle":
-            region_cfg = _static_blank_region([
-                "cycle",
-                "",
-                "Rotates one panel through a configured widget list.",
-                "Use widget: cycle with cycle.widgets in scene config",
-                "or assign it to a region from the CLI.",
-            ])
-            regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
-        elif unavailable:
-            region_cfg = _static_blank_region([widget, "", unavailable])
-            regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
-        else:
-            region_cfg = {"widget": widget}
-            if widget == "image":
-                region_cfg["image"] = {"paths": image_paths[:]}
-            regions_cfg = {region_key: dict(region_cfg) for region_key in region_keys}
-        runtime = resolve_runtime_layout(
-            "grid_3x3",
-            regions_cfg,
-            parser,
-            scene_name=f"<demo:widgets:{widget}>",
-            theme=theme,
-            speed=speed,
-            text=text,
-            config_paths=config_paths,
+        header_lines = [f"widget: {widget}"]
+        left_cfg = _static_blank_region(
+            _pad_showcase_description(
+                _widget_showcase_description(widget, attrs, unavailable),
+                len(header_lines),
+            ),
+            align="left",
         )
-        runtime["showcase_header_lines"] = [f"widget: {widget}"]
-        scenes.append(runtime)
-    return scenes
-
-
-def _build_theme_scenes(speed: int, text: str, parser, config_paths: tuple[str, ...]) -> list[dict]:
-    scenes = []
-    for theme_name in THEME_CHOICES:
+        if widget == "cycle" or unavailable:
+            right_cfg = _static_blank_region(
+                _widget_showcase_description(widget, attrs, unavailable),
+                align="center",
+            )
+        else:
+            right_cfg = {"widget": widget}
+            if widget == "image":
+                right_cfg["image"] = {"paths": image_paths[:]}
         runtime = resolve_runtime_layout(
-            "grid_3x3",
+            "grid_2x2",
             {
-                "left": {"widget": "text"},
-                "center": {"widget": "text_wide"},
-                "p7": {"widget": "readouts"},
-                "p8+p9": {"widget": "text_scant"},
+                "left": left_cfg,
+                "right": right_cfg,
             },
             parser,
-            scene_name=f"<demo:theme:{theme_name}>",
-            theme=theme_name,
+            scene_name=f"<widgets:{widget}>",
+            theme=theme,
             speed=speed,
             text=text,
             config_paths=config_paths,
         )
-        runtime["showcase_header_lines"] = [f"theme: {theme_name}"]
-        scenes.append(runtime)
-    return scenes
-
-
-def _build_layout_scenes(theme: str, speed: int, parser, config_paths: tuple[str, ...]) -> list[dict]:
-    scenes = []
-    layouts = layout_catalog(config_paths)
-    for layout_name, layout_cfg in layouts.items():
-        panels = layout_cfg.get("panels", {})
-        regions_cfg = {
-            panel_name: _static_blank_region([panel_name])
-            for panel_name in panels
-        }
-        runtime = resolve_runtime_layout(
-            layout_name,
-            regions_cfg,
-            parser,
-            scene_name=f"<demo:layout:{layout_name}>",
-            theme=theme,
-            speed=speed,
-            text="",
-            config_paths=config_paths,
-        )
-        runtime["showcase_header_lines"] = [
-            f"layout: {layout_name}",
-            "(adjacent panels can be combined)",
-        ]
+        runtime["showcase_header_lines"] = header_lines
         scenes.append(runtime)
     return scenes
 
@@ -395,15 +439,11 @@ def _build_scene_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
     return scenes
 
 
-def _build_demo_showcase(theme: str, speed: int, text: str, image_paths: list[str], parser,
-                         image_module, image_checker,
-                         config_paths: tuple[str, ...] | None = None) -> dict:
+def _build_widget_showcase(theme: str, speed: int, text: str, image_paths: list[str], parser,
+                           image_module, image_checker,
+                           config_paths: tuple[str, ...] | None = None) -> dict:
     resolved_paths = config_paths or ()
-    scenes = [_build_intro_scene(theme, speed, parser, resolved_paths)]
-    scenes.extend(_build_widget_scenes(theme, speed, text, image_paths, parser, image_module, image_checker, resolved_paths))
-    scenes.extend(_build_theme_scenes(speed, text, parser, resolved_paths))
-    scenes.extend(_build_layout_scenes(theme, speed, parser, resolved_paths))
-    scenes.extend(_build_scene_scenes(parser, resolved_paths))
+    scenes = _build_widget_scenes(theme, speed, text, image_paths, parser, image_module, image_checker, resolved_paths)
     initial = scenes[0]
     return {
         "active": True,
@@ -413,6 +453,22 @@ def _build_demo_showcase(theme: str, speed: int, text: str, image_paths: list[st
         "pair_duration": 10.0,
         "done": False,
         "initial": initial,
+    }
+
+
+def _build_scene_showcase(parser, config_paths: tuple[str, ...] | None = None) -> dict:
+    resolved_paths = config_paths or ()
+    scenes = _build_scene_scenes(parser, resolved_paths)
+    if not scenes:
+        parser.error("--scenes found no configured scenes to show")
+    return {
+        "active": True,
+        "scenes": scenes,
+        "idx": 0,
+        "next": float("inf"),
+        "pair_duration": 10.0,
+        "done": False,
+        "initial": scenes[0],
     }
 
 
@@ -598,11 +654,26 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.demo and (args.scene is not None or args.layout is not None or args.panel_widget or args.panel_speed or args.panel_title or args.panel_theme or args.panel_colour or args.panel_image or args.default_speed is not None or args.default_colour is not None or args.default_widget is not None):
-        parser.error("--demo is a standalone showcase mode; do not combine it with --scene, --layout, or panel overrides")
+    if args.widgets and args.scenes:
+        parser.error("choose only one standalone showcase mode: --widgets or --scenes")
 
-    if not args.demo and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
-        parser.error("specify either --scene, --layout, or --demo, or configure defaults.layout")
+    if (args.widgets or args.scenes) and (
+        args.scene is not None or
+        args.layout is not None or
+        args.panel_widget or
+        args.panel_speed or
+        args.panel_title or
+        args.panel_theme or
+        args.panel_colour or
+        args.panel_image or
+        args.default_speed is not None or
+        args.default_colour is not None or
+        args.default_widget is not None
+    ):
+        parser.error("standalone showcase modes (--widgets, --scenes) do not combine with --scene, --layout, or panel overrides")
+
+    if not args.widgets and not args.scenes and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
+        parser.error("specify either --scene, --layout, --widgets, or --scenes, or configure defaults.layout")
 
     speed_explicit = any(a == "--default-speed" or a.startswith("--default-speed=") for a in raw_argv)
     colour_explicit = any(a in {"--default-colour", "--default-color"} or a.startswith("--default-colour=") or a.startswith("--default-color=") for a in raw_argv)
@@ -632,8 +703,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     if not image_explicit:
         image_paths = default_images[:]
 
-    if args.demo:
-        widget_showcase = _build_demo_showcase(
+    if args.widgets:
+        widget_showcase = _build_widget_showcase(
             runtime_theme,
             runtime_speed,
             runtime_text,
@@ -641,6 +712,13 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             parser,
             image_module,
             image_checker,
+            config_paths,
+        )
+        config_scene_runtime = widget_showcase["initial"]
+        runtime_layout_name = config_scene_runtime["layout"]
+    elif args.scenes:
+        widget_showcase = _build_scene_showcase(
+            parser,
             config_paths,
         )
         config_scene_runtime = widget_showcase["initial"]
@@ -697,7 +775,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     image_sources = config_scene_runtime["image_paths"] if not image_explicit else image_paths
     image_mode_active = any(area["mode"] == "image" for area in config_scene_runtime["areas"])
-    if args.demo:
+    if args.widgets or args.scenes:
         image_mode_active = any(
             area["mode"] == "image"
             for scene in widget_showcase["scenes"]
@@ -719,7 +797,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "main_mode": None,
         "sidebar_mode": None,
         "theme": config_scene_runtime["theme"],
-        "scene_name": "<demo>" if args.demo else (args.scene or f"<cli:{runtime_layout_name}>"),
+        "scene_name": "<widgets>" if args.widgets else ("<scenes>" if args.scenes else (args.scene or f"<cli:{runtime_layout_name}>")),
         "themes": THEME_CHOICES[:],
         "config_scene": config_scene_runtime,
         "layout_name": config_scene_runtime["layout"],

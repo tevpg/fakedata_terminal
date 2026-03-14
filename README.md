@@ -60,10 +60,11 @@ python3 fakedata_terminal.py --scene science
 python3 fakedata_terminal.py --scene clocks
 ```
 
-Browse the interactive demo pages:
+Browse the widget showcase:
 
 ```bash
-python3 fakedata_terminal.py --demo
+python3 fakedata_terminal.py --widgets
+python3 fakedata_terminal.py --scenes
 ```
 
 Build a layout manually:
@@ -195,7 +196,7 @@ These pieces fit together in a specific order:
 - `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `clock`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
 - `Region attributes`: options attached to one region assignment, such as `speed`, `source_theme`, `colour`, `title`, `image`, and `cycle`.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.
-- `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide theme/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, and `python3 fakedata_terminal.py --demo` to browse sample scenes, widgets, layouts, and themes.
+- `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide theme/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, `python3 fakedata_terminal.py --scenes` to browse just the configured scene pages, and `python3 fakedata_terminal.py --widgets` to browse the widget showcase.
 
 In short:
 
