@@ -15,7 +15,7 @@ defaults:
   theme: science
   speed: 55
   colour: green
-  widget: cycle
+  widget: blank
   panel_speed: {}
   image:
     glob: "geom*.png"
