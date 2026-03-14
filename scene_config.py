@@ -267,7 +267,15 @@ def _normalize_region_expr_in_layout(layout_name: str, layout_cfg: dict[str, Any
         if canonical_panel is None:
             return None
         canonical_panels.append(canonical_panel)
-    return "+".join(canonical_panels)
+    ordered_panels = sorted(
+        canonical_panels,
+        key=lambda name: (
+            float(panels[name].get("y", 0.0)),
+            float(panels[name].get("x", 0.0)),
+            str(name),
+        ),
+    )
+    return "+".join(ordered_panels)
 
 
 def layout_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
