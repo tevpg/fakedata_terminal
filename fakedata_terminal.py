@@ -35,7 +35,7 @@ CONFIG_SCENE = None
 _showcase_state = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
 try:
-    from .cli_config import prepare_runtime_config, show_startup_banner
+    from .cli_config import prepare_runtime_config
     from .layout_support import (
         config_area_specs as build_config_area_specs,
         cycle_widget_names as list_cycle_widget_names,
@@ -71,7 +71,7 @@ try:
         HEX_WORD, _build_pools, get_bar_config, get_gauge_config, random_line, random_rcol_line,
     )
 except ImportError:
-    from cli_config import prepare_runtime_config, show_startup_banner
+    from cli_config import prepare_runtime_config
     from layout_support import (
         config_area_specs as build_config_area_specs,
         cycle_widget_names as list_cycle_widget_names,
@@ -204,6 +204,8 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     }
     if scene_colour is not None:
         scene_body["colour"] = scene_colour
+    if config_scene.get("glitch", 0.0) > 0:
+        scene_body["glitch"] = config_scene["glitch"]
     scene_body["regions"] = {}
 
     for area in sorted(config_scene.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
@@ -955,17 +957,11 @@ def main(stdscr):
     def _fire_glitch():
         nonlocal _glitch_active, _glitch_restore_at, _glitch_r0, _glitch_c0, _glitch_rh, _glitch_cw
         cur_rows, cur_cols = stdscr.getmaxyx()
-        current_specs = _current_area_specs(cur_rows, cur_cols)
-        main_specs = [spec for spec in current_specs if spec["role"] == "main"]
-        target = main_specs[0] if main_specs else current_specs[0]
-        cur_main_w = target["width"]
-        base_x = target["x"]
-        base_y = target["y"]
-        rh = random.randint(3, min(12, max(3, cur_rows - 1)))
-        cw = random.randint(8, min(40, max(8, cur_main_w - 1)))
+        rh = random.randint(3, min(12, max(3, cur_rows)))
+        cw = random.randint(8, min(40, max(8, cur_cols)))
         _glitch_rh, _glitch_cw = rh, cw
-        _glitch_r0 = base_y + random.randint(0, max(0, target["height"] - rh - 1))
-        _glitch_c0 = base_x + random.randint(0, max(0, cur_main_w - cw - 1))
+        _glitch_r0 = random.randint(0, max(0, cur_rows - rh))
+        _glitch_c0 = random.randint(0, max(0, cur_cols - cw))
         flavour = random.choice(["noise", "shift", "invert", "blank"])
         for r in range(_glitch_r0, _glitch_r0 + rh):
             for c in range(_glitch_c0, _glitch_c0 + cw):
@@ -977,7 +973,7 @@ def main(stdscr):
                         ch, attr = (cell & 0xFF or ord(" ")), curses.color_pair(5) | curses.A_REVERSE | curses.A_BOLD
                     elif flavour == "shift":
                         sr = max(0, min(cur_rows - 1, r + random.randint(-3, 3)))
-                        sc = max(0, min(cur_main_w - 1, c + random.randint(-5, 5)))
+                        sc = max(0, min(cur_cols - 1, c + random.randint(-5, 5)))
                         cell = stdscr.inch(sr, sc)
                         ch, attr = (cell & 0xFF or ord(" ")), curses.color_pair(random.choice([5, 4, 3])) | curses.A_BOLD
                     else:
@@ -1148,13 +1144,6 @@ def run(argv=None) -> int:
     GLITCH_INTERVAL = config["glitch_interval"]
 
     GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
-    if not _showcase_state["active"]:
-        show_startup_banner(SCRIPT_NAME, config)
-
-        for countdown in (2, 1):
-            print(f"  Starting in {countdown}...", end="\r", flush=True)
-            time.sleep(1)
-        print(" " * 30, end="\r")
 
     while True:
         exported_scene_yaml = None

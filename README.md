@@ -120,6 +120,8 @@ Enable periodic glitch effects:
 python3 fakedata_terminal.py --scene science --glitch 5
 ```
 
+`glitch` can also be set in config at `defaults.glitch` or `scenes.<name>.glitch`. An explicit `--glitch` overrides config.
+
 ## Controls
 
 During runtime:
@@ -190,6 +192,7 @@ Supported widget-default keys are:
 `text` is context-sensitive but still consistent:
 
 - scene-level `text` is the global text override for that scene
+- scene-level `glitch` is the glitch interval in seconds for that scene
 - region-level `text` is the per-region override used by `blank`, `readouts`, and text-heavy widgets
 
 ### Core Terms

@@ -535,7 +535,7 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
 def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[str], panel_speeds: list[str],
                             panel_texts: list[str], panel_themes: list[str], panel_colours: list[str], panel_images: list[str],
                             parser, *, layout_name: str, scene_name: str, theme: str,
-                            speed: int, text: str, default_widget: str | None, default_colour: str | None,
+                            speed: int, text: str, glitch: float, default_widget: str | None, default_colour: str | None,
                             config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
     if base_scene:
@@ -642,6 +642,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
         theme=theme,
         speed=speed,
         text=text,
+        glitch=glitch,
         default_widget=default_widget,
         default_colour=default_colour,
         config_paths=config_paths,
@@ -710,6 +711,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     widget_explicit = any(a == "--default-widget" or a.startswith("--default-widget=") for a in raw_argv)
     text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
     image_explicit = any(a == "--image" or a.startswith("--image=") for a in raw_argv)
+    glitch_explicit = any(a == "--glitch" or a.startswith("--glitch=") for a in raw_argv)
 
     configured_defaults = config_defaults(config_paths)
     default_images = default_image_paths(config_paths)
@@ -726,6 +728,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else configured_defaults.get("speed", 50)
     runtime_text = args.text.strip() if text_explicit and args.text is not None else ""
     runtime_theme = args.theme or configured_defaults.get("theme", DEFAULT_THEME)
+    runtime_glitch = max(0.0, configured_defaults.get("glitch", 0.0))
     runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("colour")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
@@ -764,9 +767,10 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_theme = args.theme or (base_runtime["theme"] if base_runtime else configured_defaults.get("theme", DEFAULT_THEME))
         runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else (base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50))
         runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
+        runtime_glitch = max(0.0, args.glitch if glitch_explicit and args.glitch is not None else (base_runtime["glitch"] if base_runtime else configured_defaults.get("glitch", 0.0)))
 
         has_cli_overrides = bool(
-            args.layout or args.panel_widget or args.panel_speed or args.panel_text or args.panel_theme or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit or text_explicit
+            args.layout or args.panel_widget or args.panel_speed or args.panel_text or args.panel_theme or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit or text_explicit or glitch_explicit
         )
         if base_runtime is None or has_cli_overrides:
             config_scene_runtime = _apply_panel_widget_overrides(
@@ -783,6 +787,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 theme=runtime_theme,
                 speed=runtime_speed,
                 text=runtime_text,
+                glitch=runtime_glitch,
                 default_widget=runtime_default_widget,
                 default_colour=runtime_default_colour,
                 config_paths=config_paths,
@@ -836,7 +841,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_scene_runtime["areas"]),
         "demo_state": {"active": False, "scenes": [], "idx": 0, "scene": None, "next": float("inf"), "done": False},
         "widget_showcase": widget_showcase,
-        "glitch_interval": max(0.0, args.glitch if args.glitch is not None else 0.0),
+        "glitch_interval": runtime_glitch if not (args.widgets or args.scenes) else max(0.0, args.glitch if glitch_explicit and args.glitch is not None else 0.0),
         "image_paths": image_sources,
         "configured_defaults": configured_defaults,
         "default_colour": runtime_default_colour,
