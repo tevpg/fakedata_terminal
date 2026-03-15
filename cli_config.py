@@ -6,6 +6,7 @@ import os
 import sys
 
 try:
+    from .runtime_support import ansi_colour_label
     from .scene_config import (
         config_defaults,
         canonical_layout_name,
@@ -22,6 +23,7 @@ try:
         widget_names,
     )
 except ImportError:
+    from runtime_support import ansi_colour_label
     from scene_config import (
         config_defaults,
         canonical_layout_name,
@@ -51,29 +53,6 @@ COLOUR_CHOICES = [
 COLOUR_HELP = ", ".join(COLOUR_CHOICES)
 DIRECTION_CHOICES = ["left", "right", "random", "none"]
 DIRECTION_HELP = ", ".join(DIRECTION_CHOICES)
-
-
-def _ansi_colour_label(name: str) -> str:
-    if not sys.stdout.isatty():
-        return name
-    codes = {
-        "red": "\033[31m",
-        "orange": "\033[38;5;208m",
-        "amber": "\033[38;5;172m",
-        "yellow": "\033[93m",
-        "green": "\033[32m",
-        "lime": "\033[92m",
-        "cyan": "\033[36m",
-        "blue": "\033[34m",
-        "magenta": "\033[35m",
-        "purple": "\033[38;5;141m",
-        "pink": "\033[38;5;213m",
-        "white": "\033[97m",
-        "grey": "\033[38;5;245m",
-        "multi": "\033[1m",
-    }
-    reset = "\033[0m"
-    return f"{codes.get(name, '')}{name}{reset}"
 
 
 def _scene_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -388,7 +367,7 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     layouts = layout_names(config_paths)
     themes = THEME_CHOICES[:]
     scenes = config_scene_names(config_paths)
-    colours = [_ansi_colour_label(name) for name in COLOUR_CHOICES] if colourize else COLOUR_CHOICES[:]
+    colours = [ansi_colour_label(name, is_tty=sys.stdout.isatty()) for name in COLOUR_CHOICES] if colourize else COLOUR_CHOICES[:]
     columns = [
         ("Scenes", scenes),
         ("Layouts", layouts),
@@ -416,7 +395,7 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     defaults = config_defaults(config_paths)
     default_colour = defaults.get("colour")
     if colourize and default_colour:
-        default_colour = _ansi_colour_label(str(default_colour))
+        default_colour = ansi_colour_label(str(default_colour), is_tty=sys.stdout.isatty())
     lines.extend([
         "",
         "Configured defaults:",

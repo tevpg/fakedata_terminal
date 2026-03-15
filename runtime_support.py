@@ -23,6 +23,41 @@ HELP_TEXT_TOPICS_WIN = [
     "Get-ComputerInfo", "about_Arrays", "about_Pipelines", "about_Objects",
 ]
 
+COLOUR_PAIR_INDICES = {
+    "green": 1,
+    "white": 2,
+    "cyan": 3,
+    "yellow": 4,
+    "red": 5,
+    "lime": 6,
+    "blue": 8,
+    "magenta": 9,
+    "orange": 10,
+    "amber": 11,
+    "purple": 12,
+    "pink": 13,
+    "grey": 14,
+    "gray": 14,
+}
+
+COLOUR_ANSI_CODES = {
+    "red": "\033[31m",
+    "orange": "\033[38;5;208m",
+    "amber": "\033[38;5;172m",
+    "yellow": "\033[93m",
+    "green": "\033[32m",
+    "lime": "\033[92m",
+    "cyan": "\033[36m",
+    "blue": "\033[38;5;39m",
+    "magenta": "\033[35m",
+    "purple": "\033[38;5;141m",
+    "pink": "\033[38;5;213m",
+    "white": "\033[97m",
+    "grey": "\033[38;5;245m",
+    "gray": "\033[38;5;245m",
+    "multi": "\033[1m",
+}
+
 
 def build_colour_pairs(curses_module):
     return {
@@ -33,7 +68,7 @@ def build_colour_pairs(curses_module):
         5: (curses_module.COLOR_RED, curses_module.COLOR_BLACK),
         6: (82, curses_module.COLOR_BLACK),
         7: (curses_module.COLOR_CYAN, curses_module.COLOR_BLACK),
-        8: (curses_module.COLOR_BLUE, curses_module.COLOR_BLACK),
+        8: (39, curses_module.COLOR_BLACK),
         9: (curses_module.COLOR_MAGENTA, curses_module.COLOR_BLACK),
         10: (208, curses_module.COLOR_BLACK),
         11: (172, curses_module.COLOR_BLACK),
@@ -109,26 +144,24 @@ def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold
     resolved = normalize_colour_spec(spec) or normalize_colour_spec(default)
     if resolved == "multi":
         return None
-    mapping = {
-        "green": curses_module.color_pair(1),
-        "lime": curses_module.color_pair(6),
-        "red": curses_module.color_pair(5),
-        "yellow": curses_module.color_pair(4),
-        "orange": curses_module.color_pair(10),
-        "amber": curses_module.color_pair(11),
-        "cyan": curses_module.color_pair(3),
-        "blue": curses_module.color_pair(8),
-        "magenta": curses_module.color_pair(9),
-        "purple": curses_module.color_pair(12),
-        "pink": curses_module.color_pair(13),
-        "white": curses_module.color_pair(2),
-        "grey": curses_module.color_pair(14),
-        "gray": curses_module.color_pair(14),
-    }
-    attr = mapping.get(resolved, mapping[normalize_colour_spec(default) or "white"])
+    default_name = normalize_colour_spec(default) or "white"
+    pair_index = COLOUR_PAIR_INDICES.get(resolved, COLOUR_PAIR_INDICES[default_name])
+    attr = curses_module.color_pair(pair_index)
+    if resolved == "yellow":
+        attr |= curses_module.A_BOLD
     if bold:
         attr |= curses_module.A_BOLD
     return attr
+
+
+def ansi_colour_label(name: str, *, is_tty: bool) -> str:
+    if not is_tty:
+        return name
+    resolved = normalize_colour_spec(name) or name
+    code = COLOUR_ANSI_CODES.get(resolved, "")
+    if not code:
+        return name
+    return f"{code}{name}\033[0m"
 
 
 def centre_delay(speed: int) -> float:
