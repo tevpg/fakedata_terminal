@@ -24,34 +24,71 @@ scenes:
 
   clocks:
     note: >
-      9 clocks
+      12 clock gauges with varied temporal and quantum instrumentation labels.
     layout: 4x3
-    speed: 90
+    theme: science
+    glitch: 0.5
     regions:
       P1:
         widget: clock
+        speed: 30
+        colour: cyan
+        text: "PHASE DRIFT"
       P2:
         widget: clock
+        speed: 36
+        colour: amber
+        text: "TAU LAG"
       P3:
         widget: clock
+        speed: 42
+        colour: magenta
+        text: "QBIT SPIN"
       P4:
         widget: clock
+        speed: 48
+        colour: lime
+        text: "VAC DECAY"
       P5:
         widget: clock
+        speed: 54
+        colour: orange
+        text: "LENS JITTER"
       P6:
         widget: clock
+        speed: 60
+        colour: yellow
+        text: "RIFT CLOCK"
       P7:
         widget: clock
+        speed: 66
+        colour: white
+        text: "CAUSAL BIAS"
       P8:
         widget: clock
+        speed: 72
+        colour: purple
+        text: "WAVE DELAY"
       P9:
         widget: clock
+        speed: 78
+        colour: cyan
+        text: "ION PHASE"
       P10:
         widget: clock
+        speed: 84
+        colour: orange
+        text: "DELTA T"
       P11:
         widget: clock
+        speed: 92
+        colour: pink
+        text: "TIMEFLUX"
       P12:
         widget: clock
+        speed: 100
+        colour: grey
+        text: "GRAV SHIFT"
 
   cycle9:
     note: >
