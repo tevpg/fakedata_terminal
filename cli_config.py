@@ -181,6 +181,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         help=("Glitch interval in seconds. Every ~N seconds a rectangular region "
               "of the display is briefly corrupted then restored. "
               "0 = disabled (default). --glitch alone defaults to 5s."))
+    parser.add_argument(
+        "--exit", type=float, default=None, metavar="N",
+        help="Exit automatically after approximately N seconds.")
     return parser
 
 
@@ -841,6 +844,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         parser.error(f"--default-widget must be one of: {', '.join(widget_names(config_paths))}")
     if args.life_max < 1:
         parser.error("--life-max must be at least 1")
+    if args.exit is not None and args.exit < 0:
+        parser.error("--exit must be >= 0")
 
     image_sources = config_scene_runtime["image_paths"] if not image_explicit else image_paths
     image_mode_active = any(area["mode"] == "image" for area in config_scene_runtime["areas"])
@@ -875,6 +880,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "demo_state": {"active": False, "scenes": [], "idx": 0, "scene": None, "next": float("inf"), "done": False},
         "widget_showcase": widget_showcase,
         "glitch_interval": runtime_glitch if not (args.widgets or args.scenes) else max(0.0, args.glitch if glitch_explicit and args.glitch is not None else 0.0),
+        "exit_after": args.exit,
         "image_paths": image_sources,
         "configured_defaults": configured_defaults,
         "default_colour": runtime_default_colour,
@@ -921,6 +927,8 @@ def show_startup_banner(script_name: str, config: dict) -> None:
         print(f"  {bold}areas{reset}  : {config['area_summary']}")
     glitch_str = f"every ~{config['glitch_interval']:.1f}s" if config["glitch_interval"] > 0 else "off"
     print(f"  {bold}glitch{reset} : {glitch_str}")
+    if config.get("exit_after") is not None:
+        print(f"  {bold}exit{reset}   : after ~{config['exit_after']:.1f}s")
     print(f"  {dim}{'─' * 54}{reset}")
     print(f"  {dim}Press Q or Ctrl-C to quit  |  Space to pause  |  + / - to change speed live{reset}")
     print()

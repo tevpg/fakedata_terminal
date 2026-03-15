@@ -276,19 +276,29 @@ scenes:
 
   test1:
     note: >
-      Mixed 2x2 smoke-test scene with one widget per panel/region.
-    layout: 2x2
+      Smoke test for the simplest widgets
+    layout: 3x2
+    glitch: 0.0
     theme: science
+    speed: 55
+    text: ''
+    direction: right
+    colour: green
     regions:
       P1:
-        widget: life
+        widget: blank
+        text: i am blank
       P2:
-        widget: sparkline
-        text: "SIGNAL"
+        widget: blocks
       P3:
-        widget: text
+        widget: life
       P4:
-        widget: clock
+        widget: matrix
+      P5:
+        widget: sweep
+      P6:
+        widget: bars
+
 
   test2:
     note: >

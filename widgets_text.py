@@ -11,6 +11,8 @@ import time
 
 
 class TextWidgets:
+    TEXT_MODES = {"text", "text_wide", "text_scant", "text_spew"}
+
     def __init__(
         self,
         *,
@@ -325,3 +327,46 @@ class TextWidgets:
                     self.stdscr.addnstr(y + r, x, txt[:draw_w].ljust(draw_w), draw_w, attr)
             except self.curses.error:
                 pass
+
+    def handles_mode(self, mode: str) -> bool:
+        return mode in self.TEXT_MODES
+
+    def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
+        del now
+        mode = self.effective_mode(area)
+        if mode in self.TEXT_MODES:
+            self.ensure_text_buffer(area, rows, mode, width, role)
+
+    def update(self, area: dict, rows: int, width: int, role: str, now: float) -> None:
+        del rows
+        mode = self.effective_mode(area)
+        if mode not in self.TEXT_MODES:
+            return
+        if mode == "text_spew":
+            self.scroll_text_buffer(area, mode, width, role, "up")
+        elif mode == "text_wide":
+            if area["textwall_reverse_left"] > 0:
+                self.scroll_text_buffer(area, mode, width, role, "down")
+                area["textwall_reverse_left"] -= 1
+                if area["textwall_reverse_left"] <= 0:
+                    area["textwall_next_reverse_at"] = now + random.uniform(5.0, 15.0)
+            elif now >= area["textwall_next_reverse_at"]:
+                if area["textwall_pause_until"] <= 0.0:
+                    area["textwall_pause_until"] = now + 1.0
+                elif now >= area["textwall_pause_until"]:
+                    area["textwall_pause_until"] = 0.0
+                    area["textwall_reverse_left"] = random.randint(10, 80)
+                    self.scroll_text_buffer(area, mode, width, role, "down")
+                    area["textwall_reverse_left"] -= 1
+            else:
+                self.scroll_text_buffer(area, mode, width, role, "up")
+        else:
+            interval = 1 if mode == "text" else (5 if role == "sidebar" else 2)
+            if area["tick"] % interval == 0:
+                self.scroll_text_buffer(area, mode, width, role, "up")
+
+    def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
+        del role
+        mode = self.effective_mode(area)
+        if mode in self.TEXT_MODES:
+            self.repaint_text_buffer(area["buf"], rows, y, x, width)

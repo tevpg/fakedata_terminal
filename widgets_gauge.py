@@ -7,6 +7,8 @@ import time
 
 
 class GaugeWidgets:
+    GAUGE_MODES = {"gauges", "sparkline", "readouts"}
+
     def __init__(
         self,
         *,
@@ -352,3 +354,86 @@ class GaugeWidgets:
                 self.stdscr.addnstr(y + row, x, line[:safe_w].ljust(safe_w), safe_w, line_attr)
             except self.curses.error:
                 pass
+
+    def handles_mode(self, mode: str) -> bool:
+        return mode in self.GAUGE_MODES
+
+    def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
+        del now
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        if mode in self.GAUGE_MODES:
+            self.ensure_gauges(area, rows, width, role, mode)
+            if area.get("text_override"):
+                if mode == "readouts":
+                    area["gauge_title"] = area["text_override"]
+                else:
+                    area["gauge_scroll_title"] = area["text_override"]
+
+    def update(self, area: dict, rows: int, width: int, role: str, now: float, *,
+               resolved_direction_motion, stabilize_direction_history) -> None:
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        if mode not in self.GAUGE_MODES:
+            return
+        if mode == "sparkline":
+            motion = resolved_direction_motion(area, now)
+            if motion != 0:
+                stabilize_direction_history(area, width, motion, "gauge_spark")
+                sample = self.next_gauge_spark(area)
+                if motion < 0:
+                    area["gauge_spark"].insert(0, sample)
+                else:
+                    area["gauge_spark"].append(sample)
+                if len(area["gauge_spark"]) > width + 20:
+                    if motion < 0:
+                        area["gauge_spark"].pop()
+                    else:
+                        area["gauge_spark"].pop(0)
+                area["direction_motion_prev"] = motion
+        else:
+            area["gauge_spark"].append(self.next_gauge_spark(area))
+            if len(area["gauge_spark"]) > width + 20:
+                area["gauge_spark"].pop(0)
+        if now >= area["gauge_next_reads_at"]:
+            vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
+            for i, val_str in enumerate(vals):
+                label = area["gauge_reads"][i][0] if i < len(area["gauge_reads"]) else ""
+                if label in {"COUNT", "PRIME"}:
+                    continue
+                num = self.gauge_parse_num(val_str)
+                if num is None:
+                    continue
+                hist = area["gauge_hist"][i]
+                prev_num = hist[-1] if hist else None
+                if prev_num is not None:
+                    eps = max(0.005, 0.005 * max(1.0, abs(prev_num)))
+                    if num > prev_num + eps:
+                        area["gauge_arrows"][i] = "▲"
+                    elif num < prev_num - eps:
+                        area["gauge_arrows"][i] = "▼"
+                hist.append(num)
+                if len(hist) > 4:
+                    hist.pop(0)
+            area["gauge_last_values"] = vals
+            if self.area_theme(area) == "pharmacy" and role == "sidebar":
+                area["gauge_next_reads_at"] = now + 0.80
+            elif role == "sidebar":
+                area["gauge_next_reads_at"] = now + 0.45
+            else:
+                area["gauge_next_reads_at"] = now + 0.30
+        area["gauge_tick"] += 1
+        if mode == "gauges" and area["gauge_tick"] >= 5:
+            area["gauge_tick"] = 0
+            area["gauge_feed"].pop(0)
+            area["gauge_feed"].append(
+                self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role)
+            )
+
+    def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
+        del role
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        if mode == "gauges":
+            self.repaint_gauges(area, rows, y, x, width)
+        elif mode == "sparkline":
+            self.repaint_sparkline(area, rows, y, x, width)
+        elif mode == "readouts":
+            self.repaint_readouts(area, rows, y, x, width)

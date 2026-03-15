@@ -383,7 +383,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(stdscr):
-    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCENE, _showcase_state
+    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCENE, _showcase_state, EXIT_AFTER
     try:
         curses.curs_set(0)
     except curses.error:
@@ -511,23 +511,12 @@ def main(stdscr):
         return max(10, int(frac * width))
 
     _area_theme = text_widgets.area_theme
-    _theme_pools = text_widgets.theme_pools
-    _make_area_state = text_widgets.make_area_state
-    _dense_line = text_widgets.dense_line
-    _new_area_text_entry = text_widgets.new_area_text_entry
-    _load_helptext_lines = text_widgets.load_helptext_lines
-    _next_helptext_entry = text_widgets.next_helptext_entry
-    _effective_mode = text_widgets.effective_mode
-    _ensure_cycle = text_widgets.ensure_cycle
-    _advance_cycle = text_widgets.advance_cycle
 
     def _sync_cycle_start_modes(area_specs: list[dict], area_states: dict[str, dict], now: float):
-        sync_cycle_start_modes(area_specs, area_states, _ensure_cycle, now)
+        sync_cycle_start_modes(area_specs, area_states, text_widgets.ensure_cycle, now)
 
-    _ensure_text_buffer = text_widgets.ensure_text_buffer
     _scroll_text_buffer = text_widgets.scroll_text_buffer
     _safe_row_width = text_widgets.safe_row_width
-    _repaint_text_buffer = text_widgets.repaint_text_buffer
 
     visual_widgets = VisualWidgets(
         curses_module=curses,
@@ -542,55 +531,19 @@ def main(stdscr):
         matrix_chars=MATRIX_CHARS,
         sweep_symbols=SWEEP_SYMBOLS,
     )
-    _update_scope = visual_widgets.update_scope
-    _repaint_scope = visual_widgets.repaint_scope
-    _update_bars = visual_widgets.update_bars
-    _repaint_bars = visual_widgets.repaint_bars
-    _update_matrix = visual_widgets.update_matrix
-    _repaint_matrix = visual_widgets.repaint_matrix
-    _choose_clock_spin = visual_widgets.choose_clock_spin
-    _update_clock = visual_widgets.update_clock
-    _repaint_clock = visual_widgets.repaint_clock
-    _ensure_blocks = visual_widgets.ensure_blocks
-    _update_blocks = visual_widgets.update_blocks
-    _repaint_blocks = visual_widgets.repaint_blocks
-    _build_nested_box_layers = visual_widgets.build_nested_box_layers
-    _build_tunnel_layers = visual_widgets.build_tunnel_layers
-    _ensure_tunnel = visual_widgets.ensure_tunnel
-    _repaint_nested_layers = visual_widgets.repaint_nested_layers
-    _ensure_sweep = visual_widgets.ensure_sweep
-    _update_sweep = visual_widgets.update_sweep
-    _repaint_sweep = visual_widgets.repaint_sweep
-    _update_tunnel = visual_widgets.update_tunnel
-    _repaint_tunnel = visual_widgets.repaint_tunnel
 
     gauge_widgets = GaugeWidgets(
         curses_module=curses,
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
         area_theme=_area_theme,
-        new_area_text_entry=_new_area_text_entry,
+        new_area_text_entry=text_widgets.new_area_text_entry,
         inject_text_getter=lambda: INJECT_TEXT,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
         colour_attr_from_spec=_colour_attr_from_spec,
         prime_values=prime_values,
     )
-    _gauge_parse_num = gauge_widgets.gauge_parse_num
-    _readout_use_title = gauge_widgets.readout_use_title
-    _readout_line_capacity = gauge_widgets.readout_line_capacity
-    _readout_filler_rows = gauge_widgets.readout_filler_rows
-    _next_prime_value = gauge_widgets.next_prime_value
-    _refresh_readout_rows = gauge_widgets.refresh_readout_rows
-    _sync_gauge_vectors = gauge_widgets.sync_gauge_vectors
-    _ensure_gauges = gauge_widgets.ensure_gauges
-    _next_gauge_spark = gauge_widgets.next_gauge_spark
-    _gauge_rows = gauge_widgets.gauge_rows
-    _draw_divider = gauge_widgets.draw_divider
-    _repaint_gauges = gauge_widgets.repaint_gauges
-    _repaint_sparkline = gauge_widgets.repaint_sparkline
-    _repaint_readouts = gauge_widgets.repaint_readouts
-
     image_widgets = ImageWidgets(
         curses_module=curses,
         stdscr=stdscr,
@@ -602,20 +555,12 @@ def main(stdscr):
         image_colour_cycle=IMAGE_COLOUR_CYCLE,
         image_trail_attrs=IMAGE_TRAIL_ATTRS,
     )
-    _image_message = image_widgets.image_message
-    _jp2a_background = image_widgets.jp2a_background
-    _fit_ascii_to_panel = image_widgets.fit_ascii_to_panel
-    _render_image = image_widgets.render_image
-    _ensure_image = image_widgets.ensure_image
-    _update_image = image_widgets.update_image
-    _life_hash = image_widgets.life_hash
-    _seed_life = image_widgets.seed_life
-    _ensure_life = image_widgets.ensure_life
-    _update_life = image_widgets.update_life
-    _repaint_life = image_widgets.repaint_life
-    _repaint_image = image_widgets.repaint_image
-    _repaint_unavailable = image_widgets.repaint_unavailable
-    _repaint_static_lines = image_widgets.repaint_static_lines
+    widget_families = [
+        text_widgets,
+        visual_widgets,
+        gauge_widgets,
+        image_widgets,
+    ]
 
     def _draw_separator(nrows, left_w):
         if _effective_sidebar_mode() == "none":
@@ -701,7 +646,7 @@ def main(stdscr):
                 pass
 
     def _make_area(mode, theme_name: str | None = None):
-        area = _make_area_state(theme_name)
+        area = text_widgets.make_area_state(theme_name)
         area["mode"] = mode
         return area
 
@@ -731,7 +676,7 @@ def main(stdscr):
             area["direction_motion"] = -1
             return -1
         if now >= area["clock_next_spin_change"]:
-            area["clock_spin"] = _choose_clock_spin()
+            area["clock_spin"] = visual_widgets.choose_clock_spin()
             area["clock_next_spin_change"] = now + random.uniform(0.5, 3.0)
         motion = area.get("clock_spin", 1)
         if motion > 0:
@@ -751,11 +696,17 @@ def main(stdscr):
         area[key] = visible[:]
         area["direction_motion_prev"] = motion
 
+    def _family_for_mode(mode: str):
+        for family in widget_families:
+            if family.handles_mode(mode):
+                return family
+        return None
+
     def _reset_area_timing(area: dict):
         role = area.get("role", "main")
         area_speed = area.get("speed_override") or _current_speed_for_role(role)
         area["next_update"] = time.time()
-        if _effective_mode(area) in STEADY_MODES:
+        if text_widgets.effective_mode(area) in STEADY_MODES:
             area["burst_fn"] = None
             area["burst_delay"] = 0.0
             area["burst_left"] = 0
@@ -765,46 +716,17 @@ def main(stdscr):
 
     def _ensure_area(area: dict, rows: int, width: int, role: str):
         if area["mode"] == "cycle":
-            _ensure_cycle(area)
-        mode = _effective_mode(area)
+            text_widgets.ensure_cycle(area)
+        mode = text_widgets.effective_mode(area)
         area["role"] = role
-        if mode in TEXT_MODES:
-            _ensure_text_buffer(area, rows, mode, width, role)
-        elif mode == "blocks":
-            _ensure_blocks(area, rows, width)
-        elif mode == "sweep":
-            _ensure_sweep(area, rows, width)
-        elif mode == "tunnel":
-            return
-        elif mode in {"gauges", "sparkline", "readouts"}:
-            _ensure_gauges(area, rows, width, role, mode)
-            if area.get("text_override"):
-                if mode == "readouts":
-                    area["gauge_title"] = area["text_override"]
-                else:
-                    area["gauge_scroll_title"] = area["text_override"]
-        elif mode == "image":
-            _ensure_image(area, rows, width)
-        elif mode == "blank":
-            return
-        elif mode == "life":
-            _ensure_life(area, rows, width)
-        if mode == "oscilloscope" and not area["scope_warmed"]:
-            for _ in range(max(24, width + 24)):
-                _update_scope(area, width)
-            area["scope_warmed"] = True
-        elif mode == "matrix" and not area["matrix_warmed"]:
-            for _ in range(max(18, rows * 3)):
-                _update_matrix(area, rows, width)
-            area["matrix_warmed"] = True
-        elif mode == "sweep" and not area["sweep_warmed"]:
-            _update_sweep(area, rows, width, role)
-            area["sweep_warmed"] = True
+        family = _family_for_mode(mode)
+        if family is not None:
+            family.ensure(area, rows, width, role, time.time())
 
     def _step_area(area: dict, rows: int, width: int, role: str, now: float):
         if area["mode"] == "cycle":
-            _ensure_cycle(area)
-        mode = _effective_mode(area)
+            text_widgets.ensure_cycle(area)
+        mode = text_widgets.effective_mode(area)
         if now < area["next_update"]:
             return
         frozen_by_direction = (
@@ -815,107 +737,24 @@ def main(stdscr):
         if not frozen_by_direction:
             area["tick"] += 1
         _ensure_area(area, rows, width, role)
-        if mode in TEXT_MODES:
-            if mode == "text_spew":
-                _scroll_text_buffer(area, mode, width, role, "up")
-            elif mode == "text_wide":
-                if area["textwall_reverse_left"] > 0:
-                    _scroll_text_buffer(area, mode, width, role, "down")
-                    area["textwall_reverse_left"] -= 1
-                    if area["textwall_reverse_left"] <= 0:
-                        area["textwall_next_reverse_at"] = now + random.uniform(5.0, 15.0)
-                elif now >= area["textwall_next_reverse_at"]:
-                    if area["textwall_pause_until"] <= 0.0:
-                        area["textwall_pause_until"] = now + 1.0
-                    elif now >= area["textwall_pause_until"]:
-                        area["textwall_pause_until"] = 0.0
-                        area["textwall_reverse_left"] = random.randint(10, 80)
-                        _scroll_text_buffer(area, mode, width, role, "down")
-                        area["textwall_reverse_left"] -= 1
-                else:
-                    _scroll_text_buffer(area, mode, width, role, "up")
-            else:
-                interval = 1 if mode == "text" else (5 if role == "sidebar" else 2)
-                if area["tick"] % interval == 0:
-                    _scroll_text_buffer(area, mode, width, role, "up")
-        elif mode == "bars":
-            _update_bars(area)
-        elif mode == "clock":
-            if not frozen_by_direction:
-                _update_clock(area)
-        elif mode == "matrix":
-            _update_matrix(area, rows, width)
-        elif mode == "blocks":
-            _update_blocks(area, rows, width)
-        elif mode == "sweep":
-            _update_sweep(area, rows, width, role)
-        elif mode == "tunnel":
-            if not frozen_by_direction:
-                _update_tunnel(area, rows, width)
-        elif mode == "oscilloscope":
-            if not frozen_by_direction:
-                _update_scope(area, width)
-        elif mode in {"gauges", "sparkline", "readouts"}:
-            if mode == "sparkline":
-                motion = _resolved_area_direction_motion(area, now)
-                if motion != 0:
-                    _stabilize_direction_history(area, width, motion, "gauge_spark")
-                    sample = _next_gauge_spark(area)
-                    if motion < 0:
-                        area["gauge_spark"].insert(0, sample)
-                    else:
-                        area["gauge_spark"].append(sample)
-                    if len(area["gauge_spark"]) > width + 20:
-                        if motion < 0:
-                            area["gauge_spark"].pop()
-                        else:
-                            area["gauge_spark"].pop(0)
-                    area["direction_motion_prev"] = motion
-            else:
-                area["gauge_spark"].append(_next_gauge_spark(area))
-                if len(area["gauge_spark"]) > width + 20:
-                    area["gauge_spark"].pop(0)
-            if now >= area["gauge_next_reads_at"]:
-                vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
-                for i, val_str in enumerate(vals):
-                    label = area["gauge_reads"][i][0] if i < len(area["gauge_reads"]) else ""
-                    if label in {"COUNT", "PRIME"}:
-                        continue
-                    num = _gauge_parse_num(val_str)
-                    if num is None:
-                        continue
-                    hist = area["gauge_hist"][i]
-                    prev_num = hist[-1] if hist else None
-                    if prev_num is not None:
-                        eps = max(0.005, 0.005 * max(1.0, abs(prev_num)))
-                        if num > prev_num + eps:
-                            area["gauge_arrows"][i] = "▲"
-                        elif num < prev_num - eps:
-                            area["gauge_arrows"][i] = "▼"
-                        # Otherwise keep the last non-flat direction.
-                    hist.append(num)
-                    if len(hist) > 4:
-                        hist.pop(0)
-                area["gauge_last_values"] = vals
-                if _area_theme(area) == "pharmacy" and role == "sidebar":
-                    area["gauge_next_reads_at"] = now + 0.80
-                elif role == "sidebar":
-                    area["gauge_next_reads_at"] = now + 0.45
-                else:
-                    area["gauge_next_reads_at"] = now + 0.30
-            area["gauge_tick"] += 1
-            if mode == "gauges" and area["gauge_tick"] >= 5:
-                area["gauge_tick"] = 0
-                area["gauge_feed"].pop(0)
-                area["gauge_feed"].append(
-                    _new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": _area_theme(area)}, role)
-                )
-        elif mode == "image":
-            _update_image(area, rows, width)
-        elif mode == "life":
-            _update_life(area, rows, width)
-        elif mode == "blank":
-            pass
+        family = _family_for_mode(mode)
+        if family is text_widgets:
+            family.update(area, rows, width, role, now)
+        elif family is visual_widgets:
+            if not (frozen_by_direction and mode in {"clock", "oscilloscope", "tunnel"}):
+                family.update(area, rows, width, role, now)
+        elif family is gauge_widgets:
+            family.update(
+                area,
+                rows,
+                width,
+                role,
+                now,
+                resolved_direction_motion=_resolved_area_direction_motion,
+                stabilize_direction_history=_stabilize_direction_history,
+            )
+        elif family is image_widgets:
+            family.update(area, rows, width, role, now)
 
         if mode in STEADY_MODES:
             area["next_update"] = now + _steady_mode_delay(mode, area_speed)
@@ -933,45 +772,10 @@ def main(stdscr):
                 area["next_update"] = now
 
     def _paint_area(area: dict, rows: int, y: int, x: int, width: int, role: str):
-        mode = _effective_mode(area)
-        if mode in TEXT_MODES:
-            _repaint_text_buffer(area["buf"], rows, y, x, width)
-        elif mode == "bars":
-            _repaint_bars(area, rows, y, x, width)
-        elif mode == "clock":
-            _repaint_clock(area, rows, y, x, width)
-        elif mode == "matrix":
-            _repaint_matrix(area, rows, y, x, width)
-        elif mode == "blocks":
-            _repaint_blocks(area, rows, y, x, width)
-        elif mode == "sweep":
-            _repaint_sweep(area, rows, y, x, width, role)
-        elif mode == "tunnel":
-            _repaint_tunnel(area, rows, y, x, width)
-        elif mode == "oscilloscope":
-            _repaint_scope(area, rows, y, x, width)
-        elif mode == "gauges":
-            _repaint_gauges(area, rows, y, x, width)
-        elif mode == "sparkline":
-            _repaint_sparkline(area, rows, y, x, width)
-        elif mode == "readouts":
-            _repaint_readouts(area, rows, y, x, width)
-        elif mode == "image":
-            _repaint_image(area, rows, y, x, width)
-        elif mode == "life":
-            _repaint_life(area, rows, y, x, width)
-        elif mode == "blank":
-            if area.get("static_lines") or area.get("text_override") or INJECT_TEXT:
-                _repaint_static_lines(area, rows, y, x, width)
-            elif area.get("unavailable_message"):
-                _repaint_unavailable(area, rows, y, x, width)
-            else:
-                blank = " " * width
-                for r in range(rows):
-                    try:
-                        stdscr.addnstr(y + r, x, blank, width, curses.color_pair(1))
-                    except curses.error:
-                        pass
+        mode = text_widgets.effective_mode(area)
+        family = _family_for_mode(mode)
+        if family is not None:
+            family.render(area, rows, y, x, width, role)
 
     def _draw_area_label(y: int, x: int, width: int, label: str | None):
         if not label or width < 6:
@@ -1106,6 +910,7 @@ def main(stdscr):
     _glitch_r0 = _glitch_c0 = _glitch_rh = _glitch_cw = 0
     _paused = False
     _paused_at = 0.0
+    _exit_at = time.time() + EXIT_AFTER if EXIT_AFTER is not None else float("inf")
 
     if _showcase_state["active"] and _showcase_state["next"] == float("inf"):
         _showcase_state["next"] = time.time() + _showcase_state["pair_duration"]
@@ -1176,6 +981,8 @@ def main(stdscr):
     while True:
         rows, cols = stdscr.getmaxyx()
         now = time.time()
+        if now >= _exit_at:
+            break
         if _sidebar_cycle and not _paused:
             new_modes = list_sidebar_cycle_modes_for_main(MAIN_MODE, SIDEBAR_CYCLE_MODES)
             if new_modes != _sidebar_cycle["modes"]:
@@ -1194,15 +1001,15 @@ def main(stdscr):
                 if area["mode"] != "cycle" or now < area["cycle_next_change"]:
                     continue
                 forbidden = {
-                    _effective_mode(other)
+                    text_widgets.effective_mode(other)
                     for other_name, other in area_states.items()
                     if other_name != spec["name"] and other["mode"] == "cycle"
                 }
-                _advance_cycle(area, forbidden)
+                text_widgets.advance_cycle(area, forbidden)
         for spec in area_specs:
             area = area_states[spec["name"]]
             if not _paused:
-                if _effective_mode(area) == "readouts":
+                if text_widgets.effective_mode(area) == "readouts":
                     area["gauge_count"] += 1
                 _step_area(area, spec["height"], spec["width"], spec["role"], now)
             if spec.get("separator_after"):
@@ -1300,7 +1107,7 @@ def main(stdscr):
 def run(argv=None) -> int:
     global IMAGE_PATHS, SPEED_ARG, MAIN_SPEED_ARG, SIDEBAR_SPEED_ARG
     global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_THEMES
-    global THEME_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCENE, _showcase_state
+    global THEME_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCENE, _showcase_state, EXIT_AFTER
 
     config = prepare_runtime_config(
         argv=argv,
@@ -1323,6 +1130,7 @@ def run(argv=None) -> int:
     _demo_state = config["demo_state"]
     _showcase_state = config["widget_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
+    EXIT_AFTER = config["exit_after"]
 
     GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
 
@@ -1341,15 +1149,9 @@ def run(argv=None) -> int:
                 helper_names={
                     "main",
                     "_paint_area",
-                    "_repaint_text_buffer",
-                    "_repaint_readouts",
-                    "_repaint_bars",
-                    "_repaint_scope",
-                    "_repaint_sparkline",
-                    "_repaint_blocks",
-                    "_repaint_sweep",
-                    "_repaint_life",
                     "_ensure_area",
+                    "_step_area",
+                    "_draw_config_separators",
                     "_sync_areas",
                 },
             ):

@@ -9,6 +9,8 @@ import textwrap
 
 
 class ImageWidgets:
+    IMAGE_MODES = {"image", "life", "blank"}
+
     def __init__(
         self,
         *,
@@ -344,3 +346,45 @@ class ImageWidgets:
                     self.stdscr.addnstr(y + r, x, line, safe_w, attr)
             except self.curses.error:
                 pass
+
+    def handles_mode(self, mode: str) -> bool:
+        return mode in self.IMAGE_MODES
+
+    def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
+        del role, now
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        if mode == "image":
+            self.ensure_image(area, rows, width)
+        elif mode == "life":
+            self.ensure_life(area, rows, width)
+
+    def update(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
+        del role, now
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        if mode == "image":
+            self.update_image(area, rows, width)
+        elif mode == "life":
+            self.update_life(area, rows, width)
+
+    def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
+        del role
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        if mode == "image":
+            self.repaint_image(area, rows, y, x, width)
+        elif mode == "life":
+            self.repaint_life(area, rows, y, x, width)
+        elif mode == "blank":
+            if area.get("static_lines") or area.get("text_override") or self.inject_text_getter():
+                self.repaint_static_lines(area, rows, y, x, width)
+            elif area.get("unavailable_message"):
+                self.repaint_unavailable(area, rows, y, x, width)
+            else:
+                blank = " " * width
+                for r in range(rows):
+                    safe_w = self.safe_row_width(y, r, x, width)
+                    if safe_w <= 0:
+                        continue
+                    try:
+                        self.stdscr.addnstr(y + r, x, blank, safe_w, self.curses.color_pair(1))
+                    except self.curses.error:
+                        pass
