@@ -80,6 +80,18 @@ COLOUR_RAINBOW_ORDER = [
     "white",
 ]
 
+COLOUR_NORMAL_BRIGHTNESS_ORDER = [
+    "white",
+    "yellow",
+    "cyan",
+    "orange",
+    "green",
+    "magenta",
+    "red",
+    "purple",
+    "blue",
+]
+
 COLOUR_CATALOG_COLUMNS = [
     ("Dim", [f"dim-{base}" for base in COLOUR_RAINBOW_ORDER]),
     ("Normal", COLOUR_RAINBOW_ORDER[:]),
@@ -251,6 +263,35 @@ def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold
     if bold:
         attr |= curses_module.A_BOLD
     return attr
+
+
+def colour_family_name(spec: str | None, *, default: str = "green") -> str:
+    resolved = normalize_colour_spec(spec) or normalize_colour_spec(default) or "green"
+    if resolved == "multi":
+        return "multi"
+    if resolved in COLOUR_SINGLES:
+        fallback = normalize_colour_spec(default) or "green"
+        if fallback in COLOUR_TRIADS:
+            return fallback
+        if "-" in fallback:
+            tone, base = fallback.split("-", 1)
+            if tone in {"dim", "bright"} and base in COLOUR_TRIADS:
+                return base
+        return "green"
+    if resolved in COLOUR_TRIADS:
+        return resolved
+    if "-" in resolved:
+        tone, base = resolved.split("-", 1)
+        if tone in {"dim", "bright"} and base in COLOUR_TRIADS:
+            return base
+    return normalize_colour_spec(default) or "green"
+
+
+def life_ramp_specs(spec: str | None) -> list[str]:
+    family = colour_family_name(spec, default="green")
+    if family == "multi":
+        return COLOUR_NORMAL_BRIGHTNESS_ORDER[:]
+    return ["bright-white", f"bright-{family}", family, f"dim-{family}", "dim-white"]
 
 
 def ansi_colour_label(name: str, *, is_tty: bool) -> str:

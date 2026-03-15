@@ -54,6 +54,7 @@ try:
         build_colour_pairs,
         centre_delay as _centre_delay,
         colour_attr_from_spec as _colour_attr_from_spec,
+        life_ramp_specs as _life_ramp_specs,
         line_colour as _line_colour,
         load_prime_values,
         make_area_state as build_area_state,
@@ -90,6 +91,7 @@ except ImportError:
         build_colour_pairs,
         centre_delay as _centre_delay,
         colour_attr_from_spec as _colour_attr_from_spec,
+        life_ramp_specs as _life_ramp_specs,
         line_colour as _line_colour,
         load_prime_values,
         make_area_state as build_area_state,
@@ -554,6 +556,7 @@ def main(stdscr):
         life_max_getter=lambda: LIFE_MAX_ITERATIONS,
         normalize_colour_spec=_normalize_colour_spec,
         colour_attr_from_spec=_colour_attr_from_spec,
+        life_ramp_specs=_life_ramp_specs,
         image_colour_cycle=IMAGE_COLOUR_CYCLE,
         image_trail_attrs=IMAGE_TRAIL_ATTRS,
     )

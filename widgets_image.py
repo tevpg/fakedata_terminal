@@ -23,6 +23,7 @@ class ImageWidgets:
         life_max_getter,
         normalize_colour_spec,
         colour_attr_from_spec,
+        life_ramp_specs,
         image_colour_cycle,
         image_trail_attrs,
     ):
@@ -35,6 +36,7 @@ class ImageWidgets:
         self.life_max_getter = life_max_getter
         self.normalize_colour_spec = normalize_colour_spec
         self.colour_attr_from_spec = colour_attr_from_spec
+        self.life_ramp_specs = life_ramp_specs
         self.image_colour_cycle = image_colour_cycle
         self.image_trail_attrs = image_trail_attrs
         self.jp2a_cache = {}
@@ -232,7 +234,18 @@ class ImageWidgets:
 
     def repaint_life(self, area: dict, rows: int, y: int, x: int, width: int):
         self.ensure_life(area, rows, width)
-        dead_attr = self.curses.color_pair(1)
+        ramp_specs = self.life_ramp_specs(area.get("colour_override"))
+        live_specs = ramp_specs[:-1]
+        life_attrs = [
+            self.colour_attr_from_spec(
+                self.curses,
+                colour_spec,
+                default=colour_spec,
+                bold=(idx < 3),
+            )
+            for idx, colour_spec in enumerate(live_specs)
+        ]
+        dead_attr = self.colour_attr_from_spec(self.curses, ramp_specs[-1], default="dim-white")
         cells = area["life_cells"]
         ages = area["life_ages"]
         for r in range(rows):
@@ -242,14 +255,7 @@ class ImageWidgets:
             for c in range(safe_w):
                 if cells[r][c]:
                     age = ages[r][c]
-                    if age <= 1:
-                        attr = self.curses.color_pair(9) | self.curses.A_BOLD
-                    elif age <= 3:
-                        attr = self.curses.color_pair(3) | self.curses.A_BOLD
-                    elif age <= 6:
-                        attr = self.curses.color_pair(2) | self.curses.A_BOLD
-                    else:
-                        attr = self.curses.color_pair(7) | self.curses.A_DIM
+                    attr = life_attrs[min(max(0, age - 1), len(life_attrs) - 1)]
                     ch = "◉"
                 else:
                     ch = " "

@@ -197,7 +197,7 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "clock": ["speed", "colour", "text", "direction"],
         "cycle": ["speed", "theme", "colour", "cycle"],
         "image": ["speed", "image"],
-        "life": ["speed"],
+        "life": ["speed", "colour"],
         "matrix": ["speed"],
         "oscilloscope": ["speed", "theme", "text", "direction"],
         "readouts": ["theme", "text", "colour"],
