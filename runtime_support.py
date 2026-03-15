@@ -190,9 +190,9 @@ def make_text_state():
     return {"theme": theme, "left": left, "countdown": random.randint(35, 50)}
 
 
-def make_area_state(vocab_name: str | None, default_vocab: str, get_bar_config) -> dict:
-    area_vocab = vocab_name or default_vocab
-    bar_headers, bar_labels = get_bar_config(area_vocab)
+def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) -> dict:
+    area_theme = theme_name or default_theme
+    bar_headers, bar_labels = get_bar_config(area_theme)
     return {
         "buf": [],
         "tick": 0,
@@ -215,11 +215,11 @@ def make_area_state(vocab_name: str | None, default_vocab: str, get_bar_config) 
         "cycle_idx": 0,
         "cycle_next_change": 0.0,
         "cycle_current": None,
-        "radar_angle": random.uniform(0.0, math.tau),
-        "radar_blips": [],
-        "radar_tick": 0,
-        "radar_spin": 1,
-        "radar_next_spin_change": 0.0,
+        "clock_angle": random.uniform(0.0, math.tau),
+        "clock_blips": [],
+        "clock_tick": 0,
+        "clock_spin": 1,
+        "clock_next_spin_change": 0.0,
         "direction_motion": 1,
         "direction_motion_prev": 1,
         "gauge_tick": 0,
@@ -270,7 +270,7 @@ def make_area_state(vocab_name: str | None, default_vocab: str, get_bar_config) 
         "textwall_next_reverse_at": 0.0,
         "textwall_pause_until": 0.0,
         "textwall_reverse_left": 0,
-        "vocab_override": vocab_name,
+        "theme_override": theme_name,
         "text_override": None,
         "direction_override": None,
         "unavailable_message": None,

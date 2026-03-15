@@ -16,7 +16,7 @@ class VisualWidgets:
         safe_row_width,
         leading_blank,
         inject_text_getter,
-        area_vocab,
+        area_theme,
         get_gauge_config,
         normalize_colour_spec,
         colour_attr_from_spec,
@@ -28,7 +28,7 @@ class VisualWidgets:
         self.safe_row_width = safe_row_width
         self.leading_blank = leading_blank
         self.inject_text_getter = inject_text_getter
-        self.area_vocab = area_vocab
+        self.area_theme = area_theme
         self.get_gauge_config = get_gauge_config
         self.normalize_colour_spec = normalize_colour_spec
         self.colour_attr_from_spec = colour_attr_from_spec
@@ -113,7 +113,7 @@ class VisualWidgets:
     def update_scope(self, area: dict, width: int):
         motion = self.resolved_direction_motion(area)
         keep = max(12, width + 12)
-        cfg = self.get_gauge_config(self.area_vocab(area))
+        cfg = self.get_gauge_config(self.area_theme(area))
         area["scope_signal"] = cfg[1]
         if motion == 0:
             if len(area["scope_vals"]) != keep:
@@ -164,15 +164,15 @@ class VisualWidgets:
         if direction == "none":
             area["direction_motion"] = 0
             return 0
-        forced_spin = self.radar_spin_for_direction(direction)
+        forced_spin = self.clock_spin_for_direction(direction)
         if forced_spin:
             area["direction_motion"] = forced_spin
             return forced_spin
         current = time.time() if now is None else now
-        if current >= area["radar_next_spin_change"]:
-            area["radar_spin"] = self.choose_radar_spin()
-            area["radar_next_spin_change"] = current + random.uniform(0.5, 3.0)
-        motion = area.get("radar_spin", 1)
+        if current >= area["clock_next_spin_change"]:
+            area["clock_spin"] = self.choose_clock_spin()
+            area["clock_next_spin_change"] = current + random.uniform(0.5, 3.0)
+        motion = area.get("clock_spin", 1)
         if motion > 0:
             area["direction_motion"] = 1
             return 1
@@ -301,7 +301,7 @@ class VisualWidgets:
                     pass
 
     @staticmethod
-    def choose_radar_spin() -> int:
+    def choose_clock_spin() -> int:
         roll = random.random()
         if roll < 0.5:
             return 1
@@ -310,42 +310,42 @@ class VisualWidgets:
         return 0
 
     @staticmethod
-    def radar_spin_for_direction(direction: str | None) -> int:
+    def clock_spin_for_direction(direction: str | None) -> int:
         if direction == "right":
             return 1
         if direction == "left":
             return -1
         return 0
 
-    def update_radar(self, area: dict):
+    def update_clock(self, area: dict):
         now = time.time()
         direction = str(area.get("direction_override") or "right").lower()
         if direction == "none":
             area["direction_motion"] = 0
             return
-        forced_spin = self.radar_spin_for_direction(direction)
+        forced_spin = self.clock_spin_for_direction(direction)
         if forced_spin:
-            area["radar_spin"] = forced_spin
+            area["clock_spin"] = forced_spin
             area["direction_motion"] = forced_spin
-        elif now >= area["radar_next_spin_change"]:
-            area["radar_spin"] = self.choose_radar_spin()
-            area["radar_next_spin_change"] = now + random.uniform(0.5, 3.0)
-            if area["radar_spin"] > 0:
+        elif now >= area["clock_next_spin_change"]:
+            area["clock_spin"] = self.choose_clock_spin()
+            area["clock_next_spin_change"] = now + random.uniform(0.5, 3.0)
+            if area["clock_spin"] > 0:
                 area["direction_motion"] = 1
-            elif area["radar_spin"] < 0:
+            elif area["clock_spin"] < 0:
                 area["direction_motion"] = -1
-        area["radar_angle"] = (area["radar_angle"] + (0.12 * area["radar_spin"])) % (math.pi * 2)
-        area["radar_tick"] += 1
+        area["clock_angle"] = (area["clock_angle"] + (0.12 * area["clock_spin"])) % (math.pi * 2)
+        area["clock_tick"] += 1
         fresh = []
-        for ang, dist, ttl in area["radar_blips"]:
+        for ang, dist, ttl in area["clock_blips"]:
             ttl -= 1
             if ttl > 0:
                 fresh.append((ang, dist, ttl))
-        area["radar_blips"] = fresh
+        area["clock_blips"] = fresh
         if random.random() < 0.18:
-            area["radar_blips"].append((random.uniform(0, math.pi * 2), random.uniform(0.15, 0.95), random.randint(10, 24)))
+            area["clock_blips"].append((random.uniform(0, math.pi * 2), random.uniform(0.15, 0.95), random.randint(10, 24)))
 
-    def repaint_radar(self, area: dict, nrows: int, y: int, x: int, width: int):
+    def repaint_clock(self, area: dict, nrows: int, y: int, x: int, width: int):
         canvas = [[" " for _ in range(width)] for _ in range(nrows)]
         attrs = [[self.curses.color_pair(1) for _ in range(width)] for _ in range(nrows)]
         face_spec = self.normalize_colour_spec(area.get("colour_override")) or "cyan"
@@ -395,7 +395,7 @@ class VisualWidgets:
         if 0 <= r_mid < nrows and 0 <= c_mid < width:
             canvas[r_mid][c_mid] = "◉"
             attrs[r_mid][c_mid] = self.curses.color_pair(2) | self.curses.A_BOLD
-        for ang, dist, ttl in area["radar_blips"]:
+        for ang, dist, ttl in area["clock_blips"]:
             px = int(round(cx + math.cos(ang) * xrad * dist))
             py = int(round(cy + math.sin(ang) * yrad * dist))
             if 0 <= py < nrows and 0 <= px < width:
@@ -413,7 +413,7 @@ class VisualWidgets:
                 dy = (r - cy) / max(1.0, yrad)
                 dist = math.sqrt(dx * dx + dy * dy)
                 ang = math.atan2(dy, dx)
-                delta = abs((ang - area["radar_angle"] + math.pi) % (math.pi * 2) - math.pi)
+                delta = abs((ang - area["clock_angle"] + math.pi) % (math.pi * 2) - math.pi)
                 if dist <= 1.0 and delta < 0.08:
                     canvas[r][c] = "█" if delta < 0.02 else "▓"
                     attrs[r][c] = self.curses.color_pair(2)

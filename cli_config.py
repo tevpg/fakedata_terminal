@@ -220,7 +220,7 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "matrix": ["speed"],
         "oscilloscope": ["speed", "theme", "text", "direction"],
         "readouts": ["theme", "text", "colour"],
-        "sparkline": ["speed", "theme", "colour", "text", "direction"],
+        "sparkline": ["speed", "theme", "text", "direction"],
         "sweep": ["speed"],
         "text": ["speed", "theme", "text"],
         "text_scant": ["speed", "theme", "text"],

@@ -13,7 +13,7 @@ class GaugeWidgets:
         curses_module,
         stdscr,
         safe_row_width,
-        area_vocab,
+        area_theme,
         new_area_text_entry,
         inject_text_getter,
         get_gauge_config,
@@ -24,7 +24,7 @@ class GaugeWidgets:
         self.curses = curses_module
         self.stdscr = stdscr
         self.safe_row_width = safe_row_width
-        self.area_vocab = area_vocab
+        self.area_theme = area_theme
         self.new_area_text_entry = new_area_text_entry
         self.inject_text_getter = inject_text_getter
         self.get_gauge_config = get_gauge_config
@@ -85,7 +85,7 @@ class GaugeWidgets:
         reserved = 1 if self.readout_use_title(rows) else 0
         return min(10, max(1, rows - reserved))
 
-    def readout_filler_rows(self, vocab_name: str):
+    def readout_filler_rows(self, theme_name: str):
         fillers = {
             "hacker": [("LAT", lambda: f"{random.uniform(2.0, 85.0):5.1f}", "ms"), ("DISC", lambda: f"{random.randint(1, 64):2d}", "nodes"), ("TLS", lambda: f"{random.uniform(0.0, 1.0):.3f}", "err"), ("AUTH", lambda: random.choice(["PASS", "PASS", "WARN", "HOLD"]), ""), ("I/O", lambda: f"{random.randint(10, 999):3d}", "MB/s")],
             "science": [("MAG", lambda: f"{random.uniform(0.1, 8.0):4.2f}", "T"), ("PHASE", lambda: f"{random.uniform(0.0, 360.0):5.1f}", "deg"), ("VAC", lambda: f"{random.uniform(1e-9, 1e-3):.1e}", "mbar"), ("SYNC", lambda: f"{random.uniform(97.0, 100.0):4.1f}", "%"), ("BEAM", lambda: random.choice(["LOCK", "LOCK", "TUNE", "DRFT"]), "")],
@@ -98,7 +98,7 @@ class GaugeWidgets:
             "spaceteam": [("WUMBLE", lambda: f"{random.randint(0, 88):2d}", "flux"), ("BLASTR", lambda: f"{random.uniform(0.0, 9.9):3.1f}", "zorg"), ("TWIST", lambda: f"{random.randint(0, 360):3d}", "deg"), ("GRONK", lambda: random.choice(["OK", "BZZT", "???", "YEP"]), ""), ("NOISE", lambda: f"{random.uniform(10.0, 99.0):4.1f}", "spl")],
         }
         default_rows = [("SIGMA", lambda: f"{random.uniform(0.0, 99.9):4.1f}", ""), ("DELTA", lambda: f"{random.uniform(-9.9, 9.9):+4.1f}", ""), ("STATE", lambda: random.choice(["OK", "OK", "WARN", "HOLD"]), ""), ("INDEX", lambda: f"{random.randint(0, 999):3d}", ""), ("DRIFT", lambda: f"{random.uniform(0.0, 9.9):3.1f}", "")]
-        return fillers.get(vocab_name, default_rows)
+        return fillers.get(theme_name, default_rows)
 
     def next_prime_value(self, area: dict) -> str:
         idx = area["gauge_prime_idx"] % len(self.prime_values)
@@ -111,7 +111,7 @@ class GaugeWidgets:
         if target_lines <= 1:
             area["gauge_reads"] = [("COUNT", lambda area=area: str(area["gauge_count"]), "")]
             return
-        fillers = self.readout_filler_rows(self.area_vocab(area))
+        fillers = self.readout_filler_rows(self.area_theme(area))
         data_lines = list(area["gauge_base_reads"][:max(0, target_lines - 2)])
         fill_idx = 0
         while len(data_lines) < max(0, target_lines - 2):
@@ -136,7 +136,7 @@ class GaugeWidgets:
                     area["gauge_hist"][i] = [num]
 
     def ensure_gauges(self, area: dict, rows: int, width: int, role: str, mode: str):
-        cfg = self.get_gauge_config(self.area_vocab(area))
+        cfg = self.get_gauge_config(self.area_theme(area))
         area["gauge_title"], area["gauge_signal"], area["gauge_base_reads"], area["gauge_scroll_title"] = cfg
         area["gauge_reads"] = area["gauge_base_reads"]
         if mode == "readouts":
@@ -148,20 +148,20 @@ class GaugeWidgets:
         had_last_values = bool(area["gauge_last_values"])
         self.sync_gauge_vectors(area)
         if not had_last_values:
-            if self.area_vocab(area) == "pharmacy" and role == "sidebar":
+            if self.area_theme(area) == "pharmacy" and role == "sidebar":
                 area["gauge_next_reads_at"] = time.time() + 0.80
             elif role == "sidebar":
                 area["gauge_next_reads_at"] = time.time() + 0.45
             else:
                 area["gauge_next_reads_at"] = time.time() + 0.30
         while len(area["gauge_feed"]) < rows:
-            area["gauge_feed"].append(self.new_area_text_entry("text", width, {"text": area["feed_text"], "vocab_override": self.area_vocab(area)}, role))
+            area["gauge_feed"].append(self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role))
         while len(area["gauge_feed"]) > rows:
             area["gauge_feed"].pop(0)
 
     def next_gauge_spark(self, area: dict):
         if not callable(area["gauge_signal"]):
-            area["gauge_title"], area["gauge_signal"], area["gauge_reads"], area["gauge_scroll_title"] = self.get_gauge_config(self.area_vocab(area))
+            area["gauge_title"], area["gauge_signal"], area["gauge_reads"], area["gauge_scroll_title"] = self.get_gauge_config(self.area_theme(area))
         self.sync_gauge_vectors(area)
         prev = area["gauge_spark"][-1] if area["gauge_spark"] else 0.5
         raw = area["gauge_signal"]()

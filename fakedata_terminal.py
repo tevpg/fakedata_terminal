@@ -435,7 +435,7 @@ def main(stdscr):
     text_widgets = TextWidgets(
         curses_module=curses,
         stdscr=stdscr,
-        vocab_arg_getter=lambda: THEME_ARG,
+        theme_arg_getter=lambda: THEME_ARG,
         build_pools=_build_pools,
         build_area_state=build_area_state,
         get_bar_config=get_bar_config,
@@ -510,8 +510,8 @@ def main(stdscr):
         frac = 0.30 + t * 0.70
         return max(10, int(frac * width))
 
-    _area_vocab = text_widgets.area_vocab
-    _vocab_pools = text_widgets.vocab_pools
+    _area_theme = text_widgets.area_theme
+    _theme_pools = text_widgets.theme_pools
     _make_area_state = text_widgets.make_area_state
     _dense_line = text_widgets.dense_line
     _new_area_text_entry = text_widgets.new_area_text_entry
@@ -535,7 +535,7 @@ def main(stdscr):
         safe_row_width=_safe_row_width,
         leading_blank=_leading_blank,
         inject_text_getter=lambda: INJECT_TEXT,
-        area_vocab=_area_vocab,
+        area_theme=_area_theme,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
         colour_attr_from_spec=_colour_attr_from_spec,
@@ -548,9 +548,9 @@ def main(stdscr):
     _repaint_bars = visual_widgets.repaint_bars
     _update_matrix = visual_widgets.update_matrix
     _repaint_matrix = visual_widgets.repaint_matrix
-    _choose_radar_spin = visual_widgets.choose_radar_spin
-    _update_radar = visual_widgets.update_radar
-    _repaint_radar = visual_widgets.repaint_radar
+    _choose_clock_spin = visual_widgets.choose_clock_spin
+    _update_clock = visual_widgets.update_clock
+    _repaint_clock = visual_widgets.repaint_clock
     _ensure_blocks = visual_widgets.ensure_blocks
     _update_blocks = visual_widgets.update_blocks
     _repaint_blocks = visual_widgets.repaint_blocks
@@ -568,7 +568,7 @@ def main(stdscr):
         curses_module=curses,
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
-        area_vocab=_area_vocab,
+        area_theme=_area_theme,
         new_area_text_entry=_new_area_text_entry,
         inject_text_getter=lambda: INJECT_TEXT,
         get_gauge_config=get_gauge_config,
@@ -700,8 +700,8 @@ def main(stdscr):
             except curses.error:
                 pass
 
-    def _make_area(mode, vocab_name: str | None = None):
-        area = _make_area_state(vocab_name)
+    def _make_area(mode, theme_name: str | None = None):
+        area = _make_area_state(theme_name)
         area["mode"] = mode
         return area
 
@@ -730,10 +730,10 @@ def main(stdscr):
         if direction == "left":
             area["direction_motion"] = -1
             return -1
-        if now >= area["radar_next_spin_change"]:
-            area["radar_spin"] = _choose_radar_spin()
-            area["radar_next_spin_change"] = now + random.uniform(0.5, 3.0)
-        motion = area.get("radar_spin", 1)
+        if now >= area["clock_next_spin_change"]:
+            area["clock_spin"] = _choose_clock_spin()
+            area["clock_next_spin_change"] = now + random.uniform(0.5, 3.0)
+        motion = area.get("clock_spin", 1)
         if motion > 0:
             area["direction_motion"] = 1
             return 1
@@ -842,7 +842,7 @@ def main(stdscr):
             _update_bars(area)
         elif mode == "clock":
             if not frozen_by_direction:
-                _update_radar(area)
+                _update_clock(area)
         elif mode == "matrix":
             _update_matrix(area, rows, width)
         elif mode == "blocks":
@@ -897,7 +897,7 @@ def main(stdscr):
                     if len(hist) > 4:
                         hist.pop(0)
                 area["gauge_last_values"] = vals
-                if _area_vocab(area) == "pharmacy" and role == "sidebar":
+                if _area_theme(area) == "pharmacy" and role == "sidebar":
                     area["gauge_next_reads_at"] = now + 0.80
                 elif role == "sidebar":
                     area["gauge_next_reads_at"] = now + 0.45
@@ -908,7 +908,7 @@ def main(stdscr):
                 area["gauge_tick"] = 0
                 area["gauge_feed"].pop(0)
                 area["gauge_feed"].append(
-                    _new_area_text_entry("text", width, {"text": area["feed_text"], "vocab_override": _area_vocab(area)}, role)
+                    _new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": _area_theme(area)}, role)
                 )
         elif mode == "image":
             _update_image(area, rows, width)
@@ -939,7 +939,7 @@ def main(stdscr):
         elif mode == "bars":
             _repaint_bars(area, rows, y, x, width)
         elif mode == "clock":
-            _repaint_radar(area, rows, y, x, width)
+            _repaint_clock(area, rows, y, x, width)
         elif mode == "matrix":
             _repaint_matrix(area, rows, y, x, width)
         elif mode == "blocks":
