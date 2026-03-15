@@ -6,7 +6,7 @@ import os
 import sys
 
 try:
-    from .runtime_support import ansi_colour_label
+    from .runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label
     from .scene_config import (
         config_defaults,
         canonical_layout_name,
@@ -23,7 +23,7 @@ try:
         widget_names,
     )
 except ImportError:
-    from runtime_support import ansi_colour_label
+    from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label
     from scene_config import (
         config_defaults,
         canonical_layout_name,
@@ -45,10 +45,6 @@ DEFAULT_THEME = "science"
 THEME_CHOICES = [
     "hacker", "science", "medicine", "pharmacy", "finance",
     "space", "military", "navigation", "spaceteam",
-]
-COLOUR_CHOICES = [
-    "red", "orange", "amber", "yellow", "green", "lime", "cyan", "blue",
-    "magenta", "purple", "pink", "white", "grey", "multi",
 ]
 COLOUR_HELP = ", ".join(COLOUR_CHOICES)
 DIRECTION_CHOICES = ["left", "right", "random", "none"]
@@ -367,13 +363,19 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     layouts = layout_names(config_paths)
     themes = THEME_CHOICES[:]
     scenes = config_scene_names(config_paths)
-    colours = [ansi_colour_label(name, is_tty=sys.stdout.isatty()) for name in COLOUR_CHOICES] if colourize else COLOUR_CHOICES[:]
+    colour_columns = []
+    for heading, values in COLOUR_CATALOG_COLUMNS:
+        if colourize:
+            display_values = [ansi_colour_label(name, is_tty=sys.stdout.isatty()) for name in values]
+        else:
+            display_values = values[:]
+        colour_columns.append((heading, display_values))
     columns = [
         ("Scenes", scenes),
         ("Layouts", layouts),
         ("Widgets", widgets),
         ("Themes", themes),
-        ("Colours", colours),
+        *colour_columns,
     ]
     widths = []
     for heading, values in columns:

@@ -23,58 +23,151 @@ HELP_TEXT_TOPICS_WIN = [
     "Get-ComputerInfo", "about_Arrays", "about_Pipelines", "about_Objects",
 ]
 
+COLOUR_TRIADS = {
+    "red": {"dim": 88, "normal": 160, "bright": 196},
+    "green": {"dim": 22, "normal": 34, "bright": 82},
+    "blue": {"dim": 18, "normal": 33, "bright": 39},
+    "cyan": {"dim": 23, "normal": 44, "bright": 51},
+    "magenta": {"dim": 90, "normal": 165, "bright": 201},
+    "yellow": {"dim": 136, "normal": 220, "bright": 226},
+    "orange": {"dim": 130, "normal": 208, "bright": 214},
+    "purple": {"dim": 54, "normal": 93, "bright": 141},
+    "white": {"dim": 245, "normal": 252, "bright": 15},
+}
+
+COLOUR_SINGLES = {
+    "black": 0,
+}
+
+COLOUR_ALIASES = {
+    "grey": "dim-white",
+    "gray": "dim-white",
+    "pink": "bright-magenta",
+    "amber": "dim-orange",
+    "light green": "bright-green",
+    "bright green": "bright-green",
+    "brightgreen": "bright-green",
+    "lime": "bright-green",
+    "light blue": "bright-blue",
+    "lightblue": "bright-blue",
+    "brown": "dim-orange",
+}
+
+COLOUR_CHOICES = [
+    "black",
+    "dim-red", "red", "bright-red",
+    "dim-orange", "orange", "bright-orange",
+    "dim-yellow", "yellow", "bright-yellow",
+    "dim-green", "green", "bright-green",
+    "dim-blue", "blue", "bright-blue",
+    "dim-cyan", "cyan", "bright-cyan",
+    "dim-magenta", "magenta", "bright-magenta",
+    "dim-purple", "purple", "bright-purple",
+    "dim-white", "white", "bright-white",
+    "grey", "gray", "pink", "amber",
+    "multi",
+]
+
+COLOUR_CATALOG_COLUMNS = [
+    ("Dim", [f"dim-{base}" for base in COLOUR_TRIADS]),
+    ("Normal", list(COLOUR_TRIADS.keys())),
+    ("Bright", [f"bright-{base}" for base in COLOUR_TRIADS]),
+]
+
 COLOUR_PAIR_INDICES = {
-    "green": 1,
+    "dim-green": 1,
     "white": 2,
     "cyan": 3,
     "yellow": 4,
     "red": 5,
-    "lime": 6,
+    "bright-green": 6,
+    "dim-cyan": 7,
     "blue": 8,
     "magenta": 9,
     "orange": 10,
-    "amber": 11,
-    "purple": 12,
-    "pink": 13,
-    "grey": 14,
-    "gray": 14,
+    "dim-orange": 11,
+    "bright-purple": 12,
+    "bright-magenta": 13,
+    "dim-white": 14,
+    "black": 15,
+    "dim-red": 16,
+    "bright-red": 17,
+    "bright-orange": 18,
+    "dim-yellow": 19,
+    "bright-yellow": 20,
+    "green": 21,
+    "dim-blue": 22,
+    "bright-blue": 23,
+    "bright-cyan": 24,
+    "dim-magenta": 25,
+    "dim-purple": 26,
+    "purple": 27,
+    "bright-white": 28,
 }
 
 COLOUR_ANSI_CODES = {
-    "red": "\033[31m",
+    "black": "\033[30m",
+    "dim-red": "\033[38;5;88m",
+    "red": "\033[38;5;160m",
+    "bright-red": "\033[38;5;196m",
+    "dim-orange": "\033[38;5;130m",
     "orange": "\033[38;5;208m",
-    "amber": "\033[38;5;172m",
-    "yellow": "\033[93m",
-    "green": "\033[32m",
-    "lime": "\033[92m",
-    "cyan": "\033[36m",
-    "blue": "\033[38;5;39m",
-    "magenta": "\033[35m",
-    "purple": "\033[38;5;141m",
-    "pink": "\033[38;5;213m",
-    "white": "\033[97m",
-    "grey": "\033[38;5;245m",
-    "gray": "\033[38;5;245m",
+    "bright-orange": "\033[38;5;214m",
+    "dim-yellow": "\033[38;5;136m",
+    "yellow": "\033[38;5;220m",
+    "bright-yellow": "\033[38;5;226m",
+    "dim-green": "\033[38;5;22m",
+    "green": "\033[38;5;34m",
+    "bright-green": "\033[38;5;82m",
+    "dim-blue": "\033[38;5;18m",
+    "blue": "\033[38;5;33m",
+    "bright-blue": "\033[38;5;39m",
+    "dim-cyan": "\033[38;5;23m",
+    "cyan": "\033[38;5;44m",
+    "bright-cyan": "\033[38;5;51m",
+    "dim-magenta": "\033[38;5;90m",
+    "magenta": "\033[38;5;165m",
+    "bright-magenta": "\033[38;5;201m",
+    "dim-purple": "\033[38;5;54m",
+    "purple": "\033[38;5;93m",
+    "bright-purple": "\033[38;5;141m",
+    "dim-white": "\033[38;5;245m",
+    "white": "\033[38;5;252m",
+    "bright-white": "\033[97m",
     "multi": "\033[1m",
 }
 
 
 def build_colour_pairs(curses_module):
     return {
-        1: (curses_module.COLOR_GREEN, curses_module.COLOR_BLACK),
-        2: (curses_module.COLOR_WHITE, curses_module.COLOR_BLACK),
-        3: (curses_module.COLOR_CYAN, curses_module.COLOR_BLACK),
-        4: (curses_module.COLOR_YELLOW, curses_module.COLOR_BLACK),
-        5: (curses_module.COLOR_RED, curses_module.COLOR_BLACK),
+        1: (22, curses_module.COLOR_BLACK),
+        2: (252, curses_module.COLOR_BLACK),
+        3: (44, curses_module.COLOR_BLACK),
+        4: (220, curses_module.COLOR_BLACK),
+        5: (160, curses_module.COLOR_BLACK),
         6: (82, curses_module.COLOR_BLACK),
-        7: (curses_module.COLOR_CYAN, curses_module.COLOR_BLACK),
-        8: (39, curses_module.COLOR_BLACK),
-        9: (curses_module.COLOR_MAGENTA, curses_module.COLOR_BLACK),
+        7: (23, curses_module.COLOR_BLACK),
+        8: (33, curses_module.COLOR_BLACK),
+        9: (165, curses_module.COLOR_BLACK),
         10: (208, curses_module.COLOR_BLACK),
-        11: (172, curses_module.COLOR_BLACK),
+        11: (130, curses_module.COLOR_BLACK),
         12: (141, curses_module.COLOR_BLACK),
-        13: (213, curses_module.COLOR_BLACK),
+        13: (201, curses_module.COLOR_BLACK),
         14: (245, curses_module.COLOR_BLACK),
+        15: (curses_module.COLOR_BLACK, curses_module.COLOR_BLACK),
+        16: (88, curses_module.COLOR_BLACK),
+        17: (196, curses_module.COLOR_BLACK),
+        18: (214, curses_module.COLOR_BLACK),
+        19: (136, curses_module.COLOR_BLACK),
+        20: (226, curses_module.COLOR_BLACK),
+        21: (34, curses_module.COLOR_BLACK),
+        22: (18, curses_module.COLOR_BLACK),
+        23: (39, curses_module.COLOR_BLACK),
+        24: (51, curses_module.COLOR_BLACK),
+        25: (90, curses_module.COLOR_BLACK),
+        26: (54, curses_module.COLOR_BLACK),
+        27: (93, curses_module.COLOR_BLACK),
+        28: (15, curses_module.COLOR_BLACK),
     }
 
 
@@ -128,16 +221,10 @@ def normalize_colour_spec(spec: str | None) -> str | None:
     if spec is None:
         return None
     normalized = str(spec).strip().lower().replace("-", " ").replace("_", " ")
-    aliases = {
-        "brightgreen": "lime",
-        "bright green": "lime",
-        "light green": "lime",
-        "lightblue": "cyan",
-        "light blue": "cyan",
-        "gray": "grey",
-        "brown": "amber",
-    }
-    return aliases.get(normalized, normalized)
+    if normalized == "multi":
+        return "multi"
+    canonical = normalized.replace(" ", "-")
+    return COLOUR_ALIASES.get(normalized, canonical)
 
 
 def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold: bool = False):
@@ -147,7 +234,7 @@ def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold
     default_name = normalize_colour_spec(default) or "white"
     pair_index = COLOUR_PAIR_INDICES.get(resolved, COLOUR_PAIR_INDICES[default_name])
     attr = curses_module.color_pair(pair_index)
-    if resolved == "yellow":
+    if resolved in {"yellow", "bright-yellow", "bright-white"}:
         attr |= curses_module.A_BOLD
     if bold:
         attr |= curses_module.A_BOLD
