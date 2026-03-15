@@ -220,6 +220,8 @@ def make_area_state(vocab_name: str | None, default_vocab: str, get_bar_config) 
         "radar_tick": 0,
         "radar_spin": 1,
         "radar_next_spin_change": 0.0,
+        "direction_motion": 1,
+        "direction_motion_prev": 1,
         "gauge_tick": 0,
         "gauge_signal": None,
         "gauge_title": "",

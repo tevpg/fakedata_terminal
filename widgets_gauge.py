@@ -282,23 +282,11 @@ class GaugeWidgets:
 
     def repaint_sparkline(self, area: dict, rows: int, y: int, x: int, width: int):
         spark_chars = " ▁▂▃▄▅▆▇█"
-        vals = area["gauge_spark"][-width:] if len(area["gauge_spark"]) >= width else area["gauge_spark"]
-        direction = str(area.get("direction_override") or "right").lower()
-        if direction == "left":
-            vals = list(reversed(vals))
-        elif direction == "random":
-            now = time.time()
-            if now >= area["radar_next_spin_change"]:
-                roll = random.random()
-                if roll < 0.5:
-                    area["radar_spin"] = 1
-                elif roll < 0.9:
-                    area["radar_spin"] = -1
-                else:
-                    area["radar_spin"] = 0
-                area["radar_next_spin_change"] = now + random.uniform(0.5, 3.0)
-            if area.get("radar_spin", 1) < 0:
-                vals = list(reversed(vals))
+        motion = area.get("direction_motion", 1)
+        if len(area["gauge_spark"]) >= width:
+            vals = area["gauge_spark"][:width] if motion < 0 else area["gauge_spark"][-width:]
+        else:
+            vals = area["gauge_spark"]
         for r in range(rows):
             safe_w = self.safe_row_width(y, r, x, width)
             if safe_w <= 0:

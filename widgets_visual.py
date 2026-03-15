@@ -111,6 +111,14 @@ class VisualWidgets:
                 attrs[draw_row][col] = overlay_attr
 
     def update_scope(self, area: dict, width: int):
+        motion = self.resolved_direction_motion(area)
+        if motion == 0:
+            return
+        prev_motion = area.get("direction_motion_prev", motion)
+        if prev_motion != motion:
+            visible = area["scope_vals"][-width:] if prev_motion >= 0 else area["scope_vals"][:width]
+            area["scope_vals"] = visible[:]
+            area["direction_motion_prev"] = motion
         cfg = self.get_gauge_config(self.area_vocab(area))
         area["scope_signal"] = cfg[1]
         raw = area["scope_signal"]()
@@ -124,26 +132,45 @@ class VisualWidgets:
         if random.random() < 0.04:
             spike = random.choice([-1.0, 1.0]) * random.uniform(0.05, 0.16)
         nxt = 0.5 + math.sin(phase) * amplitude + harmonic + noise + spike
-        area["scope_vals"].append(max(0.04, min(0.96, nxt)))
+        sample = max(0.04, min(0.96, nxt))
+        if motion < 0:
+            area["scope_vals"].insert(0, sample)
+        else:
+            area["scope_vals"].append(sample)
         keep = max(12, width + 12)
         if len(area["scope_vals"]) > keep:
-            area["scope_vals"] = area["scope_vals"][-keep:]
+            if motion < 0:
+                area["scope_vals"] = area["scope_vals"][:keep]
+            else:
+                area["scope_vals"] = area["scope_vals"][-keep:]
+        area["direction_motion_prev"] = motion
 
-    def resolved_direction_sign(self, area: dict, *, now: float | None = None) -> int:
+    def resolved_direction_motion(self, area: dict, *, now: float | None = None) -> int:
         direction = str(area.get("direction_override") or "right").lower()
         forced_spin = self.radar_spin_for_direction(direction)
         if forced_spin:
+            area["direction_motion"] = forced_spin
             return forced_spin
         current = time.time() if now is None else now
         if current >= area["radar_next_spin_change"]:
             area["radar_spin"] = self.choose_radar_spin()
             area["radar_next_spin_change"] = current + random.uniform(0.5, 3.0)
-        return -1 if area.get("radar_spin", 1) < 0 else 1
+        motion = area.get("radar_spin", 1)
+        if motion > 0:
+            area["direction_motion"] = 1
+            return 1
+        if motion < 0:
+            area["direction_motion"] = -1
+            return -1
+        return 0
 
     def repaint_scope(self, area: dict, nrows: int, y: int, x: int, width: int):
-        vals = area["scope_vals"][-width:] or [0.5] * width
-        if self.resolved_direction_sign(area) < 0:
-            vals = list(reversed(vals))
+        motion = area.get("direction_motion", 1)
+        if len(area["scope_vals"]) >= width:
+            vals = area["scope_vals"][:width] if motion < 0 else area["scope_vals"][-width:]
+        else:
+            vals = area["scope_vals"]
+        vals = vals or [0.5] * width
         canvas = [[" " for _ in range(width)] for _ in range(nrows)]
         mid = nrows // 2
         for c in range(0, width, 4):
@@ -279,9 +306,14 @@ class VisualWidgets:
         forced_spin = self.radar_spin_for_direction(direction)
         if forced_spin:
             area["radar_spin"] = forced_spin
+            area["direction_motion"] = forced_spin
         elif now >= area["radar_next_spin_change"]:
             area["radar_spin"] = self.choose_radar_spin()
             area["radar_next_spin_change"] = now + random.uniform(0.5, 3.0)
+            if area["radar_spin"] > 0:
+                area["direction_motion"] = 1
+            elif area["radar_spin"] < 0:
+                area["direction_motion"] = -1
         area["radar_angle"] = (area["radar_angle"] + (0.12 * area["radar_spin"])) % (math.pi * 2)
         area["radar_tick"] += 1
         fresh = []

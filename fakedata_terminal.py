@@ -608,6 +608,35 @@ def main(stdscr):
             return delay / 1.5
         return delay
 
+    def _resolved_area_direction_motion(area: dict, now: float) -> int:
+        direction = str(area.get("direction_override") or "right").lower()
+        if direction == "right":
+            area["direction_motion"] = 1
+            return 1
+        if direction == "left":
+            area["direction_motion"] = -1
+            return -1
+        if now >= area["radar_next_spin_change"]:
+            area["radar_spin"] = _choose_radar_spin()
+            area["radar_next_spin_change"] = now + random.uniform(0.5, 3.0)
+        motion = area.get("radar_spin", 1)
+        if motion > 0:
+            area["direction_motion"] = 1
+            return 1
+        if motion < 0:
+            area["direction_motion"] = -1
+            return -1
+        return 0
+
+    def _stabilize_direction_history(area: dict, width: int, motion: int, key: str) -> None:
+        prev_motion = area.get("direction_motion_prev", motion)
+        if prev_motion == motion:
+            return
+        values = area.get(key) or []
+        visible = values[-width:] if prev_motion >= 0 else values[:width]
+        area[key] = visible[:]
+        area["direction_motion_prev"] = motion
+
     def _reset_area_timing(area: dict):
         role = area.get("role", "main")
         area_speed = area.get("speed_override") or _current_speed_for_role(role)
@@ -705,9 +734,25 @@ def main(stdscr):
         elif mode == "oscilloscope":
             _update_scope(area, width)
         elif mode in {"gauges", "sparkline", "readouts"}:
-            area["gauge_spark"].append(_next_gauge_spark(area))
-            if len(area["gauge_spark"]) > width + 20:
-                area["gauge_spark"].pop(0)
+            if mode == "sparkline":
+                motion = _resolved_area_direction_motion(area, now)
+                if motion != 0:
+                    _stabilize_direction_history(area, width, motion, "gauge_spark")
+                    sample = _next_gauge_spark(area)
+                    if motion < 0:
+                        area["gauge_spark"].insert(0, sample)
+                    else:
+                        area["gauge_spark"].append(sample)
+                    if len(area["gauge_spark"]) > width + 20:
+                        if motion < 0:
+                            area["gauge_spark"].pop()
+                        else:
+                            area["gauge_spark"].pop(0)
+                    area["direction_motion_prev"] = motion
+            else:
+                area["gauge_spark"].append(_next_gauge_spark(area))
+                if len(area["gauge_spark"]) > width + 20:
+                    area["gauge_spark"].pop(0)
             if now >= area["gauge_next_reads_at"]:
                 vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
                 for i, val_str in enumerate(vals):
