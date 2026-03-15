@@ -68,10 +68,22 @@ COLOUR_CHOICES = [
     "multi",
 ]
 
+COLOUR_RAINBOW_ORDER = [
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "cyan",
+    "blue",
+    "purple",
+    "magenta",
+    "white",
+]
+
 COLOUR_CATALOG_COLUMNS = [
-    ("Dim", [f"dim-{base}" for base in COLOUR_TRIADS]),
-    ("Normal", list(COLOUR_TRIADS.keys())),
-    ("Bright", [f"bright-{base}" for base in COLOUR_TRIADS]),
+    ("Dim", [f"dim-{base}" for base in COLOUR_RAINBOW_ORDER]),
+    ("Normal", COLOUR_RAINBOW_ORDER[:]),
+    ("Bright", [f"bright-{base}" for base in COLOUR_RAINBOW_ORDER]),
 ]
 
 COLOUR_PAIR_INDICES = {

@@ -3,6 +3,8 @@
 import argparse
 import math
 import os
+import re
+import shutil
 import sys
 
 try:
@@ -49,6 +51,7 @@ THEME_CHOICES = [
 COLOUR_HELP = ", ".join(COLOUR_CHOICES)
 DIRECTION_CHOICES = ["left", "right", "random", "none"]
 DIRECTION_HELP = ", ".join(DIRECTION_CHOICES)
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _scene_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -359,41 +362,17 @@ def _pad_showcase_description(lines: list[str], header_lines: int) -> list[str]:
 
 
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
-    widgets = [_format_widget_catalog_entry(name) for name in widget_names(config_paths)]
-    layouts = layout_names(config_paths)
-    themes = THEME_CHOICES[:]
-    scenes = config_scene_names(config_paths)
-    colour_columns = []
-    for heading, values in COLOUR_CATALOG_COLUMNS:
-        if colourize:
-            display_values = [ansi_colour_label(name, is_tty=sys.stdout.isatty()) for name in values]
-        else:
-            display_values = values[:]
-        colour_columns.append((heading, display_values))
-    columns = [
-        ("Scenes", scenes),
-        ("Layouts", layouts),
-        ("Widgets", widgets),
-        ("Themes", themes),
-        *colour_columns,
-    ]
-    widths = []
-    for heading, values in columns:
-        longest = max([len(heading), *(len(value) for value in values)] or [len(heading)])
-        widths.append(longest + 2)
-    height = max(len(values) for _, values in columns)
+    width = shutil.get_terminal_size((100, 24)).columns
     lines = []
-    heading_line = "    ".join(f"{heading:<{widths[idx]}}" for idx, (heading, _) in enumerate(columns))
-    rule_line = "    ".join("-" * (widths[idx] - 1) for idx in range(len(columns)))
-    lines.extend([heading_line.rstrip(), rule_line.rstrip(), ""])
-    for row in range(height):
-        parts = []
-        for idx, (_, values) in enumerate(columns):
-            entry = values[row] if row < len(values) else ""
-            parts.append(f"{entry:<{widths[idx]}}")
-        lines.append("    ".join(parts).rstrip())
+    lines.extend(_format_catalog_section("Scenes (--scenes to view all the preset scenes)", config_scene_names(config_paths), width))
+    lines.append("")
+    lines.extend(_format_catalog_section("Layouts (--layouts to see the layouts)", layout_names(config_paths), width))
+    lines.append("")
+    lines.extend(_format_catalog_section("Widgets (--widgets to view the available widgets)", [_format_widget_catalog_entry(name) for name in widget_names(config_paths)], width))
+    lines.append("")
+    lines.extend(_format_modifiers_section(width, colourize=colourize))
     lines.extend(["", "Config files:"])
-    lines.extend(str(path) for path in config_paths)
+    lines.extend(f"  {path}" for path in config_paths)
     defaults = config_defaults(config_paths)
     default_colour = defaults.get("colour")
     if colourize and default_colour:
@@ -401,12 +380,126 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     lines.extend([
         "",
         "Configured defaults:",
-        f"layout: {defaults.get('layout') if defaults.get('layout') is not None else '(none)'}",
-        f"speed: {defaults.get('speed', 50)}",
-        f"colour: {default_colour if default_colour is not None else '(none)'}",
-        f"direction: {defaults.get('direction', 'right')}",
-        f"widget: {defaults.get('widget') if defaults.get('widget') is not None else '(none)'}",
+        f"  layout: {defaults.get('layout') if defaults.get('layout') is not None else '(none)'}",
+        f"  speed: {defaults.get('speed', 50)}",
+        f"  colour: {default_colour if default_colour is not None else '(none)'}",
+        f"  direction: {defaults.get('direction', 'right')}",
+        f"  widget: {defaults.get('widget') if defaults.get('widget') is not None else '(none)'}",
     ])
+    return lines
+
+
+def _visible_len(text: str) -> int:
+    return len(_ANSI_ESCAPE_RE.sub("", text))
+
+
+def _columnize_items(items: list[str], width: int, *, gap: int = 2, columns: int | None = None) -> list[str]:
+    if not items:
+        return ["(none)"]
+    clean_width = max(20, width)
+    if columns is None:
+        max_cols = len(items)
+        for cols in range(max_cols, 0, -1):
+            rows = math.ceil(len(items) / cols)
+            col_widths = []
+            fits = True
+            for col in range(cols):
+                column_items = items[col * rows:(col + 1) * rows]
+                if not column_items:
+                    continue
+                col_width = max(_visible_len(item) for item in column_items)
+                col_widths.append(col_width)
+            total = sum(col_widths) + gap * max(0, len(col_widths) - 1)
+            if total <= clean_width:
+                columns = cols
+                break
+        if columns is None:
+            columns = 1
+    rows = math.ceil(len(items) / columns)
+    matrix = [items[col * rows:(col + 1) * rows] for col in range(columns)]
+    col_widths = [max((_visible_len(item) for item in column), default=0) for column in matrix]
+    lines = []
+    for row in range(rows):
+        parts = []
+        for col in range(columns):
+            entry = matrix[col][row] if row < len(matrix[col]) else ""
+            if col == columns - 1:
+                parts.append(entry)
+            else:
+                padding = max(0, col_widths[col] - _visible_len(entry))
+                parts.append(f"{entry}{' ' * (padding + gap)}")
+        lines.append("".join(parts).rstrip())
+    return lines
+
+
+def _format_catalog_section(title: str, items: list[str], width: int) -> list[str]:
+    return [title, "-" * len(title), *_columnize_items(items, width)]
+
+
+def _format_modifier_subsection(title: str, body_lines: list[str], *, note: str | None = None) -> list[str]:
+    heading = f"  {title.lower()}"
+    if note:
+        heading = f"{heading}: {note}"
+    return [heading, *[f"    {line}" if line else "" for line in body_lines]]
+
+
+def _format_colour_modifier(width: int, *, colourize: bool) -> list[str]:
+    display_columns = []
+    for heading, values in COLOUR_CATALOG_COLUMNS:
+        display_values = [ansi_colour_label(name, is_tty=sys.stdout.isatty()) for name in values] if colourize else values[:]
+        display_columns.append((heading, display_values))
+    gap = 2
+    col_widths = []
+    for heading, values in display_columns:
+        col_widths.append(max([len(heading), *(_visible_len(value) for value in values)]))
+    total = sum(col_widths) + gap * (len(col_widths) - 1)
+    if total > max(20, width):
+        # The colour block is always exactly three columns; if the terminal is narrow,
+        # keep the structure and let it run wide rather than collapsing the layout.
+        pass
+    lines = []
+    header_parts = []
+    for idx, (heading, _) in enumerate(display_columns):
+        if idx == len(display_columns) - 1:
+            header_parts.append(heading)
+        else:
+            header_parts.append(f"{heading}{' ' * (col_widths[idx] - len(heading) + gap)}")
+    lines.append("".join(header_parts).rstrip())
+    row_count = max(len(values) for _, values in display_columns)
+    for row in range(row_count):
+        parts = []
+        for idx, (_, values) in enumerate(display_columns):
+            entry = values[row] if row < len(values) else ""
+            if idx == len(display_columns) - 1:
+                parts.append(entry)
+            else:
+                padding = max(0, col_widths[idx] - _visible_len(entry))
+                parts.append(f"{entry}{' ' * (padding + gap)}")
+        lines.append("".join(parts).rstrip())
+    lines.append("")
+    lines.append("special: multi")
+    return lines
+
+
+def _format_modifiers_section(width: int, *, colourize: bool) -> list[str]:
+    lines = ["Modifiers", "---------"]
+    sections = [
+        _format_modifier_subsection("Colour", _format_colour_modifier(width - 4, colourize=colourize)),
+        _format_modifier_subsection("Direction", _columnize_items(DIRECTION_CHOICES, width - 4)),
+        _format_modifier_subsection(
+            "Theme",
+            _columnize_items(THEME_CHOICES[:], width - 4),
+            note="theme/source vocabulary and behavior profile",
+        ),
+        _format_modifier_subsection("Speed", ["1..100"], note="widget speed range"),
+        _format_modifier_subsection("Text", ["use custom text in the widget"]),
+        _format_modifier_subsection("Image", ["one or more image paths for image widgets"]),
+        _format_modifier_subsection("Cycle", ["ordered widget list for cycle widgets"]),
+    ]
+    for idx, section in enumerate(sections):
+        if idx:
+            lines.append("")
+        lines.extend(section)
     return lines
 
 def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:

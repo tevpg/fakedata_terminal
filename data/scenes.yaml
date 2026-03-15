@@ -14,7 +14,7 @@ defaults:
   layout: 2x2
   theme: science
   speed: 55
-  colour: green
+  # colour: green
   widget: blank
   image:
     glob: "geom*.png"
