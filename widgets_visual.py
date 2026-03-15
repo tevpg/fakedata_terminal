@@ -129,8 +129,21 @@ class VisualWidgets:
         if len(area["scope_vals"]) > keep:
             area["scope_vals"] = area["scope_vals"][-keep:]
 
+    def resolved_direction_sign(self, area: dict, *, now: float | None = None) -> int:
+        direction = str(area.get("direction_override") or "right").lower()
+        forced_spin = self.radar_spin_for_direction(direction)
+        if forced_spin:
+            return forced_spin
+        current = time.time() if now is None else now
+        if current >= area["radar_next_spin_change"]:
+            area["radar_spin"] = self.choose_radar_spin()
+            area["radar_next_spin_change"] = current + random.uniform(0.5, 3.0)
+        return -1 if area.get("radar_spin", 1) < 0 else 1
+
     def repaint_scope(self, area: dict, nrows: int, y: int, x: int, width: int):
         vals = area["scope_vals"][-width:] or [0.5] * width
+        if self.resolved_direction_sign(area) < 0:
+            vals = list(reversed(vals))
         canvas = [[" " for _ in range(width)] for _ in range(nrows)]
         mid = nrows // 2
         for c in range(0, width, 4):
@@ -262,7 +275,7 @@ class VisualWidgets:
 
     def update_radar(self, area: dict):
         now = time.time()
-        direction = str(area.get("direction_override") or "random").lower()
+        direction = str(area.get("direction_override") or "right").lower()
         forced_spin = self.radar_spin_for_direction(direction)
         if forced_spin:
             area["radar_spin"] = forced_spin

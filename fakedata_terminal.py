@@ -194,7 +194,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     shortened_data_images = False
     scene_colour = None
     scene_text = config_scene.get("text", "")
-    scene_direction = config_scene.get("direction", "random")
+    scene_direction = config_scene.get("direction", "right")
     colour_values = {
         area.get("colour")
         for area in config_scene.get("areas", [])
@@ -210,7 +210,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         "speed": current_base_speed,
         "text": _escape_export_text_modifier(scene_text),
     }
-    if scene_direction != "random":
+    if scene_direction != "right":
         scene_body["direction"] = scene_direction
     if scene_colour is not None:
         scene_body["colour"] = scene_colour

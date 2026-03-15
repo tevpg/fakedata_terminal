@@ -218,9 +218,9 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "image": ["speed", "image"],
         "life": ["speed"],
         "matrix": ["speed"],
-        "oscilloscope": ["speed", "theme", "text"],
+        "oscilloscope": ["speed", "theme", "text", "direction"],
         "readouts": ["theme", "text", "colour"],
-        "sparkline": ["speed", "theme", "colour", "text"],
+        "sparkline": ["speed", "theme", "colour", "text", "direction"],
         "sweep": ["speed"],
         "text": ["speed", "theme", "text"],
         "text_scant": ["speed", "theme", "text"],
@@ -420,7 +420,7 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
         f"layout: {defaults.get('layout') if defaults.get('layout') is not None else '(none)'}",
         f"speed: {defaults.get('speed', 50)}",
         f"colour: {default_colour if default_colour is not None else '(none)'}",
-        f"direction: {defaults.get('direction', 'random')}",
+        f"direction: {defaults.get('direction', 'right')}",
         f"widget: {defaults.get('widget') if defaults.get('widget') is not None else '(none)'}",
     ])
     return lines
@@ -758,7 +758,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     runtime_glitch = max(0.0, configured_defaults.get("glitch", 0.0))
     runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("colour")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
-    runtime_direction = args.direction if direction_explicit and args.direction is not None else configured_defaults.get("direction", "random")
+    runtime_direction = args.direction if direction_explicit and args.direction is not None else configured_defaults.get("direction", "right")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
     if not image_explicit:
@@ -796,7 +796,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else (base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50))
         runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
         runtime_glitch = max(0.0, args.glitch if glitch_explicit and args.glitch is not None else (base_runtime["glitch"] if base_runtime else configured_defaults.get("glitch", 0.0)))
-        runtime_direction = args.direction if direction_explicit and args.direction is not None else (base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "random"))
+        runtime_direction = args.direction if direction_explicit and args.direction is not None else (base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "right"))
 
         has_cli_overrides = bool(
             args.layout or args.panel_widget or args.panel_speed or args.panel_text or args.panel_theme or args.panel_direction or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit or direction_explicit or text_explicit or glitch_explicit
@@ -904,7 +904,7 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(f"  {bold}theme{reset}  : {config['theme']}")
     if config.get("default_colour") is not None:
         print(f"  {bold}colour{reset} : default {config['default_colour']}")
-    print(f"  {bold}direction{reset}: {config.get('direction', 'random')}")
+    print(f"  {bold}direction{reset}: {config.get('direction', 'right')}")
     if config.get("default_widget") is not None:
         print(f"  {bold}widget{reset} : default {config['default_widget']}")
     if config["image_paths"]:

@@ -342,7 +342,7 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
         "colour": colour,
         "image": defaults.get("image"),
         "glitch": defaults.get("glitch", 0.0),
-        "direction": _direction_value(defaults.get("direction")) or "random",
+        "direction": _direction_value(defaults.get("direction")) or "right",
     }
 
 
@@ -958,7 +958,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                            theme: str, speed: int | float, text: str,
                            glitch: int | float = 0.0,
                            default_widget: str | None = None, default_colour: str | None = None,
-                           direction: str = "random",
+                           direction: str = "right",
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
         parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
@@ -969,7 +969,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     seen = []
     areas = []
     image_paths = []
-    scene_direction = _direction_value(direction) or "random"
+    scene_direction = _direction_value(direction) or "right"
     for region_name, region_cfg in regions_cfg.items():
         widget = _widget_name(region_cfg)
         if not widget:
@@ -1083,7 +1083,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
                            speed: int | float = 50, text: str = "",
                            glitch: int | float = 0.0,
                            default_widget: str | None = None, default_colour: str | None = None,
-                           direction: str = "random",
+                           direction: str = "right",
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
@@ -1124,6 +1124,6 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
         glitch=scene_cfg.get("glitch", defaults.get("glitch", 0.0)),
         default_widget=defaults.get("widget"),
         default_colour=_region_colour(scene_cfg) or defaults.get("colour"),
-        direction=_region_direction(scene_cfg) or defaults.get("direction", "random"),
+        direction=_region_direction(scene_cfg) or defaults.get("direction", "right"),
         config_paths=config_paths,
     )
