@@ -7,6 +7,11 @@ import random
 import subprocess
 import textwrap
 
+try:
+    from .runtime_support import multi_palette_specs
+except ImportError:
+    from runtime_support import multi_palette_specs
+
 
 class ImageWidgets:
     IMAGE_MODES = {"image", "life", "blank"}
@@ -336,6 +341,22 @@ class ImageWidgets:
                 break_on_hyphens=False,
             ) or [""])
         lines = wrapped_lines
+        multi_mode = colour_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}
+        line_attrs: list[int] = []
+        if multi_mode:
+            multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-normal")
+            palette_attrs = [
+                self.colour_attr_from_spec(self.curses, spec, default=spec)
+                for spec in multi_specs
+            ]
+            attr_sig = (colour_spec, tuple(lines))
+            if area.get("static_colour_sig") != attr_sig:
+                area["static_colour_sig"] = attr_sig
+                area["static_line_attrs"] = [
+                    random.choice(palette_attrs)
+                    for _ in lines
+                ] if palette_attrs else []
+            line_attrs = area.get("static_line_attrs") or []
         align = area.get("static_align") or "top"
         if text_only and align == "top":
             align = "center"
@@ -354,7 +375,9 @@ class ImageWidgets:
                         line = (" " * start + source_line).ljust(safe_w)
                     else:
                         line = source_line.ljust(safe_w)
-                    attr = base_attr if not source_line.endswith(":") else base_attr | self.curses.A_BOLD
+                    attr = line_attrs[line_idx % len(line_attrs)] if multi_mode and line_attrs else base_attr
+                    if source_line.endswith(":"):
+                        attr |= self.curses.A_BOLD
                     self.stdscr.addnstr(y + r, x, line, safe_w, attr)
             except self.curses.error:
                 pass

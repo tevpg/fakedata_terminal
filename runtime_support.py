@@ -329,6 +329,21 @@ def life_ramp_specs(spec: str | None) -> list[str]:
     return ["bright-white", f"bright-{family}", family, f"dim-{family}", "dim-white"]
 
 
+def multi_palette_specs(spec: str | None, *, bare_multi: str = "multi-normal") -> list[str]:
+    resolved = normalize_colour_spec(spec) or bare_multi
+    if resolved == "multi":
+        resolved = bare_multi
+    if resolved == "multi-all":
+        return colour_band_specs("all")
+    if resolved == "multi-dim":
+        return colour_band_specs("dim")
+    if resolved == "multi-normal":
+        return colour_band_specs("normal")
+    if resolved == "multi-bright":
+        return colour_band_specs("bright")
+    return [resolved]
+
+
 def blocks_palette_specs(spec: str | None) -> list[str]:
     resolved = normalize_colour_spec(spec) or "multi-all"
     if resolved == "multi":

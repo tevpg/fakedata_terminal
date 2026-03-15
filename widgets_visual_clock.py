@@ -6,6 +6,11 @@ import math
 import random
 import time
 
+try:
+    from .runtime_support import multi_palette_specs
+except ImportError:
+    from runtime_support import multi_palette_specs
+
 
 class ClockWidget:
     def __init__(
@@ -73,14 +78,10 @@ class ClockWidget:
         attrs = [[self.curses.color_pair(1) for _ in range(width)] for _ in range(rows)]
         face_spec = self.normalize_colour_spec(area.get("colour_override")) or "cyan"
         face_attr = self.colour_attr_from_spec(self.curses, face_spec, default="cyan")
+        multi_specs = multi_palette_specs(face_spec, bare_multi="multi-normal")
         face_multi_attrs = [
-            self.curses.color_pair(5) | self.curses.A_BOLD,
-            self.curses.color_pair(4) | self.curses.A_BOLD,
-            self.curses.color_pair(6) | self.curses.A_BOLD,
-            self.curses.color_pair(3) | self.curses.A_BOLD,
-            self.curses.color_pair(8) | self.curses.A_BOLD,
-            self.curses.color_pair(9) | self.curses.A_BOLD,
-            self.curses.color_pair(2) | self.curses.A_BOLD,
+            self.colour_attr_from_spec(self.curses, spec, default=spec, bold=True)
+            for spec in multi_specs
         ]
         cx = (width - 1) / 2.0
         cy = (rows - 1) / 2.0
@@ -101,7 +102,7 @@ class ClockWidget:
                 ang = math.atan2(dy, dx)
                 if abs(dist - 1.0) < 0.08:
                     canvas[r][c] = "•"
-                    if face_spec == "multi":
+                    if face_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"} and face_multi_attrs:
                         sector = int((((ang + math.pi) / (math.pi * 2)) * len(face_multi_attrs)))
                         attrs[r][c] = face_multi_attrs[sector % len(face_multi_attrs)]
                     else:

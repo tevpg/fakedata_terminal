@@ -5,6 +5,11 @@ from __future__ import annotations
 import random
 import time
 
+try:
+    from .runtime_support import multi_palette_specs
+except ImportError:
+    from runtime_support import multi_palette_specs
+
 
 class GaugeWidgets:
     GAUGE_MODES = {"gauges", "sparkline", "readouts"}
@@ -320,7 +325,11 @@ class GaugeWidgets:
         title = area["gauge_title"]
         use_title = self.readout_use_title(rows)
         colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
-        multi_attrs = [self.curses.color_pair(2), self.curses.color_pair(3), self.curses.color_pair(6), self.curses.color_pair(4), self.curses.color_pair(5), self.curses.color_pair(8), self.curses.color_pair(9)]
+        multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-normal")
+        multi_attrs = [
+            self.colour_attr_from_spec(self.curses, spec, default=spec)
+            for spec in multi_specs
+        ]
         single_attr = self.colour_attr_from_spec(self.curses, colour_spec, default="white")
         data_rows = min(len(area["gauge_reads"]), max(1, rows - (1 if use_title else 0)))
         content_rows = min(rows, data_rows + (1 if use_title else 0))
@@ -334,7 +343,7 @@ class GaugeWidgets:
             except self.curses.error:
                 pass
         if use_title:
-            title_attr = multi_attrs[0] if colour_spec == "multi" else single_attr
+            title_attr = multi_attrs[0] if colour_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"} and multi_attrs else single_attr
             self.draw_divider(y, top_pad, x, width, title, attr=title_attr | self.curses.A_DIM)
         for i, (label, val_fn, unit) in enumerate(area["gauge_reads"]):
             row = start_row + i
@@ -350,7 +359,11 @@ class GaugeWidgets:
             if safe_w <= 0:
                 continue
             try:
-                line_attr = multi_attrs[(i + (1 if use_title else 0)) % len(multi_attrs)] if colour_spec == "multi" else single_attr
+                line_attr = (
+                    multi_attrs[(i + (1 if use_title else 0)) % len(multi_attrs)]
+                    if colour_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"} and multi_attrs
+                    else single_attr
+                )
                 self.stdscr.addnstr(y + row, x, line[:safe_w].ljust(safe_w), safe_w, line_attr)
             except self.curses.error:
                 pass
