@@ -78,6 +78,38 @@ class VisualWidgets:
             except self.curses.error:
                 pass
 
+    def draw_centered_overlay_to_canvas(self, area: dict, row: int, width: int, canvas, attrs, *,
+                                        rows: int | None = None, anchor: str = "center"):
+        overlay = self.overlay_text(area)
+        if not overlay or row < 0:
+            return
+        lines = overlay.splitlines() or [overlay]
+        if rows is None:
+            rows = row + len(lines)
+        if anchor == "top":
+            start_row = row
+        elif anchor == "bottom":
+            start_row = row - len(lines) + 1
+        else:
+            start_row = row - ((len(lines) - 1) // 2)
+        start_row = max(0, min(start_row, max(0, rows - len(lines))))
+        overlay_attr = self.curses.color_pair(2) | self.curses.A_BOLD
+        for idx, source in enumerate(lines):
+            draw_row = start_row + idx
+            if draw_row < 0 or draw_row >= rows:
+                continue
+            safe_w = min(width, len(canvas[draw_row]), len(attrs[draw_row]))
+            if safe_w <= 0:
+                continue
+            draw = source[:safe_w]
+            start_col = max(0, (safe_w - len(draw)) // 2)
+            for offset, ch in enumerate(draw):
+                col = start_col + offset
+                if col >= safe_w:
+                    break
+                canvas[draw_row][col] = ch
+                attrs[draw_row][col] = overlay_attr
+
     def update_scope(self, area: dict, width: int):
         cfg = self.get_gauge_config(self.area_vocab(area))
         area["scope_signal"] = cfg[1]
@@ -274,10 +306,6 @@ class VisualWidgets:
                         attrs[r][c] = face_multi_attrs[sector % len(face_multi_attrs)]
                     else:
                         attrs[r][c] = face_attr
-                delta = abs((ang - area["radar_angle"] + math.pi) % (math.pi * 2) - math.pi)
-                if dist <= 1.0 and delta < 0.08:
-                    canvas[r][c] = "█" if delta < 0.02 else "▓"
-                    attrs[r][c] = self.curses.color_pair(2)
         for mr, mc, ch in [
             (int(round(cy - yrad)), c_mid, "▲"),
             (r_mid, int(round(cx + xrad)), "▶"),
@@ -300,14 +328,24 @@ class VisualWidgets:
                     if 0 <= ny < nrows and 0 <= nx < width and canvas[ny][nx] == " ":
                         canvas[ny][nx] = "·"
                         attrs[ny][nx] = self.curses.color_pair(2)
+        clock_text_row = min(nrows - 1, max(0, int(round(cy + max(1.0, yrad * 0.72)))))
+        self.draw_centered_overlay_to_canvas(area, clock_text_row, width, canvas, attrs, rows=nrows, anchor="center")
+        for r in range(nrows):
+            for c in range(width):
+                dx = (c - cx) / max(1.0, xrad)
+                dy = (r - cy) / max(1.0, yrad)
+                dist = math.sqrt(dx * dx + dy * dy)
+                ang = math.atan2(dy, dx)
+                delta = abs((ang - area["radar_angle"] + math.pi) % (math.pi * 2) - math.pi)
+                if dist <= 1.0 and delta < 0.08:
+                    canvas[r][c] = "█" if delta < 0.02 else "▓"
+                    attrs[r][c] = self.curses.color_pair(2)
         for r in range(nrows):
             for c in range(width):
                 try:
                     self.stdscr.addch(y + r, x + c, canvas[r][c], attrs[r][c])
                 except self.curses.error:
                     pass
-        clock_text_row = min(nrows - 1, max(0, int(round(cy + max(1.0, yrad * 0.72)))))
-        self.draw_centered_overlay(area, clock_text_row, y, x, width, rows=nrows, anchor="center")
 
     def ensure_blocks(self, area: dict, rows: int, width: int):
         bg = area["blocks_bg"]
