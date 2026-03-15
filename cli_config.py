@@ -193,7 +193,7 @@ def _widget_attribute_names(widget: str) -> list[str]:
     widget_attrs = {
         "bars": ["speed", "theme"],
         "blank": ["text", "colour"],
-        "blocks": ["speed"],
+        "blocks": ["speed", "colour"],
         "clock": ["speed", "colour", "text", "direction"],
         "cycle": ["speed", "theme", "colour", "cycle"],
         "image": ["speed", "image"],
@@ -368,7 +368,7 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     lines.append("")
     lines.extend(_format_catalog_section("Layouts (--layouts to see the layouts)", layout_names(config_paths), width))
     lines.append("")
-    lines.extend(_format_catalog_section("Widgets (--widgets to view the available widgets)", [_format_widget_catalog_entry(name) for name in widget_names(config_paths)], width))
+    lines.extend(_format_widget_matrix_section("Widgets (--widgets to view the available widgets)", widget_names(config_paths), width))
     lines.append("")
     lines.extend(_format_modifiers_section(width, colourize=colourize))
     lines.extend(["", "Config files:"])
@@ -436,6 +436,29 @@ def _format_catalog_section(title: str, items: list[str], width: int) -> list[st
     return [title, "-" * len(title), *_columnize_items(items, width)]
 
 
+def _format_widget_matrix_section(title: str, widgets: list[str], width: int) -> list[str]:
+    modifier_columns = ["speed", "theme", "text", "colour", "direction", "image", "cycle"]
+    check = "✓"
+    widget_width = max(len("widget"), max((len(name) for name in widgets), default=0))
+    col_widths = [max(len(name), 1) for name in modifier_columns]
+    gap = 2
+    total_width = widget_width + sum(col_widths) + gap * len(modifier_columns)
+    if total_width > width:
+        widget_width = max(len("widget"), widget_width - max(0, total_width - width))
+    header = f"{'widget':<{widget_width}}"
+    for idx, name in enumerate(modifier_columns):
+        header += f"{' ' * gap}{name:<{col_widths[idx]}}"
+    lines = [title, "-" * len(title), header.rstrip()]
+    for widget in widgets:
+        attrs = set(_widget_attribute_names(widget))
+        row = f"{widget:<{widget_width}}"
+        for idx, name in enumerate(modifier_columns):
+            mark = check if name in attrs else ""
+            row += f"{' ' * gap}{mark:<{col_widths[idx]}}"
+        lines.append(row.rstrip())
+    return lines
+
+
 def _format_modifier_subsection(title: str, body_lines: list[str], *, note: str | None = None) -> list[str]:
     heading = f"  {title.lower()}"
     if note:
@@ -477,7 +500,7 @@ def _format_colour_modifier(width: int, *, colourize: bool) -> list[str]:
                 parts.append(f"{entry}{' ' * (padding + gap)}")
         lines.append("".join(parts).rstrip())
     lines.append("")
-    lines.append("special: multi")
+    lines.append("special: multi-all, multi-dim, multi-normal, multi-bright, multi [widget-defined]")
     return lines
 
 

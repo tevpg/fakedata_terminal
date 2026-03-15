@@ -66,6 +66,10 @@ COLOUR_CHOICES = [
     "dim-white", "white", "bright-white",
     "grey", "gray", "pink", "amber",
     "multi",
+    "multi-all",
+    "multi-dim",
+    "multi-normal",
+    "multi-bright",
 ]
 
 COLOUR_RAINBOW_ORDER = [
@@ -91,6 +95,20 @@ COLOUR_NORMAL_BRIGHTNESS_ORDER = [
     "purple",
     "blue",
 ]
+
+
+def colour_band_specs(band: str) -> list[str]:
+    if band == "dim":
+        return [f"dim-{base}" for base in COLOUR_NORMAL_BRIGHTNESS_ORDER]
+    if band == "bright":
+        return [f"bright-{base}" for base in COLOUR_NORMAL_BRIGHTNESS_ORDER]
+    if band == "all":
+        return (
+            [f"bright-{base}" for base in COLOUR_NORMAL_BRIGHTNESS_ORDER]
+            + COLOUR_NORMAL_BRIGHTNESS_ORDER[:]
+            + [f"dim-{base}" for base in COLOUR_NORMAL_BRIGHTNESS_ORDER]
+        )
+    return COLOUR_NORMAL_BRIGHTNESS_ORDER[:]
 
 COLOUR_CATALOG_COLUMNS = [
     ("Dim", [f"dim-{base}" for base in COLOUR_RAINBOW_ORDER]),
@@ -247,13 +265,21 @@ def normalize_colour_spec(spec: str | None) -> str | None:
     normalized = str(spec).strip().lower().replace("-", " ").replace("_", " ")
     if normalized == "multi":
         return "multi"
+    if normalized == "multi all":
+        return "multi-all"
+    if normalized == "multi dim":
+        return "multi-dim"
+    if normalized == "multi normal":
+        return "multi-normal"
+    if normalized == "multi bright":
+        return "multi-bright"
     canonical = normalized.replace(" ", "-")
     return COLOUR_ALIASES.get(normalized, canonical)
 
 
 def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold: bool = False):
     resolved = normalize_colour_spec(spec) or normalize_colour_spec(default)
-    if resolved == "multi":
+    if resolved in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}:
         return None
     default_name = normalize_colour_spec(default) or "white"
     pair_index = COLOUR_PAIR_INDICES.get(resolved, COLOUR_PAIR_INDICES[default_name])
@@ -267,7 +293,7 @@ def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold
 
 def colour_family_name(spec: str | None, *, default: str = "green") -> str:
     resolved = normalize_colour_spec(spec) or normalize_colour_spec(default) or "green"
-    if resolved == "multi":
+    if resolved in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}:
         return "multi"
     if resolved in COLOUR_SINGLES:
         fallback = normalize_colour_spec(default) or "green"
@@ -288,10 +314,53 @@ def colour_family_name(spec: str | None, *, default: str = "green") -> str:
 
 
 def life_ramp_specs(spec: str | None) -> list[str]:
-    family = colour_family_name(spec, default="green")
+    resolved = normalize_colour_spec(spec) or "green"
+    if resolved in {"multi", "multi-normal"}:
+        return colour_band_specs("normal")
+    if resolved == "multi-dim":
+        return colour_band_specs("dim")
+    if resolved == "multi-bright":
+        return colour_band_specs("bright")
+    if resolved == "multi-all":
+        return colour_band_specs("all")
+    family = colour_family_name(resolved, default="green")
     if family == "multi":
-        return COLOUR_NORMAL_BRIGHTNESS_ORDER[:]
+        return colour_band_specs("normal")
     return ["bright-white", f"bright-{family}", family, f"dim-{family}", "dim-white"]
+
+
+def blocks_palette_specs(spec: str | None) -> list[str]:
+    resolved = normalize_colour_spec(spec) or "multi-all"
+    if resolved == "multi":
+        resolved = "multi-all"
+    if resolved == "multi-all":
+        return [colour_name for colour_name in COLOUR_PAIR_INDICES if colour_name != "black"]
+    if resolved == "multi-dim":
+        return [f"dim-{base}" for base in COLOUR_RAINBOW_ORDER]
+    if resolved == "multi-normal":
+        return COLOUR_RAINBOW_ORDER[:]
+    if resolved == "multi-bright":
+        return [f"bright-{base}" for base in COLOUR_RAINBOW_ORDER]
+    if resolved == "black":
+        return []
+    return [resolved]
+
+
+def tunnel_palette_specs(spec: str | None) -> list[str]:
+    resolved = normalize_colour_spec(spec) or "multi"
+    if resolved == "multi":
+        resolved = "multi-bright"
+    if resolved == "multi-all":
+        return [colour_name for colour_name in COLOUR_PAIR_INDICES if colour_name != "black"]
+    if resolved == "multi-dim":
+        return [f"dim-{base}" for base in COLOUR_RAINBOW_ORDER]
+    if resolved == "multi-normal":
+        return COLOUR_RAINBOW_ORDER[:]
+    if resolved == "multi-bright":
+        return [f"bright-{base}" for base in COLOUR_RAINBOW_ORDER]
+    if resolved == "black":
+        return []
+    return [resolved]
 
 
 def ansi_colour_label(name: str, *, is_tty: bool) -> str:
@@ -419,6 +488,8 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "sweep_dir": 1,
         "tunnel_sig": None,
         "tunnel_layers": [],
+        "tunnel_colour_sig": None,
+        "tunnel_band_attrs": [],
         "tunnel_phase": random.random(),
         "tunnel_palette_idx": random.randrange(6),
         "tunnel_drift_phase": random.uniform(0.0, math.tau),

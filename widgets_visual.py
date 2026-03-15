@@ -7,6 +7,7 @@ import random
 import time
 
 try:
+    from .runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from .widgets_visual_blocks import BlocksWidget
     from .widgets_visual_clock import ClockWidget
     from .widgets_visual_matrix import MatrixWidget
@@ -14,6 +15,7 @@ try:
     from .widgets_visual_sweep import SweepWidget
     from .widgets_visual_tunnel import TunnelWidget
 except ImportError:
+    from runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from widgets_visual_blocks import BlocksWidget
     from widgets_visual_clock import ClockWidget
     from widgets_visual_matrix import MatrixWidget
@@ -51,7 +53,13 @@ class VisualWidgets:
         self.colour_attr_from_spec = colour_attr_from_spec
         self.matrix_chars = matrix_chars
         self.sweep_symbols = sweep_symbols
-        self.blocks_widget = BlocksWidget(curses_module=curses_module, stdscr=stdscr)
+        self.blocks_widget = BlocksWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            normalize_colour_spec=normalize_colour_spec,
+            blocks_palette_specs=blocks_palette_specs,
+            colour_pair_indices=COLOUR_PAIR_INDICES,
+        )
         self.clock_widget = ClockWidget(
             curses_module=curses_module,
             stdscr=stdscr,

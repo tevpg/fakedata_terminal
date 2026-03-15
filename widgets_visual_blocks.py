@@ -5,13 +5,15 @@ from __future__ import annotations
 import random
 
 BLACK_BLOCK_PROBABILITY = 0.65
-BLOCK_COLOUR_INDICES = tuple(range(1, 15))
 
 
 class BlocksWidget:
-    def __init__(self, *, curses_module, stdscr):
+    def __init__(self, *, curses_module, stdscr, normalize_colour_spec, blocks_palette_specs, colour_pair_indices):
         self.curses = curses_module
         self.stdscr = stdscr
+        self.normalize_colour_spec = normalize_colour_spec
+        self.blocks_palette_specs = blocks_palette_specs
+        self.colour_pair_indices = colour_pair_indices
 
     def ensure(self, area: dict, rows: int, width: int) -> None:
         bg = area["blocks_bg"]
@@ -31,13 +33,19 @@ class BlocksWidget:
         self.ensure(area, rows, width)
         cells = area["blocks_cells"]
         rect_count = random.randint(1, 3)
-        palette = [cp for cp in BLOCK_COLOUR_INDICES if cp != area["blocks_bg"]]
+        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "multi-all"
+        palette_specs = self.blocks_palette_specs(colour_spec)
+        palette = [
+            self.colour_pair_indices[spec]
+            for spec in palette_specs
+            if spec in self.colour_pair_indices and self.colour_pair_indices[spec] != area["blocks_bg"]
+        ]
         for _ in range(rect_count):
             rh = random.randint(1, max(1, rows // 3))
             rw = random.randint(2, max(2, width // 3))
             r0 = random.randint(0, max(0, rows - rh))
             c0 = random.randint(0, max(0, width - rw))
-            cp = 0 if random.random() < BLACK_BLOCK_PROBABILITY else random.choice(palette)
+            cp = 0 if (not palette or random.random() < BLACK_BLOCK_PROBABILITY) else random.choice(palette)
             for r in range(r0, r0 + rh):
                 cells[r][c0:c0 + rw] = [cp] * rw
 
