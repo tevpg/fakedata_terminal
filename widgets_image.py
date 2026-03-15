@@ -21,6 +21,8 @@ class ImageWidgets:
         image_paths_getter,
         inject_text_getter,
         life_max_getter,
+        normalize_colour_spec,
+        colour_attr_from_spec,
         image_colour_cycle,
         image_trail_attrs,
     ):
@@ -31,6 +33,8 @@ class ImageWidgets:
         self.image_paths_getter = image_paths_getter
         self.inject_text_getter = inject_text_getter
         self.life_max_getter = life_max_getter
+        self.normalize_colour_spec = normalize_colour_spec
+        self.colour_attr_from_spec = colour_attr_from_spec
         self.image_colour_cycle = image_colour_cycle
         self.image_trail_attrs = image_trail_attrs
         self.jp2a_cache = {}
@@ -306,6 +310,8 @@ class ImageWidgets:
     def repaint_static_lines(self, area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width
         lines = area.get("static_lines") or []
+        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
+        base_attr = self.colour_attr_from_spec(self.curses, colour_spec, default="white")
         text_only = False
         overlay = self.overlay_text(area)
         if not lines and overlay:
@@ -342,7 +348,7 @@ class ImageWidgets:
                         line = (" " * start + source_line).ljust(safe_w)
                     else:
                         line = source_line.ljust(safe_w)
-                    attr = self.curses.color_pair(2) if not source_line.endswith(":") else self.curses.color_pair(2) | self.curses.A_BOLD
+                    attr = base_attr if not source_line.endswith(":") else base_attr | self.curses.A_BOLD
                     self.stdscr.addnstr(y + r, x, line, safe_w, attr)
             except self.curses.error:
                 pass

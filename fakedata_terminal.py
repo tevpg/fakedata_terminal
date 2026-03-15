@@ -552,6 +552,8 @@ def main(stdscr):
         image_paths_getter=lambda: IMAGE_PATHS,
         inject_text_getter=lambda: INJECT_TEXT,
         life_max_getter=lambda: LIFE_MAX_ITERATIONS,
+        normalize_colour_spec=_normalize_colour_spec,
+        colour_attr_from_spec=_colour_attr_from_spec,
         image_colour_cycle=IMAGE_COLOUR_CYCLE,
         image_trail_attrs=IMAGE_TRAIL_ATTRS,
     )

@@ -214,7 +214,7 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
 def _widget_attribute_names(widget: str) -> list[str]:
     widget_attrs = {
         "bars": ["speed", "theme"],
-        "blank": ["text"],
+        "blank": ["text", "colour"],
         "blocks": ["speed"],
         "clock": ["speed", "colour", "text", "direction"],
         "cycle": ["speed", "theme", "colour", "cycle"],
