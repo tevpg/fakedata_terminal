@@ -53,6 +53,8 @@ def config_area_specs(config_style: dict, rows: int, cols: int) -> list[dict]:
         rect = scaled_rect(area_spec, rows, cols)
         if rect.get("theme") is None and config_style.get("theme") is not None:
             rect["theme"] = config_style["theme"]
+        if rect.get("direction") is None and config_style.get("direction") is not None:
+            rect["direction"] = config_style["direction"]
         specs.append(rect)
     return specs
 
@@ -95,6 +97,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
+            area["direction_override"] = spec.get("direction")
             area["role"] = spec["role"]
             area["vocab_override"] = spec.get("theme")
             area["image_paths"] = spec.get("image_paths") or []
@@ -108,6 +111,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
             area["colour_override"] = spec.get("colour")
+            area["direction_override"] = spec.get("direction")
             area["role"] = spec["role"]
             area["vocab_override"] = spec.get("theme")
             area["image_paths"] = spec.get("image_paths") or []

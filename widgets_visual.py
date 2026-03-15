@@ -252,9 +252,21 @@ class VisualWidgets:
             return -1
         return 0
 
+    @staticmethod
+    def radar_spin_for_direction(direction: str | None) -> int:
+        if direction == "right":
+            return 1
+        if direction == "left":
+            return -1
+        return 0
+
     def update_radar(self, area: dict):
         now = time.time()
-        if now >= area["radar_next_spin_change"]:
+        direction = str(area.get("direction_override") or "random").lower()
+        forced_spin = self.radar_spin_for_direction(direction)
+        if forced_spin:
+            area["radar_spin"] = forced_spin
+        elif now >= area["radar_next_spin_change"]:
             area["radar_spin"] = self.choose_radar_spin()
             area["radar_next_spin_change"] = now + random.uniform(0.5, 3.0)
         area["radar_angle"] = (area["radar_angle"] + (0.12 * area["radar_spin"])) % (math.pi * 2)

@@ -194,6 +194,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     shortened_data_images = False
     scene_colour = None
     scene_text = config_scene.get("text", "")
+    scene_direction = config_scene.get("direction", "random")
     colour_values = {
         area.get("colour")
         for area in config_scene.get("areas", [])
@@ -209,6 +210,8 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         "speed": current_base_speed,
         "text": _escape_export_text_modifier(scene_text),
     }
+    if scene_direction != "random":
+        scene_body["direction"] = scene_direction
     if scene_colour is not None:
         scene_body["colour"] = scene_colour
     if config_scene.get("glitch", 0.0) > 0:
@@ -236,6 +239,10 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         area_colour = area.get("colour")
         if area_colour is not None and area_colour != scene_body.get("colour"):
             region_body["colour"] = area_colour
+
+        area_direction = area.get("direction")
+        if area_direction is not None and area_direction != scene_direction:
+            region_body["direction"] = area_direction
 
         image_paths = area.get("image_paths") or []
         if image_paths:
