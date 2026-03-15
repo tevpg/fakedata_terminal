@@ -25,7 +25,7 @@ PROJECT_CONFIG_NAMES = (
 )
 
 TOP_LEVEL_KEYS = {"defaults", "layouts", "scenes", "widgets"}
-DEFAULT_KEYS = {"layout", "theme", "speed", "panel_speed", "image", "widget", "colour", "color", "glitch", "direction"}
+DEFAULT_KEYS = {"layout", "theme", "speed", "image", "widget", "colour", "color", "glitch", "direction"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}

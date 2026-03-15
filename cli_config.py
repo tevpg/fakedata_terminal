@@ -89,7 +89,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         description=(
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
-            "Use --scene for a preset, or --layout plus --panel-widget overrides to build a screen explicitly. "
+            "Use --scene for a preset, or --layout plus --region-widget overrides to build a screen explicitly. "
             "Run --widgets to browse the widget showcase, "
             "or --scenes to browse only the configured scene pages."
         ),
@@ -102,10 +102,10 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --scenes\n"
             "  %(prog)s --scene test1\n"
             "  %(prog)s --config ~/.config/fakedata-terminal/scenes.yaml --scene lab\n"
-            "  %(prog)s --layout 2x2 --panel-widget P1=life --panel-widget P2=blank --panel-widget P3=text --panel-widget P4=clock\n"
-            "  %(prog)s --scene test1 --panel-widget P4=matrix --panel-speed P4=80\n"
-            "  %(prog)s --layout 3x3 --panel-widget L2=image --panel-widget R=clock "
-            "--panel-image L2=geom_07_diamond_lattice.png --panel-image L2=geom_33_torus.png"
+            "  %(prog)s --layout 2x2 --region-widget P1=life --region-widget P2=blank --region-widget P3=text --region-widget P4=clock\n"
+            "  %(prog)s --scene test1 --region-widget P4=matrix --region-speed P4=80\n"
+            "  %(prog)s --layout 3x3 --region-widget L2=image --region-widget R=clock "
+            "--region-image L2=geom_07_diamond_lattice.png --region-image L2=geom_33_torus.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -135,32 +135,32 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--theme", type=str, default=None, choices=THEME_CHOICES,
         help=f"Theme. Defaults to {DEFAULT_THEME} unless a scene supplies one.")
     parser.add_argument(
-        "--panel-widget", action="append", default=[], metavar="REGION=WIDGET",
+        "--region-widget", dest="region_widget", action="append", default=[], metavar="REGION=WIDGET",
         help="Assign a widget to a specific region or panel group. Repeatable.")
     parser.add_argument(
-        "--panel-speed", action="append", default=[], metavar="REGION=N",
+        "--region-speed", dest="region_speed", action="append", default=[], metavar="REGION=N",
         help="Override speed for a specific region or panel group. Repeatable.")
     parser.add_argument(
-        "--panel-text", action="append", default=[], metavar="REGION=TEXT",
+        "--region-text", dest="region_text", action="append", default=[], metavar="REGION=TEXT",
         help="Override text for a specific region or panel group. Repeatable.")
     parser.add_argument(
-        "--panel-theme", action="append", default=[], metavar="REGION=THEME",
+        "--region-theme", dest="region_theme", action="append", default=[], metavar="REGION=THEME",
         help="Override theme for a specific region or panel group. Repeatable.")
     parser.add_argument(
-        "--panel-direction", action="append", default=[], metavar="REGION=VALUE",
+        "--region-direction", dest="region_direction", action="append", default=[], metavar="REGION=VALUE",
         help=f"Override direction for a specific region or panel group. Repeatable. Recognized: {DIRECTION_HELP}.")
     parser.add_argument(
-        "--panel-colour", "--panel-color", action="append", default=[], metavar="REGION=VALUE",
+        "--region-colour", "--region-color", dest="region_colour", action="append", default=[], metavar="REGION=VALUE",
         help=f"Override colour for a specific region or panel group. Repeatable. Recognized: {COLOUR_HELP}.")
     parser.add_argument(
-        "--panel-image", action="append", default=[], metavar="REGION=PATH",
+        "--region-image", dest="region_image", action="append", default=[], metavar="REGION=PATH",
         help="Add an image path for a specific image region. Repeatable.")
     parser.add_argument(
         "--default-speed", type=int, default=None, metavar="N",
-        help="Default speed 1 (slowest) to 100 (no delay) for panels without a panel-specific speed.")
+        help="Default speed 1 (slowest) to 100 (no delay) for panels without a region-specific speed.")
     parser.add_argument(
         "--default-colour", "--default-color", type=str, default=None, metavar="VALUE",
-        help=f"Default colour for panels without a panel-specific colour. Recognized: {COLOUR_HELP}.")
+        help=f"Default colour for panels without a region-specific colour. Recognized: {COLOUR_HELP}.")
     parser.add_argument(
         "--direction", type=str, default=None, metavar="VALUE", choices=DIRECTION_CHOICES,
         help=f"Default direction for widgets that support it. Recognized: {DIRECTION_HELP}.")
@@ -247,12 +247,12 @@ def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
         "cycle": "cycle.widgets",
     }
     cli_map = {
-        "speed": "--default-speed, --panel-speed",
-        "theme": "--theme, --panel-theme",
-        "text": "--text, --panel-text",
-        "colour": "--default-colour, --panel-colour",
-        "direction": "--direction, --panel-direction",
-        "image": "--image, --panel-image",
+        "speed": "--default-speed, --region-speed",
+        "theme": "--theme, --region-theme",
+        "text": "--text, --region-text",
+        "colour": "--default-colour, --region-colour",
+        "direction": "--direction, --region-direction",
+        "image": "--image, --region-image",
     }
     if not attrs:
         return [
@@ -543,8 +543,8 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
     return normalized
 
 
-def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[str], panel_speeds: list[str],
-                            panel_texts: list[str], panel_themes: list[str], panel_directions: list[str], panel_colours: list[str], panel_images: list[str],
+def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[str], region_speeds: list[str],
+                            region_texts: list[str], region_themes: list[str], region_directions: list[str], region_colours: list[str], region_images: list[str],
                             parser, *, layout_name: str, scene_name: str, theme: str,
                             speed: int, text: str, glitch: float, default_widget: str | None, default_colour: str | None,
                             direction: str,
@@ -571,9 +571,9 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
                 entry["cycle"] = {"widgets": area["cycle_widgets"][:]}
             regions_cfg[region_key] = entry
 
-    for item in panel_widgets:
-        target, widget = _parse_equals(item, parser, "--panel-widget")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-widget", config_paths)
+    for item in region_widgets:
+        target, widget = _parse_equals(item, parser, "--region-widget")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-widget", config_paths)
         target_panels = set(normalized_target.split("+"))
         to_delete = []
         for existing_key in list(regions_cfg):
@@ -589,12 +589,12 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
                 continue
             if target_panels < existing_panels:
                 parser.error(
-                    f"--panel-widget {target}={widget} partially overlaps existing region '{existing_key}'. "
+                    f"--region-widget {target}={widget} partially overlaps existing region '{existing_key}'. "
                     "Overrides may replace whole regions or fully cover smaller ones."
                 )
             else:
                 parser.error(
-                    f"--panel-widget {target}={widget} partially overlaps existing region '{existing_key}'. "
+                    f"--region-widget {target}={widget} partially overlaps existing region '{existing_key}'. "
                     "Overrides may replace whole regions or fully cover smaller ones."
                 )
         for existing_key in to_delete:
@@ -603,58 +603,58 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
         current["widget"] = widget
         regions_cfg[normalized_target] = current
 
-    for item in panel_speeds:
-        target, speed_text = _parse_equals(item, parser, "--panel-speed")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-speed", config_paths)
+    for item in region_speeds:
+        target, speed_text = _parse_equals(item, parser, "--region-speed")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-speed", config_paths)
         try:
             panel_speed = int(speed_text)
         except ValueError:
-            parser.error(f"--panel-speed expects an integer speed, got '{speed_text}'")
+            parser.error(f"--region-speed expects an integer speed, got '{speed_text}'")
         if not 1 <= panel_speed <= 100:
-            parser.error("--panel-speed must be between 1 and 100")
+            parser.error("--region-speed must be between 1 and 100")
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-speed target '{target}' has no matching assignment")
+            parser.error(f"--region-speed target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["speed"] = panel_speed
 
-    for item in panel_texts:
-        target, panel_text = _parse_equals(item, parser, "--panel-text")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-text", config_paths)
+    for item in region_texts:
+        target, panel_text = _parse_equals(item, parser, "--region-text")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-text", config_paths)
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-text target '{target}' has no matching assignment")
+            parser.error(f"--region-text target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["text"] = panel_text
 
-    for item in panel_themes:
-        target, theme_name = _parse_equals(item, parser, "--panel-theme")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-theme", config_paths)
+    for item in region_themes:
+        target, theme_name = _parse_equals(item, parser, "--region-theme")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-theme", config_paths)
         if theme_name not in THEME_CHOICES:
-            parser.error(f"--panel-theme must be one of: {', '.join(THEME_CHOICES)}")
+            parser.error(f"--region-theme must be one of: {', '.join(THEME_CHOICES)}")
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-theme target '{target}' has no matching assignment")
+            parser.error(f"--region-theme target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["source_theme"] = theme_name
 
-    for item in panel_directions:
-        target, direction_name = _parse_equals(item, parser, "--panel-direction")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-direction", config_paths)
+    for item in region_directions:
+        target, direction_name = _parse_equals(item, parser, "--region-direction")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-direction", config_paths)
         if direction_name not in DIRECTION_CHOICES:
-            parser.error(f"--panel-direction must be one of: {', '.join(DIRECTION_CHOICES)}")
+            parser.error(f"--region-direction must be one of: {', '.join(DIRECTION_CHOICES)}")
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-direction target '{target}' has no matching assignment")
+            parser.error(f"--region-direction target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["direction"] = direction_name
 
-    for item in panel_colours:
-        target, colour_name = _parse_equals(item, parser, "--panel-colour")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-colour", config_paths)
+    for item in region_colours:
+        target, colour_name = _parse_equals(item, parser, "--region-colour")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-colour", config_paths)
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-colour target '{target}' has no matching assignment")
+            parser.error(f"--region-colour target '{target}' has no matching assignment")
         regions_cfg[normalized_target]["colour"] = colour_name
 
-    for item in panel_images:
-        target, image_path = _parse_equals(item, parser, "--panel-image")
-        normalized_target = _normalize_region_key(layout_name, target, parser, "--panel-image", config_paths)
+    for item in region_images:
+        target, image_path = _parse_equals(item, parser, "--region-image")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-image", config_paths)
         if normalized_target not in regions_cfg:
-            parser.error(f"--panel-image target '{target}' has no matching assignment")
+            parser.error(f"--region-image target '{target}' has no matching assignment")
         if regions_cfg[normalized_target].get("widget") != "image":
-            parser.error(f"--panel-image target '{target}' is not assigned to widget 'image'")
+            parser.error(f"--region-image target '{target}' is not assigned to widget 'image'")
         image_cfg = regions_cfg[normalized_target].setdefault("image", {})
         image_cfg.setdefault("paths", []).append(image_path)
 
@@ -716,19 +716,19 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     if (args.widgets or args.scenes) and (
         args.scene is not None or
         args.layout is not None or
-        args.panel_widget or
-        args.panel_speed or
-        args.panel_text or
-        args.panel_theme or
-        args.panel_direction or
-        args.panel_colour or
-        args.panel_image or
+        args.region_widget or
+        args.region_speed or
+        args.region_text or
+        args.region_theme or
+        args.region_direction or
+        args.region_colour or
+        args.region_image or
         args.direction is not None or
         args.default_speed is not None or
         args.default_colour is not None or
         args.default_widget is not None
     ):
-        parser.error("standalone showcase modes (--widgets, --scenes) do not combine with --scene, --layout, or panel overrides")
+        parser.error("standalone showcase modes (--widgets, --scenes) do not combine with --scene, --layout, or region overrides")
 
     if not args.widgets and not args.scenes and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
         parser.error("specify either --scene, --layout, --widgets, or --scenes, or configure defaults.layout")
@@ -800,18 +800,18 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_direction = args.direction if direction_explicit and args.direction is not None else (base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "right"))
 
         has_cli_overrides = bool(
-            args.layout or args.panel_widget or args.panel_speed or args.panel_text or args.panel_theme or args.panel_direction or args.panel_colour or args.panel_image or args.theme or speed_explicit or colour_explicit or widget_explicit or direction_explicit or text_explicit or glitch_explicit
+            args.layout or args.region_widget or args.region_speed or args.region_text or args.region_theme or args.region_direction or args.region_colour or args.region_image or args.theme or speed_explicit or colour_explicit or widget_explicit or direction_explicit or text_explicit or glitch_explicit
         )
         if base_runtime is None or has_cli_overrides:
             config_scene_runtime = _apply_panel_widget_overrides(
                 base_runtime if (base_runtime and not args.layout) else None,
-                args.panel_widget,
-                args.panel_speed,
-                args.panel_text,
-                args.panel_theme,
-                args.panel_direction,
-                args.panel_colour,
-                args.panel_image,
+                args.region_widget,
+                args.region_speed,
+                args.region_text,
+                args.region_theme,
+                args.region_direction,
+                args.region_colour,
+                args.region_image,
                 parser,
                 layout_name=runtime_layout_name,
                 scene_name=args.scene or f"<cli:{runtime_layout_name}>",
@@ -851,7 +851,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
             for area in scene["areas"]
         )
     if image_mode_active and not image_paths and not any(area.get("image_paths") for area in config_scene_runtime["areas"]):
-        parser.error("image mode requires --image PATH [PATH ...] or --panel-image REGION=PATH")
+        parser.error("image mode requires --image PATH [PATH ...] or --region-image REGION=PATH")
     if image_mode_active and image_module is None:
         parser.error("image mode requires Pillow to be installed")
     if image_mode_active and not image_checker():

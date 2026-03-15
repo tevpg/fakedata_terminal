@@ -8,7 +8,7 @@ FakeData Terminal renders animated, fake telemetry screens in the terminal. It c
 - Drives text widgets from named theme pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and scene presets from [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml)
 - Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
-- Lets you start from a preset scene or build a screen explicitly with `--layout`, `--panel-widget`, and `--default-*`
+- Lets you start from a preset scene or build a screen explicitly with `--layout`, `--region-widget`, and `--default-*`
 - Supports widget-level fallback defaults in YAML via the top-level `widgets:` section
 
 ## Requirements
@@ -72,10 +72,10 @@ Build a layout manually:
 ```bash
   python3 fakedata_terminal.py \
   --layout 2x2 \
-  --panel-widget P1=life \
-  --panel-widget P2=clock \
-  --panel-widget P3=text \
-  --panel-widget P4=matrix
+  --region-widget P1=life \
+  --region-widget P2=clock \
+  --region-widget P3=text \
+  --region-widget P4=matrix
 ```
 
 Override per-region behavior:
@@ -83,10 +83,10 @@ Override per-region behavior:
 ```bash
   python3 fakedata_terminal.py \
   --scene test1 \
-  --panel-widget P4=matrix \
-  --panel-speed P4=80 \
-  --panel-theme P4=hacker \
-  --panel-text P2=SIGNAL
+  --region-widget P4=matrix \
+  --region-speed P4=80 \
+  --region-theme P4=hacker \
+  --region-text P2=SIGNAL
 ```
 
 Run an image panel:
@@ -94,10 +94,10 @@ Run an image panel:
 ```bash
   python3 fakedata_terminal.py \
   --layout 3x2 \
-  --panel-widget P3+P4=image \
-  --panel-widget P5=clock \
-  --panel-widget P6=text \
-  --panel-image P3+P4=data/geom_33_torus.png
+  --region-widget P3+P4=image \
+  --region-widget P5=clock \
+  --region-widget P6=text \
+  --region-image P3+P4=data/geom_33_torus.png
 ```
 
 Set layout-wide defaults for unassigned panels:
@@ -108,8 +108,8 @@ python3 fakedata_terminal.py \
   --default-widget cycle \
   --default-speed 70 \
   --default-colour cyan \
-  --panel-widget L2=image \
-  --panel-image L2=data/geom_33_torus.png
+  --region-widget L2=image \
+  --region-image L2=data/geom_33_torus.png
 ```
 
 If no `--scene` or `--layout` is provided, the configured `defaults.layout` is used.
@@ -231,7 +231,7 @@ Within the merged config, area attributes resolve in this order:
 - widget-specific defaults from `widgets.<widget>.*`
 - scene region settings in `scenes.<scene>.regions.*`
 - CLI defaults such as `--default-colour`, `--default-speed`, and `--default-widget` for values still not set by the config/scene layer
-- CLI per-panel overrides such as `--panel-colour`, `--panel-speed`, `--panel-theme`, `--panel-image`, and `--panel-widget`
+- CLI per-region overrides such as `--region-colour`, `--region-speed`, `--region-theme`, `--region-image`, and `--region-widget`
 - built-in code fallback inside the widget implementation if an attribute is still unset
 
 ## Project Structure

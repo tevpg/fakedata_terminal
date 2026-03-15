@@ -16,7 +16,6 @@ defaults:
   speed: 55
   colour: green
   widget: blank
-  panel_speed: {}
   image:
     glob: "geom*.png"
 
