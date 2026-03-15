@@ -186,13 +186,25 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
 
     scene_name = _scene_name_for_export()
     shortened_data_images = False
+    scene_colour = None
+    colour_values = {
+        area.get("colour")
+        for area in config_scene.get("areas", [])
+        if area.get("colour") is not None
+    }
+    if colour_values and len(colour_values) == 1 and len(config_scene.get("areas", [])) == len([
+        area for area in config_scene.get("areas", []) if area.get("colour") is not None
+    ]):
+        scene_colour = next(iter(colour_values))
     scene_body = {
         "layout": config_scene["layout"],
         "theme": config_scene.get("theme"),
         "speed": current_base_speed,
         "text": config_scene.get("text", ""),
-        "regions": {},
     }
+    if scene_colour is not None:
+        scene_body["colour"] = scene_colour
+    scene_body["regions"] = {}
 
     for area in sorted(config_scene.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
         state = area_states.get(area["name"], {})
@@ -200,19 +212,20 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         area_speed = state.get("speed_override") or current_speed_for_role(role)
         region_body = {
             "widget": area["mode"],
-            "speed": area_speed,
         }
+        if area_speed != scene_body["speed"]:
+            region_body["speed"] = area_speed
 
         area_theme = area.get("theme")
-        if area_theme is not None:
+        if area_theme is not None and area_theme != scene_body.get("theme"):
             region_body["source_theme"] = area_theme
 
         area_text = area.get("text")
-        if area_text is not None:
+        if area_text is not None and area_text != scene_body.get("text"):
             region_body["text"] = area_text
 
         area_colour = area.get("colour")
-        if area_colour is not None:
+        if area_colour is not None and area_colour != scene_body.get("colour"):
             region_body["colour"] = area_colour
 
         image_paths = area.get("image_paths") or []

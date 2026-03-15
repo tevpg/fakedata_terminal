@@ -28,7 +28,7 @@ TOP_LEVEL_KEYS = {"defaults", "layouts", "scenes", "widgets"}
 DEFAULT_KEYS = {"layout", "theme", "speed", "panel_speed", "image", "widget", "colour", "color"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
-SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions"}
+SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color"}
 REGION_KEYS = {"widget", "speed", "text", "source_theme", "image", "paths", "path", "glob", "cycle", "colour", "color"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
@@ -816,6 +816,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
 
     scene_speed = scene_cfg.get("speed", defaults.get("speed", 50))
     theme = scene_cfg.get("theme", defaults.get("theme", "science"))
+    scene_colour = _region_colour(scene_cfg) or defaults.get("colour")
 
     if layout == "full":
         full_cfg = regions.get("full")
@@ -833,6 +834,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             "main_speed": full_cfg.get("speed") if isinstance(full_cfg, dict) else None,
             "sidebar_speed": None,
             "text": scene_cfg.get("text", ""),
+            "colour": scene_colour,
             "image_paths": _expand_image_spec(full_cfg.get("image")) if isinstance(full_cfg, dict) else [],
         }
 
@@ -856,6 +858,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             "main_speed": left_cfg.get("speed") if isinstance(left_cfg, dict) else None,
             "sidebar_speed": right_cfg.get("speed") if isinstance(right_cfg, dict) else None,
             "text": scene_cfg.get("text", ""),
+            "colour": scene_colour,
             "image_paths": (
                 _expand_image_spec(left_cfg.get("image")) if left_widget == "image" and isinstance(left_cfg, dict) else
                 _expand_image_spec(right_cfg.get("image")) if right_widget == "image" and isinstance(right_cfg, dict) else
@@ -1060,6 +1063,6 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
         speed=scene_cfg.get("speed", defaults.get("speed", 50)),
         text=scene_cfg.get("text", ""),
         default_widget=defaults.get("widget"),
-        default_colour=defaults.get("colour"),
+        default_colour=_region_colour(scene_cfg) or defaults.get("colour"),
         config_paths=config_paths,
     )
