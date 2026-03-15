@@ -240,6 +240,7 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "gauge_prime_idx": 0,
         "blocks_bg": random.choice([1, 3, 7]),
         "blocks_cells": [],
+        "blocks_warmed": False,
         "sweep_cells": [],
         "sweep_pos": 0,
         "sweep_dir": 1,

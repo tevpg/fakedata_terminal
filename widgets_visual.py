@@ -355,6 +355,10 @@ class VisualWidgets:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "blocks":
             self.ensure_blocks(area, rows, width)
+            if not area["blocks_warmed"]:
+                for _ in range(max(12, min(36, rows * 3))):
+                    self.update_blocks(area, rows, width)
+                area["blocks_warmed"] = True
         elif mode == "sweep":
             self.ensure_sweep(area, rows, width)
         elif mode == "tunnel":
