@@ -179,6 +179,12 @@ def _annotate_exported_yaml(yaml_text: str, *, shortened_data_images: bool) -> s
     return yaml_text
 
 
+def _escape_export_text_modifier(value):
+    if not isinstance(value, str) or "\n" not in value:
+        return value
+    return value.replace("\n", r"\n")
+
+
 def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], current_base_speed: int,
                              current_speed_for_role) -> str | None:
     if not config_scene:
@@ -187,6 +193,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     scene_name = _scene_name_for_export()
     shortened_data_images = False
     scene_colour = None
+    scene_text = config_scene.get("text", "")
     colour_values = {
         area.get("colour")
         for area in config_scene.get("areas", [])
@@ -200,7 +207,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         "layout": config_scene["layout"],
         "theme": config_scene.get("theme"),
         "speed": current_base_speed,
-        "text": config_scene.get("text", ""),
+        "text": _escape_export_text_modifier(scene_text),
     }
     if scene_colour is not None:
         scene_body["colour"] = scene_colour
@@ -223,8 +230,8 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
             region_body["source_theme"] = area_theme
 
         area_text = area.get("text")
-        if area_text is not None and area_text != scene_body.get("text"):
-            region_body["text"] = area_text
+        if area_text is not None and area_text != scene_text:
+            region_body["text"] = _escape_export_text_modifier(area_text)
 
         area_colour = area.get("colour")
         if area_colour is not None and area_colour != scene_body.get("colour"):
