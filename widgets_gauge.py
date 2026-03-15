@@ -89,7 +89,7 @@ class GaugeWidgets:
         return rows >= 6
 
     def readout_line_capacity(self, rows: int) -> int:
-        reserved = 1 if self.readout_use_title(rows) else 0
+        reserved = 2 if self.readout_use_title(rows) else 0
         return min(10, max(1, rows - reserved))
 
     def readout_filler_rows(self, theme_name: str):
@@ -334,7 +334,7 @@ class GaugeWidgets:
         data_rows = min(len(area["gauge_reads"]), max(1, rows - (1 if use_title else 0)))
         content_rows = min(rows, data_rows + (1 if use_title else 0))
         top_pad = max(0, (rows - content_rows) // 2)
-        start_row = top_pad + (1 if use_title else 0)
+        start_row = top_pad + (2 if use_title else 0)
         block_width = min(width, 29)
         block_pad = max(0, (width - block_width) // 2)
         for r in range(rows):
