@@ -185,6 +185,61 @@ def _escape_export_text_modifier(value):
     return value.replace("\n", r"\n")
 
 
+def _yaml_field_cost(key: str, value) -> int:
+    dumped = yaml.safe_dump({key: value}, sort_keys=False, allow_unicode=False).strip()
+    return len(dumped)
+
+
+_UNFACTORED = object()
+
+
+def _pick_factored_scene_value(scene_key: str, region_key: str, region_values: list, current_value):
+    candidates = []
+    seen = set()
+    for value in [current_value, *region_values]:
+        marker = (type(value), value)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        candidates.append(value)
+
+    occurrences = {}
+    for value in region_values:
+        marker = (type(value), value)
+        occurrences[marker] = occurrences.get(marker, 0) + 1
+
+    eligible_candidates = [
+        value for value in candidates
+        if occurrences.get((type(value), value), 0) > 1
+    ]
+    if not eligible_candidates:
+        return _UNFACTORED
+
+    best_value = eligible_candidates[0]
+    best_cost = None
+    best_matches = -1
+    for candidate in eligible_candidates:
+        scene_cost = _yaml_field_cost(scene_key, candidate)
+        region_cost = 0
+        matches = 0
+        for value in region_values:
+            if value == candidate:
+                matches += 1
+                continue
+            region_cost += _yaml_field_cost(region_key, value)
+        total_cost = scene_cost + region_cost
+        if (
+            best_cost is None
+            or total_cost < best_cost
+            or (total_cost == best_cost and matches > best_matches)
+            or (total_cost == best_cost and matches == best_matches and candidate == current_value)
+        ):
+            best_value = candidate
+            best_cost = total_cost
+            best_matches = matches
+    return best_value
+
+
 def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], current_base_speed: int,
                              current_speed_for_role) -> str | None:
     if not config_scene:
@@ -194,7 +249,18 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     shortened_data_images = False
     scene_colour = None
     scene_text = config_scene.get("text", "")
-    scene_direction = config_scene.get("direction", "right")
+    direction_values = {
+        area.get("direction")
+        for area in config_scene.get("areas", [])
+        if area.get("direction") is not None
+    }
+    scene_direction = config_scene.get("direction")
+    if scene_direction is None and len(direction_values) == 1 and len(config_scene.get("areas", [])) == len([
+        area for area in config_scene.get("areas", []) if area.get("direction") is not None
+    ]):
+        scene_direction = next(iter(direction_values))
+    if scene_direction is None:
+        scene_direction = "right"
     colour_values = {
         area.get("colour")
         for area in config_scene.get("areas", [])
@@ -204,45 +270,90 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         area for area in config_scene.get("areas", []) if area.get("colour") is not None
     ]):
         scene_colour = next(iter(colour_values))
-    scene_body = {
-        "layout": config_scene["layout"],
-        "theme": config_scene.get("theme"),
-        "speed": current_base_speed,
-        "text": _escape_export_text_modifier(scene_text),
-    }
-    if scene_direction != "right":
-        scene_body["direction"] = scene_direction
-    if scene_colour is not None:
-        scene_body["colour"] = scene_colour
-    if config_scene.get("glitch", 0.0) > 0:
-        scene_body["glitch"] = config_scene["glitch"]
-    scene_body["regions"] = {}
-
+    effective_regions = []
     for area in sorted(config_scene.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
         state = area_states.get(area["name"], {})
         role = state.get("role") or ("main" if area["x"] < 0.5 else "sidebar")
         area_speed = state.get("speed_override") or current_speed_for_role(role)
+        area_theme = area.get("theme") if area.get("theme") is not None else config_scene.get("theme")
+        area_text = area.get("text") if area.get("text") is not None else scene_text
+        area_colour = area.get("colour") if area.get("colour") is not None else scene_colour
+        area_direction = area.get("direction") if area.get("direction") is not None else scene_direction
+        effective_regions.append({
+            "area": area,
+            "speed": area_speed,
+            "theme": area_theme,
+            "text": area_text,
+            "colour": area_colour,
+            "direction": area_direction,
+            "role": role,
+        })
+
+    factored_scene_theme = _pick_factored_scene_value(
+        "theme",
+        "source_theme",
+        [entry["theme"] for entry in effective_regions],
+        config_scene.get("theme"),
+    )
+    factored_scene_speed = _pick_factored_scene_value(
+        "speed",
+        "speed",
+        [entry["speed"] for entry in effective_regions],
+        current_base_speed,
+    )
+    factored_scene_text = _pick_factored_scene_value(
+        "text",
+        "text",
+        [entry["text"] for entry in effective_regions],
+        scene_text,
+    )
+    factored_scene_direction = _pick_factored_scene_value(
+        "direction",
+        "direction",
+        [entry["direction"] for entry in effective_regions],
+        scene_direction,
+    )
+    factored_scene_colour = _pick_factored_scene_value(
+        "colour",
+        "colour",
+        [entry["colour"] for entry in effective_regions],
+        scene_colour,
+    )
+    scene_body = {
+        "layout": config_scene["layout"],
+        "glitch": max(0.0, float(config_scene.get("glitch", 0.0))),
+    }
+    if factored_scene_theme is not _UNFACTORED:
+        scene_body["theme"] = factored_scene_theme
+    if factored_scene_speed is not _UNFACTORED:
+        scene_body["speed"] = factored_scene_speed
+    if factored_scene_text is not _UNFACTORED:
+        scene_body["text"] = _escape_export_text_modifier(factored_scene_text)
+    if factored_scene_direction is not _UNFACTORED:
+        scene_body["direction"] = factored_scene_direction
+    if factored_scene_colour is not _UNFACTORED:
+        scene_body["colour"] = factored_scene_colour
+    scene_body["regions"] = {}
+
+    for entry in effective_regions:
+        area = entry["area"]
         region_body = {
             "widget": area["mode"],
         }
-        if area_speed != scene_body["speed"]:
-            region_body["speed"] = area_speed
+        if factored_scene_speed is _UNFACTORED or entry["speed"] != factored_scene_speed:
+            region_body["speed"] = entry["speed"]
 
-        area_theme = area.get("theme")
-        if area_theme is not None and area_theme != scene_body.get("theme"):
-            region_body["source_theme"] = area_theme
+        if factored_scene_theme is _UNFACTORED or entry["theme"] != factored_scene_theme:
+            region_body["source_theme"] = entry["theme"]
 
-        area_text = area.get("text")
-        if area_text is not None and area_text != scene_text:
-            region_body["text"] = _escape_export_text_modifier(area_text)
+        if factored_scene_text is _UNFACTORED or entry["text"] != factored_scene_text:
+            region_body["text"] = _escape_export_text_modifier(entry["text"])
 
-        area_colour = area.get("colour")
-        if area_colour is not None and area_colour != scene_body.get("colour"):
-            region_body["colour"] = area_colour
+        if factored_scene_colour is _UNFACTORED or entry["colour"] != factored_scene_colour:
+            region_body["colour"] = entry["colour"]
 
-        area_direction = area.get("direction")
-        if area_direction is not None and area_direction != scene_direction:
-            region_body["direction"] = area_direction
+        if factored_scene_direction is _UNFACTORED or entry["direction"] != factored_scene_direction:
+            region_body["direction"] = entry["direction"]
 
         image_paths = area.get("image_paths") or []
         if image_paths:
@@ -610,6 +721,9 @@ def main(stdscr):
 
     def _resolved_area_direction_motion(area: dict, now: float) -> int:
         direction = str(area.get("direction_override") or "right").lower()
+        if direction == "none":
+            area["direction_motion"] = 0
+            return 0
         if direction == "right":
             area["direction_motion"] = 1
             return 1
@@ -693,8 +807,13 @@ def main(stdscr):
         mode = _effective_mode(area)
         if now < area["next_update"]:
             return
+        frozen_by_direction = (
+            mode in {"clock", "oscilloscope", "sparkline", "tunnel"}
+            and str(area.get("direction_override") or "right").lower() == "none"
+        )
         area_speed = area.get("speed_override") or _current_speed_for_role(role)
-        area["tick"] += 1
+        if not frozen_by_direction:
+            area["tick"] += 1
         _ensure_area(area, rows, width, role)
         if mode in TEXT_MODES:
             if mode == "text_spew":
@@ -722,7 +841,8 @@ def main(stdscr):
         elif mode == "bars":
             _update_bars(area)
         elif mode == "clock":
-            _update_radar(area)
+            if not frozen_by_direction:
+                _update_radar(area)
         elif mode == "matrix":
             _update_matrix(area, rows, width)
         elif mode == "blocks":
@@ -730,9 +850,11 @@ def main(stdscr):
         elif mode == "sweep":
             _update_sweep(area, rows, width, role)
         elif mode == "tunnel":
-            _update_tunnel(area, rows, width)
+            if not frozen_by_direction:
+                _update_tunnel(area, rows, width)
         elif mode == "oscilloscope":
-            _update_scope(area, width)
+            if not frozen_by_direction:
+                _update_scope(area, width)
         elif mode in {"gauges", "sparkline", "readouts"}:
             if mode == "sparkline":
                 motion = _resolved_area_direction_motion(area, now)

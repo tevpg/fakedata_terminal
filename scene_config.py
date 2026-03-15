@@ -33,7 +33,7 @@ REGION_KEYS = {"widget", "speed", "text", "source_theme", "image", "paths", "pat
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
-DIRECTION_CHOICES = {"left", "right", "random"}
+DIRECTION_CHOICES = {"left", "right", "random", "none"}
 
 LEGACY_LAYOUT_ALIASES = {
     "grid_2x2": "2x2",
@@ -390,7 +390,7 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         issues.append(f"{config_label}: defaults.glitch must be >= 0")
             direction = defaults.get("direction")
             if direction is not None and _direction_value(direction) is None:
-                issues.append(f"{config_label}: defaults.direction must be one of: left, right, random")
+                issues.append(f"{config_label}: defaults.direction must be one of: left, right, random, none")
 
     layouts = catalog.get("layouts", {})
     if layouts is not None:
@@ -446,7 +446,7 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 direction = scene_cfg.get("direction")
                 if direction is not None and _direction_value(direction) is None:
                     issues.append(
-                        f"{config_label}: scene '{scene_name}' direction must be one of: left, right, random"
+                        f"{config_label}: scene '{scene_name}' direction must be one of: left, right, random, none"
                     )
                 regions = scene_cfg.get("regions", {})
                 if not isinstance(regions, dict):
@@ -462,7 +462,7 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                     direction = region_cfg.get("direction")
                     if direction is not None and _direction_value(direction) is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' direction must be one of: left, right, random"
+                            f"{config_label}: scene '{scene_name}' region '{region_name}' direction must be one of: left, right, random, none"
                         )
                     widget = region_cfg.get("widget")
                     if widget is None:
@@ -526,7 +526,7 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 _unknown_keys(widget_cfg, WIDGET_DEFAULT_KEYS, f"widgets.{widget_name}", issues)
                 direction = widget_cfg.get("direction")
                 if direction is not None and _direction_value(direction) is None:
-                    issues.append(f"{config_label}: widgets.{widget_name}.direction must be one of: left, right, random")
+                    issues.append(f"{config_label}: widgets.{widget_name}.direction must be one of: left, right, random, none")
                 cycle_spec = widget_cfg.get("cycle")
                 if cycle_spec is not None and not isinstance(cycle_spec, dict):
                     issues.append(f"{config_label}: widgets.{widget_name}.cycle must be a mapping")

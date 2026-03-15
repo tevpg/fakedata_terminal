@@ -49,7 +49,7 @@ COLOUR_CHOICES = [
     "magenta", "purple", "pink", "white", "grey", "multi",
 ]
 COLOUR_HELP = ", ".join(COLOUR_CHOICES)
-DIRECTION_CHOICES = ["left", "right", "random"]
+DIRECTION_CHOICES = ["left", "right", "random", "none"]
 DIRECTION_HELP = ", ".join(DIRECTION_CHOICES)
 
 
@@ -226,7 +226,7 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "text_scant": ["speed", "theme", "text"],
         "text_spew": ["speed", "theme", "text"],
         "text_wide": ["speed", "theme", "text"],
-        "tunnel": ["speed", "colour", "text"],
+        "tunnel": ["speed", "colour", "text", "direction"],
     }
     return widget_attrs.get(widget, ["speed"])
 
@@ -551,6 +551,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
                             config_paths: tuple[str, ...] | None = None) -> dict:
     regions_cfg = {}
     if base_scene:
+        base_scene_direction = base_scene.get("direction")
         for area in base_scene["areas"]:
             region_key = "+".join(area["panels"])
             entry = {"widget": area["mode"]}
@@ -560,7 +561,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, panel_widgets: list[s
                 entry["text"] = area["text"]
             if area.get("theme"):
                 entry["source_theme"] = area["theme"]
-            if area.get("direction"):
+            if area.get("direction") and area.get("direction") != base_scene_direction:
                 entry["direction"] = area["direction"]
             if area.get("colour"):
                 entry["colour"] = area["colour"]

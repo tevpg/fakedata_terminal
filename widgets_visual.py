@@ -112,15 +112,30 @@ class VisualWidgets:
 
     def update_scope(self, area: dict, width: int):
         motion = self.resolved_direction_motion(area)
+        keep = max(12, width + 12)
+        cfg = self.get_gauge_config(self.area_vocab(area))
+        area["scope_signal"] = cfg[1]
         if motion == 0:
+            if len(area["scope_vals"]) != keep:
+                raw = area["scope_signal"]()
+                phase = area.get("scope_phase", 0.0)
+                amplitude = 0.16 + raw * 0.18
+                samples = []
+                for idx in range(keep):
+                    pos = idx / max(1, keep - 1)
+                    base = math.sin((phase + pos * math.tau) * 1.1) * amplitude
+                    harmonic = math.sin((phase * 2.7) + pos * math.tau * 2.2 + raw * 3.0) * 0.05
+                    ripple = math.sin((phase * 0.7) + pos * math.tau * 5.0) * 0.018
+                    sample = 0.5 + base + harmonic + ripple
+                    samples.append(max(0.04, min(0.96, sample)))
+                area["scope_vals"] = samples
+                area["direction_motion_prev"] = 0
             return
         prev_motion = area.get("direction_motion_prev", motion)
         if prev_motion != motion:
             visible = area["scope_vals"][-width:] if prev_motion >= 0 else area["scope_vals"][:width]
             area["scope_vals"] = visible[:]
             area["direction_motion_prev"] = motion
-        cfg = self.get_gauge_config(self.area_vocab(area))
-        area["scope_signal"] = cfg[1]
         raw = area["scope_signal"]()
         phase = area.get("scope_phase", 0.0)
         phase += 0.22 + raw * 0.34 + random.uniform(-0.04, 0.04)
@@ -137,7 +152,6 @@ class VisualWidgets:
             area["scope_vals"].insert(0, sample)
         else:
             area["scope_vals"].append(sample)
-        keep = max(12, width + 12)
         if len(area["scope_vals"]) > keep:
             if motion < 0:
                 area["scope_vals"] = area["scope_vals"][:keep]
@@ -147,6 +161,9 @@ class VisualWidgets:
 
     def resolved_direction_motion(self, area: dict, *, now: float | None = None) -> int:
         direction = str(area.get("direction_override") or "right").lower()
+        if direction == "none":
+            area["direction_motion"] = 0
+            return 0
         forced_spin = self.radar_spin_for_direction(direction)
         if forced_spin:
             area["direction_motion"] = forced_spin
@@ -303,6 +320,9 @@ class VisualWidgets:
     def update_radar(self, area: dict):
         now = time.time()
         direction = str(area.get("direction_override") or "right").lower()
+        if direction == "none":
+            area["direction_motion"] = 0
+            return
         forced_spin = self.radar_spin_for_direction(direction)
         if forced_spin:
             area["radar_spin"] = forced_spin
@@ -492,7 +512,8 @@ class VisualWidgets:
         area["tunnel_sig"] = sig
         area["tunnel_layers"] = self.build_tunnel_layers(rows, width)
 
-    def repaint_nested_layers(self, layers, area: dict, rows: int, y: int, x: int, width: int, attr_for_band=None):
+    def repaint_nested_layers(self, layers, area: dict, rows: int, y: int, x: int, width: int, attr_for_band=None,
+                              outward: bool = True):
         blank = " " * width
         for r in range(rows):
             safe_w = self.safe_row_width(y, r, x, width)
@@ -507,7 +528,8 @@ class VisualWidgets:
         cadence = 4
         cycle_step = area["tick"] // cadence
         phase = cycle_step % cadence
-        for inner_offset, layer in enumerate(reversed(layers)):
+        ordered_layers = list(reversed(layers)) if outward else list(layers)
+        for inner_offset, layer in enumerate(ordered_layers):
             if (inner_offset - phase) % cadence != 0:
                 continue
             band_idx = (inner_offset - cycle_step) // cadence
@@ -636,6 +658,7 @@ class VisualWidgets:
     def repaint_tunnel(self, area: dict, rows: int, y: int, x: int, width: int):
         self.ensure_tunnel(area, rows, width)
         colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "multi"
+        motion = self.resolved_direction_motion(area)
         tunnel_attrs = [
             self.curses.color_pair(5) | self.curses.A_BOLD,
             self.curses.color_pair(4) | self.curses.A_BOLD,
@@ -654,5 +677,6 @@ class VisualWidgets:
             x,
             width,
             attr_for_band=(lambda _band_idx: single_attr) if colour_spec != "multi" else (lambda band_idx: tunnel_attrs[band_idx % len(tunnel_attrs)]),
+            outward=(motion >= 0),
         )
         self.draw_centered_overlay(area, max(0, rows // 2), y, x, width, rows=rows, anchor="center")
