@@ -1,31 +1,28 @@
-# First-pass timing/widget tunables for the timing rewrite.
+# First-pass widget metadata and timing/behavior tunables for the timing rewrite.
 #
 # This file is intentionally a draft. The values here are based on current
 # runtime behavior where possible, and on approximations where the current
 # behavior does not map cleanly to the new model.
 
-timing:
-  speed:
-    min_iterations_per_second: 1.0
-    max_iterations_per_second: 50.0
-    curve: linear
-    dt_clamp_seconds: 0.5
+defaults:
+  timing:
+    speed:
+      min_iterations_per_second: 1.0
+      max_iterations_per_second: 50.0
+      curve: linear
+      dt_clamp_seconds: 0.5
 
-  widgets:
-    # Direction-aware visual widgets currently share one random-direction model:
-    # - right: 50%
-    # - left: 40%
-    # - none: 10%
-    # - reroll every 0.5 to 3.0 seconds
-    #
-    # These values are taken directly from the current gauge/scope/tunnel-style
-    # direction logic and are suitable as the first shared defaults.
-    gauge:
+widgets:
+  gauge:
+    enabled: true
+    timing:
       cadence_factor: 1.0
       motion:
         units: rpm
         factor: 1.0
-      random_direction:
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
         left_probability: 0.40
         none_probability: 0.10
         right_probability: 0.50
@@ -33,9 +30,13 @@ timing:
         none_duration_range_seconds: [0.5, 3.0]
         right_duration_range_seconds: [0.5, 3.0]
 
-    scope:
+  scope:
+    enabled: true
+    timing:
       cadence_factor: 1.0
-      random_direction:
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
         left_probability: 0.40
         none_probability: 0.10
         right_probability: 0.50
@@ -43,9 +44,13 @@ timing:
         none_duration_range_seconds: [0.5, 3.0]
         right_duration_range_seconds: [0.5, 3.0]
 
-    sparkline:
+  sparkline:
+    enabled: true
+    timing:
       cadence_factor: 1.0
-      random_direction:
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
         left_probability: 0.40
         none_probability: 0.10
         right_probability: 0.50
@@ -53,9 +58,13 @@ timing:
         none_duration_range_seconds: [0.5, 3.0]
         right_duration_range_seconds: [0.5, 3.0]
 
-    tunnel:
+  tunnel:
+    enabled: true
+    timing:
       cadence_factor: 1.0
-      random_direction:
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
         left_probability: 0.40
         none_probability: 0.10
         right_probability: 0.50
@@ -63,25 +72,28 @@ timing:
         none_duration_range_seconds: [0.5, 3.0]
         right_duration_range_seconds: [0.5, 3.0]
 
-    # text_wide is the closest thing to "textwall" in the current code.
-    #
-    # The current implementation does not use the same random-direction model
-    # as the widgets above. Instead it:
-    # - scrolls forward/up for 5 to 15 seconds
-    # - pauses for 1 second
-    # - reverses for 10 to 80 update steps
-    #
-    # The values below are an approximation that fit the new shared
-    # direction-reroll model:
-    # - right ~= forward/up
-    # - none ~= pause
-    # - left ~= reverse/down
-    #
-    # These should be treated as initial estimates, not as faithful
-    # translations.
-    text_wide:
+  text_wide:
+    enabled: true
+    timing:
       cadence_factor: 1.0
-      random_direction:
+    behavior:
+      direction_random:
+        # text_wide is the closest thing to "textwall" in the current code.
+        #
+        # The current implementation does not use the same random-direction model
+        # as the widgets above. Instead it:
+        # - scrolls forward/up for 5 to 15 seconds
+        # - pauses for 1 second
+        # - reverses for 10 to 80 update steps
+        #
+        # The values below are an approximation that fit the new shared
+        # direction-reroll model:
+        # - right ~= forward/up
+        # - none ~= pause
+        # - left ~= reverse/down
+        #
+        # These should be treated as initial estimates, not as faithful
+        # translations.
         left_probability: 0.12
         none_probability: 0.10
         right_probability: 0.78
