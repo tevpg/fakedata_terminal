@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import random
-import time
 
 try:
     from .runtime_support import multi_palette_specs
+    from .timing_support import feed_scroll_interval, read_refresh_interval, schedule_next
 except ImportError:
     from runtime_support import multi_palette_specs
+    from timing_support import feed_scroll_interval, read_refresh_interval, schedule_next
 
 
 class MetricsWidgets:
@@ -142,7 +143,7 @@ class MetricsWidgets:
                 if num is not None:
                     area["gauge_hist"][i] = [num]
 
-    def ensure_gauges(self, area: dict, rows: int, width: int, role: str, mode: str):
+    def ensure_gauges(self, area: dict, rows: int, width: int, role: str, mode: str, now: float):
         cfg = self.get_gauge_config(self.area_theme(area))
         area["gauge_title"], area["gauge_signal"], area["gauge_base_reads"], area["gauge_scroll_title"] = cfg
         area["gauge_reads"] = area["gauge_base_reads"]
@@ -155,12 +156,11 @@ class MetricsWidgets:
         had_last_values = bool(area["gauge_last_values"])
         self.sync_gauge_vectors(area)
         if not had_last_values:
-            if self.area_theme(area) == "pharmacy" and role == "sidebar":
-                area["gauge_next_reads_at"] = time.time() + 0.80
-            elif role == "sidebar":
-                area["gauge_next_reads_at"] = time.time() + 0.45
-            else:
-                area["gauge_next_reads_at"] = time.time() + 0.30
+            interval = read_refresh_interval(mode, role, self.area_theme(area))
+            area["gauge_next_reads_at"] = (now + interval) if interval is not None else 0.0
+        if mode == "gauges" and area["gauge_next_feed_at"] <= 0.0:
+            interval = feed_scroll_interval(mode)
+            area["gauge_next_feed_at"] = (now + interval) if interval is not None else 0.0
         while len(area["gauge_feed"]) < rows:
             area["gauge_feed"].append(self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role))
         while len(area["gauge_feed"]) > rows:
@@ -372,18 +372,19 @@ class MetricsWidgets:
         return mode in self.GAUGE_MODES
 
     def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
-        del now
+        now = 0.0 if now is None else now
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode in self.GAUGE_MODES:
-            self.ensure_gauges(area, rows, width, role, mode)
+            self.ensure_gauges(area, rows, width, role, mode, now)
             if area.get("text_override"):
                 if mode == "readouts":
                     area["gauge_title"] = area["text_override"]
                 else:
                     area["gauge_scroll_title"] = area["text_override"]
 
-    def update(self, area: dict, rows: int, width: int, role: str, now: float, *,
+    def update(self, area: dict, rows: int, width: int, role: str, now: float, dt: float, *,
                resolved_direction_motion, stabilize_direction_history) -> None:
+        del dt
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode not in self.GAUGE_MODES:
             return
@@ -406,7 +407,7 @@ class MetricsWidgets:
             area["gauge_spark"].append(self.next_gauge_spark(area))
             if len(area["gauge_spark"]) > width + 20:
                 area["gauge_spark"].pop(0)
-        if now >= area["gauge_next_reads_at"]:
+        if area["gauge_next_reads_at"] > 0.0 and now >= area["gauge_next_reads_at"]:
             vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
             for i, val_str in enumerate(vals):
                 label = area["gauge_reads"][i][0] if i < len(area["gauge_reads"]) else ""
@@ -427,19 +428,18 @@ class MetricsWidgets:
                 if len(hist) > 4:
                     hist.pop(0)
             area["gauge_last_values"] = vals
-            if self.area_theme(area) == "pharmacy" and role == "sidebar":
-                area["gauge_next_reads_at"] = now + 0.80
-            elif role == "sidebar":
-                area["gauge_next_reads_at"] = now + 0.45
-            else:
-                area["gauge_next_reads_at"] = now + 0.30
+            interval = read_refresh_interval(mode, role, self.area_theme(area))
+            if interval is not None:
+                area["gauge_next_reads_at"] = schedule_next(area["gauge_next_reads_at"], now, interval)
         area["gauge_tick"] += 1
-        if mode == "gauges" and area["gauge_tick"] >= 5:
-            area["gauge_tick"] = 0
+        if mode == "gauges" and area["gauge_next_feed_at"] > 0.0 and now >= area["gauge_next_feed_at"]:
             area["gauge_feed"].pop(0)
             area["gauge_feed"].append(
                 self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role)
             )
+            interval = feed_scroll_interval(mode)
+            if interval is not None:
+                area["gauge_next_feed_at"] = schedule_next(area["gauge_next_feed_at"], now, interval)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         del role

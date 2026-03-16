@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import math
 import random
-import time
 
 try:
     from .runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
+    from .timing_support import resolve_direction_motion as resolve_shared_direction_motion
     from .widgets_visual_blocks import BlocksWidget
     from .widgets_visual_gauge import GaugeWidget
     from .widgets_visual_matrix import MatrixWidget
@@ -16,6 +16,7 @@ try:
     from .widgets_visual_tunnel import TunnelWidget
 except ImportError:
     from runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
+    from timing_support import resolve_direction_motion as resolve_shared_direction_motion
     from widgets_visual_blocks import BlocksWidget
     from widgets_visual_gauge import GaugeWidget
     from widgets_visual_matrix import MatrixWidget
@@ -163,30 +164,13 @@ class VisualWidgets:
                 canvas[draw_row][col] = ch
                 attrs[draw_row][col] = overlay_attr
 
-    def update_scope(self, area: dict, width: int):
-        self.scope_widget.update(area, width)
+    def update_scope(self, area: dict, width: int, now: float):
+        self.scope_widget.update(area, width, now)
 
     def resolved_direction_motion(self, area: dict, *, now: float | None = None) -> int:
-        direction = str(area.get("direction_override") or "right").lower()
-        if direction == "none":
-            area["direction_motion"] = 0
-            return 0
-        forced_spin = self.gauge_spin_for_direction(direction)
-        if forced_spin:
-            area["direction_motion"] = forced_spin
-            return forced_spin
-        current = time.time() if now is None else now
-        if current >= area["gauge_next_spin_change"]:
-            area["gauge_spin"] = self.choose_gauge_spin()
-            area["gauge_next_spin_change"] = current + random.uniform(0.5, 3.0)
-        motion = area.get("gauge_spin", 1)
-        if motion > 0:
-            area["direction_motion"] = 1
-            return 1
-        if motion < 0:
-            area["direction_motion"] = -1
-            return -1
-        return 0
+        current = 0.0 if now is None else now
+        mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
+        return resolve_shared_direction_motion(area, mode, current)
 
     def repaint_scope(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.scope_widget.render(area, nrows, y, x, width)
@@ -235,16 +219,8 @@ class VisualWidgets:
     def repaint_matrix(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.matrix_widget.render(area, nrows, y, x, width)
 
-    @staticmethod
-    def choose_gauge_spin() -> int:
-        return GaugeWidget.choose_spin()
-
-    @staticmethod
-    def gauge_spin_for_direction(direction: str | None) -> int:
-        return GaugeWidget.spin_for_direction(direction)
-
-    def update_gauge(self, area: dict):
-        self.gauge_widget.update(area)
+    def update_gauge(self, area: dict, now: float, dt: float, speed: int):
+        self.gauge_widget.update(area, now, dt, speed)
 
     def repaint_gauge(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.gauge_widget.render(area, nrows, y, x, width)
@@ -349,8 +325,8 @@ class VisualWidgets:
         del role
         self.sweep_widget.render(area, nrows, y, x, width)
 
-    def update_tunnel(self, area: dict, rows: int, width: int):
-        self.tunnel_widget.update(area, rows, width)
+    def update_tunnel(self, area: dict, rows: int, width: int, now: float):
+        self.tunnel_widget.update(area, rows, width, now)
 
     def repaint_tunnel(self, area: dict, rows: int, y: int, x: int, width: int):
         self.tunnel_widget.render(area, rows, y, x, width)
@@ -383,13 +359,12 @@ class VisualWidgets:
             self.update_sweep(area, rows, width, area.get("role", "main"))
             area["sweep_warmed"] = True
 
-    def update(self, area: dict, rows: int, width: int, role: str, now: float) -> None:
-        del now
+    def update(self, area: dict, rows: int, width: int, role: str, now: float, dt: float, speed: int) -> None:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.update_bars(area)
         elif mode == "gauge":
-            self.update_gauge(area)
+            self.update_gauge(area, now, dt, speed)
         elif mode == "matrix":
             self.update_matrix(area, rows, width)
         elif mode == "blocks":
@@ -397,9 +372,9 @@ class VisualWidgets:
         elif mode == "sweep":
             self.update_sweep(area, rows, width, role)
         elif mode == "tunnel":
-            self.update_tunnel(area, rows, width)
+            self.update_tunnel(area, rows, width, now)
         elif mode == "scope":
-            self.update_scope(area, width)
+            self.update_scope(area, width, now)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"

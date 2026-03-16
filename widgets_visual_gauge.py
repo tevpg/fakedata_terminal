@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import math
 import random
-import time
 
 try:
     from .runtime_support import multi_palette_specs
+    from .timing_support import gauge_radians_per_second, resolve_direction_motion
 except ImportError:
     from runtime_support import multi_palette_specs
+    from timing_support import gauge_radians_per_second, resolve_direction_motion
 
 
 class GaugeWidget:
@@ -28,41 +29,10 @@ class GaugeWidget:
         self.colour_attr_from_spec = colour_attr_from_spec
         self.draw_centered_overlay_to_canvas = draw_centered_overlay_to_canvas
 
-    @staticmethod
-    def choose_spin() -> int:
-        roll = random.random()
-        if roll < 0.5:
-            return 1
-        if roll < 0.9:
-            return -1
-        return 0
-
-    @staticmethod
-    def spin_for_direction(direction: str | None) -> int:
-        if direction == "right":
-            return 1
-        if direction == "left":
-            return -1
-        return 0
-
-    def update(self, area: dict) -> None:
-        now = time.time()
-        direction = str(area.get("direction_override") or "right").lower()
-        if direction == "none":
-            area["direction_motion"] = 0
-            return
-        forced_spin = self.spin_for_direction(direction)
-        if forced_spin:
-            area["gauge_spin"] = forced_spin
-            area["direction_motion"] = forced_spin
-        elif now >= area["gauge_next_spin_change"]:
-            area["gauge_spin"] = self.choose_spin()
-            area["gauge_next_spin_change"] = now + random.uniform(0.5, 3.0)
-            if area["gauge_spin"] > 0:
-                area["direction_motion"] = 1
-            elif area["gauge_spin"] < 0:
-                area["direction_motion"] = -1
-        area["gauge_angle"] = (area["gauge_angle"] + (0.12 * area["gauge_spin"])) % (math.pi * 2)
+    def update(self, area: dict, now: float, dt: float, speed: int) -> None:
+        motion = resolve_direction_motion(area, "gauge", now)
+        area["gauge_spin"] = motion
+        area["gauge_angle"] = (area["gauge_angle"] + (gauge_radians_per_second(speed) * dt * motion)) % (math.pi * 2)
         area["gauge_tick"] += 1
         fresh = []
         for ang, dist, ttl in area["gauge_blips"]:

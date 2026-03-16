@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-import time
 
 
 def sidebar_cycle_modes_for_main(main_mode: str, sidebar_cycle_modes: list[str]) -> list[str]:
@@ -124,13 +123,13 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
 
 
 def sync_cycle_start_modes(area_specs: list[dict], area_states: dict[str, dict], ensure_cycle, now: float | None = None):
-    now = time.time() if now is None else now
+    now = 0.0 if now is None else now
     used = set()
     for spec in area_specs:
         area = area_states[spec["name"]]
         if area["mode"] != "cycle":
             continue
-        ensure_cycle(area)
+        ensure_cycle(area, now)
         current = area.get("cycle_current")
         if current and current not in used:
             used.add(current)

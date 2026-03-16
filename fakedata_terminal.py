@@ -52,13 +52,11 @@ try:
         HELP_TEXT_TOPICS_UNIX,
         HELP_TEXT_TOPICS_WIN,
         build_colour_pairs,
-        centre_delay as _centre_delay,
         colour_attr_from_spec as _colour_attr_from_spec,
         life_ramp_specs as _life_ramp_specs,
         line_colour as _line_colour,
         load_prime_values,
         make_area_state as build_area_state,
-        make_burst_fn,
         make_text_state as _make_text_state,
         new_paragraph as _new_paragraph,
         normalize_colour_spec as _normalize_colour_spec,
@@ -66,6 +64,15 @@ try:
         resize_restartable,
         scaled_speed as _scaled_speed,
         strip_overstrikes as _strip_overstrikes,
+    )
+    from .timing_support import (
+        cycle_change_interval_seconds,
+        cycle_start_deadline,
+        dt_clamp_seconds,
+        resolve_direction_motion as resolve_shared_direction_motion,
+        schedule_next,
+        shift_deadline,
+        widget_interval,
     )
     from .vocab import (
         GEN_POOL, RCOL_POOL, _P_MAIN_GEN_POOL, _P_MAIN_RCOL_POOL, _P_SIDEBAR_SPIKE_POOL,
@@ -89,13 +96,11 @@ except ImportError:
         HELP_TEXT_TOPICS_UNIX,
         HELP_TEXT_TOPICS_WIN,
         build_colour_pairs,
-        centre_delay as _centre_delay,
         colour_attr_from_spec as _colour_attr_from_spec,
         life_ramp_specs as _life_ramp_specs,
         line_colour as _line_colour,
         load_prime_values,
         make_area_state as build_area_state,
-        make_burst_fn,
         make_text_state as _make_text_state,
         new_paragraph as _new_paragraph,
         normalize_colour_spec as _normalize_colour_spec,
@@ -103,6 +108,15 @@ except ImportError:
         resize_restartable,
         scaled_speed as _scaled_speed,
         strip_overstrikes as _strip_overstrikes,
+    )
+    from timing_support import (
+        cycle_change_interval_seconds,
+        cycle_start_deadline,
+        dt_clamp_seconds,
+        resolve_direction_motion as resolve_shared_direction_motion,
+        schedule_next,
+        shift_deadline,
+        widget_interval,
     )
     from vocab import (
         GEN_POOL, RCOL_POOL, _P_MAIN_GEN_POOL, _P_MAIN_RCOL_POOL, _P_SIDEBAR_SPIKE_POOL,
@@ -468,11 +482,12 @@ def main(stdscr):
         return mw, sw, mw + 1
 
     _sidebar_cycle = None
+    _clock_now = time.monotonic()
     if SIDEBAR_MODE == "cycle":
         _sidebar_cycle = {
             "modes": list_sidebar_cycle_modes_for_main(MAIN_MODE, SIDEBAR_CYCLE_MODES),
             "idx": 0,
-            "next": time.time() + 15.0,
+            "next": _clock_now + cycle_change_interval_seconds(),
         }
 
     def _effective_sidebar_mode():
@@ -663,34 +678,11 @@ def main(stdscr):
         ratio = main_speed_ratio if role == "main" else sidebar_speed_ratio
         return _scaled_speed(current_base_speed, ratio)
 
-    def _steady_mode_delay(mode: str, speed: int) -> float:
-        delay = _centre_delay(speed)
-        if mode in {"gauge", "blocks", "sweep", "tunnel"}:
-            return delay / 1.5
-        return delay
+    def _effective_widget_name(area: dict) -> str:
+        return text_widgets.effective_mode(area)
 
     def _resolved_area_direction_motion(area: dict, now: float) -> int:
-        direction = str(area.get("direction_override") or "right").lower()
-        if direction == "none":
-            area["direction_motion"] = 0
-            return 0
-        if direction == "right":
-            area["direction_motion"] = 1
-            return 1
-        if direction == "left":
-            area["direction_motion"] = -1
-            return -1
-        if now >= area["gauge_next_spin_change"]:
-            area["gauge_spin"] = visual_widgets.choose_gauge_spin()
-            area["gauge_next_spin_change"] = now + random.uniform(0.5, 3.0)
-        motion = area.get("gauge_spin", 1)
-        if motion > 0:
-            area["direction_motion"] = 1
-            return 1
-        if motion < 0:
-            area["direction_motion"] = -1
-            return -1
-        return 0
+        return resolve_shared_direction_motion(area, _effective_widget_name(area), now)
 
     def _stabilize_direction_history(area: dict, width: int, motion: int, key: str) -> None:
         prev_motion = area.get("direction_motion_prev", motion)
@@ -707,30 +699,29 @@ def main(stdscr):
                 return family
         return None
 
-    def _reset_area_timing(area: dict):
+    def _reset_area_timing(area: dict, now: float):
         role = area.get("role", "main")
         area_speed = area.get("speed_override") or _current_speed_for_role(role)
-        area["next_update"] = time.time()
-        if text_widgets.effective_mode(area) in STEADY_MODES:
-            area["burst_fn"] = None
-            area["burst_delay"] = 0.0
-            area["burst_left"] = 0
-        else:
-            area["burst_fn"] = make_burst_fn(area_speed)
-            area["burst_delay"], area["burst_left"] = area["burst_fn"]()
+        widget_name = _effective_widget_name(area)
+        interval = widget_interval(widget_name, area_speed)
+        area["next_update"] = schedule_next(0.0, now, interval)
+        area["last_update_at"] = now
+        area["burst_fn"] = None
+        area["burst_delay"] = 0.0
+        area["burst_left"] = 0
 
-    def _ensure_area(area: dict, rows: int, width: int, role: str):
+    def _ensure_area(area: dict, rows: int, width: int, role: str, now: float):
         if area["mode"] == "cycle":
-            text_widgets.ensure_cycle(area)
+            text_widgets.ensure_cycle(area, now)
         mode = text_widgets.effective_mode(area)
         area["role"] = role
         family = _family_for_mode(mode)
         if family is not None:
-            family.ensure(area, rows, width, role, time.time())
+            family.ensure(area, rows, width, role, now)
 
-    def _step_area(area: dict, rows: int, width: int, role: str, now: float):
+    def _step_area(area: dict, rows: int, width: int, role: str, now: float, dt: float):
         if area["mode"] == "cycle":
-            text_widgets.ensure_cycle(area)
+            text_widgets.ensure_cycle(area, now)
         mode = text_widgets.effective_mode(area)
         if now < area["next_update"]:
             return
@@ -741,13 +732,13 @@ def main(stdscr):
         area_speed = area.get("speed_override") or _current_speed_for_role(role)
         if not frozen_by_direction:
             area["tick"] += 1
-        _ensure_area(area, rows, width, role)
+        _ensure_area(area, rows, width, role, now)
         family = _family_for_mode(mode)
         if family is text_widgets:
-            family.update(area, rows, width, role, now)
+            family.update(area, rows, width, role, now, dt)
         elif family is visual_widgets:
             if not (frozen_by_direction and mode in {"gauge", "scope", "tunnel"}):
-                family.update(area, rows, width, role, now)
+                family.update(area, rows, width, role, now, dt, area_speed)
         elif family is metrics_widgets:
             family.update(
                 area,
@@ -755,26 +746,16 @@ def main(stdscr):
                 width,
                 role,
                 now,
+                dt,
                 resolved_direction_motion=_resolved_area_direction_motion,
                 stabilize_direction_history=_stabilize_direction_history,
             )
         elif family is image_widgets:
-            family.update(area, rows, width, role, now)
+            family.update(area, rows, width, role, now, dt)
 
-        if mode in STEADY_MODES:
-            area["next_update"] = now + _steady_mode_delay(mode, area_speed)
-        else:
-            area["burst_left"] -= 1
-            if area["burst_left"] <= 0:
-                area["burst_delay"], area["burst_left"] = area["burst_fn"]()
-            area["next_update"] = now + area["burst_delay"]
-            if mode == "text_wide":
-                if area["textwall_pause_until"] > now:
-                    area["next_update"] = area["textwall_pause_until"]
-                elif area["textwall_reverse_left"] > 0:
-                    area["next_update"] = now
-            elif mode == "text_spew":
-                area["next_update"] = now
+        interval = widget_interval(mode, area_speed)
+        area["next_update"] = schedule_next(area["next_update"], now, interval)
+        area["last_update_at"] = now
 
     def _paint_area(area: dict, rows: int, y: int, x: int, width: int, role: str):
         mode = text_widgets.effective_mode(area)
@@ -865,6 +846,7 @@ def main(stdscr):
     def _set_showcase_scene(next_idx: int) -> None:
         global CONFIG_SCENE, THEME_ARG
         nonlocal area_specs, area_states
+        now = time.monotonic()
         scenes = _showcase_state.get("scenes", [])
         if not scenes:
             return
@@ -875,10 +857,10 @@ def main(stdscr):
         THEME_ARG = CONFIG_SCENE.get("theme", THEME_ARG)
         GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
         area_specs = _current_area_specs(rows, cols)
-        area_states = _sync_areas(area_specs)
-        _sync_cycle_start_modes(area_specs, area_states, time.time())
+        area_states = _sync_areas(area_specs, now)
+        _sync_cycle_start_modes(area_specs, area_states, now)
         for spec in area_specs:
-            _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"])
+            _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"], now)
 
     def _legacy_area_specs(cols: int):
         return build_legacy_area_specs(
@@ -898,52 +880,54 @@ def main(stdscr):
             return _config_area_specs(rows, cols)
         return _legacy_area_specs(cols)
 
-    def _sync_areas(area_specs: list[dict]):
-        return sync_area_states(area_specs, area_states, _make_area, _reset_area_timing)
+    def _sync_areas(area_specs: list[dict], now: float):
+        return sync_area_states(area_specs, area_states, _make_area, lambda area: _reset_area_timing(area, now))
 
     area_states = {}
     area_specs = _current_area_specs(rows, cols)
-    area_states = _sync_areas(area_specs)
-    _sync_cycle_start_modes(area_specs, area_states, time.time())
+    start_now = time.monotonic()
+    area_states = _sync_areas(area_specs, start_now)
+    _sync_cycle_start_modes(area_specs, area_states, start_now)
     for spec in area_specs:
-        _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"])
+        _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"], start_now)
 
     _GLITCH_CHARS = "!@#$%^&*?><|/\\~`[]{}abcdefXYZ0123456789XOXOX##!!??@@$$%%^^&&**"
-    _glitch_next = time.time() + GLITCH_INTERVAL if GLITCH_INTERVAL > 0 else float("inf")
+    _glitch_next = start_now + GLITCH_INTERVAL if GLITCH_INTERVAL > 0 else float("inf")
     _glitch_active = False
     _glitch_restore_at = 0.0
     _glitch_r0 = _glitch_c0 = _glitch_rh = _glitch_cw = 0
     _paused = False
     _paused_at = 0.0
-    _exit_at = time.time() + EXIT_AFTER if EXIT_AFTER is not None else float("inf")
+    _exit_at = start_now + EXIT_AFTER if EXIT_AFTER is not None else float("inf")
+    _last_loop_now = start_now
 
     if _showcase_state["active"] and _showcase_state["next"] == float("inf"):
-        _showcase_state["next"] = time.time() + _showcase_state["pair_duration"]
+        _showcase_state["next"] = start_now + _showcase_state["pair_duration"]
 
-    def _shift_pause_timers(delta: float) -> None:
-        nonlocal _glitch_next, _glitch_restore_at
+    def _shift_pause_timers(delta: float, resumed_at: float) -> None:
+        nonlocal _glitch_next, _glitch_restore_at, _last_loop_now
         if delta <= 0.0:
             return
         if _sidebar_cycle:
-            _sidebar_cycle["next"] += delta
+            _sidebar_cycle["next"] = shift_deadline(_sidebar_cycle["next"], delta)
         for area in area_states.values():
-            area["next_update"] += delta
-            if area.get("cycle_next_change", 0.0):
-                area["cycle_next_change"] += delta
-            if area.get("gauge_next_reads_at", 0.0):
-                area["gauge_next_reads_at"] += delta
-            if area.get("textwall_next_reverse_at", 0.0):
-                area["textwall_next_reverse_at"] += delta
-            if area.get("textwall_pause_until", 0.0):
-                area["textwall_pause_until"] += delta
+            area["next_update"] = shift_deadline(area.get("next_update", 0.0), delta)
+            area["cycle_next_change"] = shift_deadline(area.get("cycle_next_change", 0.0), delta)
+            area["gauge_next_reads_at"] = shift_deadline(area.get("gauge_next_reads_at", 0.0), delta)
+            area["gauge_next_feed_at"] = shift_deadline(area.get("gauge_next_feed_at", 0.0), delta)
+            area["textwall_next_reverse_at"] = shift_deadline(area.get("textwall_next_reverse_at", 0.0), delta)
+            area["textwall_pause_until"] = shift_deadline(area.get("textwall_pause_until", 0.0), delta)
+            area["direction_next_change"] = shift_deadline(area.get("direction_next_change", 0.0), delta)
+            area["last_update_at"] = resumed_at
         if _showcase_state["active"] and _showcase_state["next"] != float("inf"):
             _showcase_state["next"] += delta
         if _demo_state["active"] and _demo_state["next"] != float("inf"):
             _demo_state["next"] += delta
         if _glitch_active and _glitch_restore_at:
-            _glitch_restore_at += delta
+            _glitch_restore_at = shift_deadline(_glitch_restore_at, delta)
         elif _glitch_next != float("inf"):
-            _glitch_next += delta
+            _glitch_next = shift_deadline(_glitch_next, delta)
+        _last_loop_now = resumed_at
 
     def _fire_glitch():
         nonlocal _glitch_active, _glitch_restore_at, _glitch_r0, _glitch_c0, _glitch_rh, _glitch_cw
@@ -973,7 +957,7 @@ def main(stdscr):
                 except curses.error:
                     pass
         _glitch_active = True
-        _glitch_restore_at = time.time() + random.uniform(0.12, 0.44)
+        _glitch_restore_at = time.monotonic() + random.uniform(0.12, 0.44)
 
     def _restore_glitch(current_specs):
         nonlocal _glitch_active
@@ -985,7 +969,9 @@ def main(stdscr):
 
     while True:
         rows, cols = stdscr.getmaxyx()
-        now = time.time()
+        now = time.monotonic()
+        dt = max(0.0, min(now - _last_loop_now, dt_clamp_seconds()))
+        _last_loop_now = now
         if now >= _exit_at:
             break
         if _sidebar_cycle and not _paused:
@@ -993,12 +979,12 @@ def main(stdscr):
             if new_modes != _sidebar_cycle["modes"]:
                 _sidebar_cycle["modes"] = new_modes
                 _sidebar_cycle["idx"] = 0
-                _sidebar_cycle["next"] = now + 15.0
+                _sidebar_cycle["next"] = now + cycle_change_interval_seconds()
         if _sidebar_cycle and not _paused and now >= _sidebar_cycle["next"]:
             _sidebar_cycle["idx"] = (_sidebar_cycle["idx"] + 1) % len(_sidebar_cycle["modes"])
-            _sidebar_cycle["next"] = now + 15.0
+            _sidebar_cycle["next"] = now + cycle_change_interval_seconds()
         area_specs = _current_area_specs(rows, cols)
-        area_states = _sync_areas(area_specs)
+        area_states = _sync_areas(area_specs, now)
         if not _paused:
             _sync_cycle_start_modes(area_specs, area_states, now)
             for spec in area_specs:
@@ -1010,13 +996,13 @@ def main(stdscr):
                     for other_name, other in area_states.items()
                     if other_name != spec["name"] and other["mode"] == "cycle"
                 }
-                text_widgets.advance_cycle(area, forbidden)
+                text_widgets.advance_cycle(area, now, forbidden)
         for spec in area_specs:
             area = area_states[spec["name"]]
             if not _paused:
                 if text_widgets.effective_mode(area) == "readouts":
                     area["gauge_count"] += 1
-                _step_area(area, spec["height"], spec["width"], spec["role"], now)
+                _step_area(area, spec["height"], spec["width"], spec["role"], now, dt)
             if spec.get("separator_after"):
                 _draw_separator(rows, spec["width"])
             _paint_area(area, spec["height"], spec["y"], spec["x"], spec["width"], spec["role"])
@@ -1041,13 +1027,13 @@ def main(stdscr):
         _draw_showcase_footer()
 
         if GLITCH_INTERVAL > 0 and not _paused:
-            now = time.time()
+            glitch_now = time.monotonic()
             if _glitch_active:
-                if now >= _glitch_restore_at:
+                if glitch_now >= _glitch_restore_at:
                     _restore_glitch(area_specs)
-            elif now >= _glitch_next:
+            elif glitch_now >= _glitch_next:
                 _fire_glitch()
-                _glitch_next = now + GLITCH_INTERVAL * random.uniform(0.70, 1.30)
+                _glitch_next = glitch_now + GLITCH_INTERVAL * random.uniform(0.70, 1.30)
 
         stdscr.refresh()
 
@@ -1069,23 +1055,26 @@ def main(stdscr):
             continue
         if key == ord(' '):
             if _paused:
-                _shift_pause_timers(time.time() - _paused_at)
+                resumed_at = time.monotonic()
+                _shift_pause_timers(resumed_at - _paused_at, resumed_at)
                 _paused = False
             else:
                 _paused = True
-                _paused_at = time.time()
+                _paused_at = time.monotonic()
         elif key in (ord('+'), ord('=')):
             current_base_speed = min(100, current_base_speed + 1)
+            speed_now = time.monotonic()
             for area in area_states.values():
-                _reset_area_timing(area)
+                _reset_area_timing(area, speed_now)
         elif key == ord('-'):
             current_base_speed = max(1, current_base_speed - 1)
+            speed_now = time.monotonic()
             for area in area_states.values():
-                _reset_area_timing(area)
+                _reset_area_timing(area, speed_now)
 
         if (not _paused and _demo_state["active"]
                 and not _demo_state["done"]
-                and time.time() >= _demo_state["next"]):
+                and time.monotonic() >= _demo_state["next"]):
             next_idx = _demo_state["idx"] + 1
             if next_idx >= len(_demo_state["scenes"]):
                 _demo_state["done"] = True
@@ -1097,11 +1086,12 @@ def main(stdscr):
             SIDEBAR_MODE = _demo_state["scene"]["sidebar"]
             GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
             area_specs = _current_area_specs(rows, cols)
-            area_states = _sync_areas(area_specs)
-            _sync_cycle_start_modes(area_specs, area_states, time.time())
+            scene_now = time.monotonic()
+            area_states = _sync_areas(area_specs, scene_now)
+            _sync_cycle_start_modes(area_specs, area_states, scene_now)
             for spec in area_specs:
-                _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"])
-            _demo_state["next"] = time.time() + _demo_state["scene"]["duration"]
+                _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"], scene_now)
+            _demo_state["next"] = scene_now + _demo_state["scene"]["duration"]
         time.sleep(0.01)
 
 
