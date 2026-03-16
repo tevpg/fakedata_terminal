@@ -3,6 +3,15 @@
 # This file is intentionally a draft. The values here are based on current
 # runtime behavior where possible, and on approximations where the current
 # behavior does not map cleanly to the new model.
+#
+# Cadence-factor derivation rule for this draft:
+# - `1.00` is reserved for the fastest ordinary cadence bucket in the current
+#   runtime: steady modes that use `_steady_mode_delay(...)/1.5`
+# - `0.67` approximates the ordinary steady bucket using `_steady_mode_delay(...)`
+# - `0.55` approximates the mean burst-driven bucket based on the current
+#   `make_burst_fn()` weighted average delay (~1.2075 * centre_delay)
+# - values below that are used only when the current implementation already
+#   advances a widget less often than its enclosing burst cadence
 
 defaults:
   timing:
@@ -13,10 +22,39 @@ defaults:
       dt_clamp_seconds: 0.5
 
 widgets:
+  text:
+    enabled: true
+    timing:
+      # Burst-driven; every update scrolls.
+      cadence_factor: 0.55
+
+  text_scant:
+    enabled: true
+    timing:
+      # Burst-driven, but only scrolls every 2 ticks in main and every 5 ticks
+      # in sidebar. This value is an intentional compromise estimate.
+      cadence_factor: 0.25
+
+  text_spew:
+    enabled: true
+    timing:
+      # The old code special-cases this to `next_update = now`, effectively
+      # making it loop-bound rather than cadence-bound. In the shared model it
+      # must be normalized back into the common <= 1.0 range, so it maps to
+      # the maximum shared cadence.
+      cadence_factor: 1.00
+
+  bars:
+    enabled: true
+    timing:
+      # Burst-driven; values update on each burst step.
+      cadence_factor: 0.55
+
   gauge:
     enabled: true
     timing:
-      cadence_factor: 1.0
+      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      cadence_factor: 1.00
       motion:
         units: rpm
         factor: 1.0
@@ -33,7 +71,8 @@ widgets:
   scope:
     enabled: true
     timing:
-      cadence_factor: 1.0
+      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      cadence_factor: 0.67
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
@@ -47,7 +86,8 @@ widgets:
   sparkline:
     enabled: true
     timing:
-      cadence_factor: 1.0
+      # Burst-driven panel updates; separate read-refresh deadlines remain explicit.
+      cadence_factor: 0.55
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
@@ -61,7 +101,8 @@ widgets:
   tunnel:
     enabled: true
     timing:
-      cadence_factor: 1.0
+      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      cadence_factor: 1.00
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
@@ -75,7 +116,8 @@ widgets:
   text_wide:
     enabled: true
     timing:
-      cadence_factor: 1.0
+      # Burst-driven forward motion with special reverse/pause deadlines.
+      cadence_factor: 0.55
     behavior:
       direction_random:
         # text_wide is the closest thing to "textwall" in the current code.
@@ -100,3 +142,83 @@ widgets:
         left_duration_range_seconds: [1.0, 4.0]
         none_duration_range_seconds: [1.0, 1.0]
         right_duration_range_seconds: [5.0, 15.0]
+
+  matrix:
+    enabled: true
+    timing:
+      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      cadence_factor: 0.67
+
+  blocks:
+    enabled: true
+    timing:
+      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      cadence_factor: 1.00
+
+  sweep:
+    enabled: true
+    timing:
+      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      cadence_factor: 1.00
+
+  gauges:
+    enabled: true
+    timing:
+      # Burst-driven panel updates; read refresh and feed scroll are separate timers.
+      cadence_factor: 0.55
+    behavior:
+      read_refresh:
+        # First-pass simplification of the current per-role refresh logic.
+        main_interval_seconds: 0.30
+        sidebar_interval_seconds: 0.45
+        pharmacy_sidebar_interval_seconds: 0.80
+      feed_scroll:
+        # Replaces the current gauge_tick >= 5 counter with an explicit target cadence.
+        interval_seconds: 0.60
+
+  readouts:
+    enabled: true
+    timing:
+      # Burst-driven panel updates; read refresh is a separate explicit deadline.
+      cadence_factor: 0.55
+    behavior:
+      read_refresh:
+        main_interval_seconds: 0.30
+        sidebar_interval_seconds: 0.45
+        pharmacy_sidebar_interval_seconds: 0.80
+
+  image:
+    enabled: true
+    timing:
+      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      cadence_factor: 0.67
+    behavior:
+      transition:
+        mode: wipe
+        colour_cycle_on_frame_change: true
+
+  life:
+    enabled: true
+    timing:
+      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      cadence_factor: 0.67
+    behavior:
+      restart:
+        on_stable_or_loop: true
+        on_max_iterations: true
+
+  blank:
+    enabled: true
+    timing:
+      cadence_factor: 0.0
+    behavior:
+      static: true
+
+  cycle:
+    enabled: true
+    timing:
+      cadence_factor: 0.0
+    behavior:
+      controller:
+        change_interval_seconds: 10.0
+        start_jitter_range_seconds: [0.0, 10.0]

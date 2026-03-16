@@ -278,6 +278,280 @@ Possible contract:
 - widgets may inspect and advance those deadlines using `now`
 - widgets do not call the system clock directly
 
+## Scheduler Contract
+
+This section defines the runtime timing behavior tightly enough to implement the rewrite without re-deciding scheduler semantics midstream.
+
+### Clock Source
+
+- use `time.monotonic()` as the one runtime clock
+- compute `now` once per main-loop iteration
+- compute `dt = clamp(now - previous_now, 0.0, dt_clamp_seconds)`
+- never use wall clock for animation cadence or in-widget deadlines
+
+Rationale:
+
+- monotonic time avoids clock-jump bugs
+- `dt` remains suitable for semantic motion such as gauge rotation
+- deadline shifting on pause/resume becomes mechanical
+
+### Area Update Contract
+
+Each area should own:
+
+- `next_update`
+- `last_update_at`
+- any explicit widget/event deadlines
+
+Main-loop behavior:
+
+1. compute one shared `now`
+2. compute shared loop `dt`
+3. for each area, resolve its effective mode
+4. call `family.ensure(...)`
+5. if `now < area["next_update"]`, skip update and render current state
+6. if `now >= area["next_update"]`, call `family.update(..., now, dt)`
+7. after update, schedule the next cadence deadline for that area
+8. render
+
+### Cadence Scheduling Rule
+
+Use deadline progression based on the prior deadline, not directly on `now`, unless the area is badly overdue.
+
+Reference rule:
+
+- `interval = widget_interval(widget, speed)`
+- if `area["next_update"] <= 0`, set `area["next_update"] = now + interval`
+- otherwise set `candidate = area["next_update"] + interval`
+- if `candidate < now - interval`, collapse backlog and set `area["next_update"] = now + interval`
+- else set `area["next_update"] = candidate`
+
+Behavioral intent:
+
+- short frame hitches do not permanently slow a widget down
+- the runtime does not attempt multi-step catch-up inside a single frame
+- long stalls drop backlog rather than burning CPU trying to replay missed steps
+
+This rewrite should use:
+
+- at most one update call per area per main-loop iteration
+- no while-loop catch-up for missed cadence steps in the first implementation
+
+### `dt` Usage Rule
+
+- `dt` is for semantic motion and smoothing
+- cadence-driven widgets may ignore `dt`
+- `dt` must not be used to simulate multiple missed cadence steps for ordinary widgets
+- `dt` is clamped to `0.5s`
+
+### Pause / Resume Rule
+
+On pause:
+
+- store `paused_at = time.monotonic()`
+
+On resume:
+
+- compute `paused_duration = resumed_at - paused_at`
+- shift every explicit deadline forward by `paused_duration`
+- set each area `last_update_at = resumed_at`
+- set the shared previous-loop time to `resumed_at`
+
+Do not:
+
+- replay missed updates
+- let the first resumed frame see a large `dt`
+
+### Deadline Ownership Rule
+
+- cadence deadline: runtime-owned `next_update`
+- semantic/event deadlines: widget-owned explicit timestamps in area state
+- family code may inspect and advance only its own explicit deadlines
+- family code must not create hidden clock state outside area state
+
+### Provisional Product Calls
+
+These are intentional defaults for the rewrite, not facts inherited from the old system:
+
+- one update max per area per frame
+- backlog is dropped after long stalls
+- cadence scheduling uses prior-deadline progression for short hitches
+- `dt` is clamped to `0.5s`
+- closer behavioral match is secondary to simpler, more coherent timing code
+
+## Timing State Inventory
+
+This is the current-state inventory needed to guide the rewrite. Each item is classified as one of:
+
+- `keep`: remains an explicit deadline or semantic-motion field
+- `replace`: replaced by shared cadence scheduling or a new normalized field
+- `delete`: obsolete in the target model
+
+### Runtime-Owned Cadence State
+
+- `next_update`: `keep`
+  Current role: per-area cadence deadline in the runtime.
+  Target role: the only cadence deadline for ordinary area updates.
+- `tick`: `replace`
+  Current role: generic animation counter used by several widgets.
+  Target role: retained only where rendering still needs a simple phase/index counter; must stop being a hidden timing primitive.
+- `burst_fn`: `delete`
+- `burst_delay`: `delete`
+- `burst_left`: `delete`
+  Current role: text-specific burst scheduler.
+  Target role: removed with the text burst model.
+
+### Cycle / Scene Timing
+
+- `cycle_next_change`: `keep`
+  Current role: absolute deadline for cycle mode widget changes.
+  Target role: explicit wall-clock-style deadline owned by cycle logic.
+- `_sidebar_cycle["next"]`: `keep`
+  Current role: absolute deadline for sidebar cycle changes.
+  Target role: explicit runtime/scene deadline, shifted on resume.
+- demo/showcase/glitch timers: `keep`
+  Target role: explicit runtime deadlines, not loop-count behavior.
+
+### Text Family State
+
+- `textwall_next_reverse_at`: `replace`
+  Current role: absolute forward-run deadline for `text_wide`.
+  Target role: replaced by shared direction-reroll deadlines/settings.
+- `textwall_pause_until`: `replace`
+  Current role: pause deadline before reverse scrolling.
+  Target role: replaced by shared direction-reroll deadlines/settings.
+- `textwall_reverse_left`: `replace`
+  Current role: reverse movement counted in update steps.
+  Target role: replaced by wall-clock direction durations in the shared reroll model.
+- `helptext_topic_idx` / `helptext_lines`: `keep`
+  These are content state, not timing state.
+
+### Metrics Family State
+
+- `gauge_next_reads_at`: `keep`
+  Current role: readout refresh deadline for `gauges`, `sparkline`, `readouts`.
+  Target role: explicit read-refresh deadline unless later tuning folds it into ordinary cadence.
+- `gauge_tick`: `replace`
+  Current role: feed-scroll cadence counter and miscellaneous gauge-family counter.
+  Target role: replace with explicit feed/update deadlines or a cleaner per-mode phase counter.
+
+### Direction / Motion State
+
+- `gauge_next_spin_change`: `keep`
+  Current role: random reroll deadline for direction-aware widgets.
+  Target role: generalized direction-reroll deadline, likely renamed away from `gauge_*`.
+- `gauge_spin`: `replace`
+  Current role: overloaded sign/direction state.
+  Target role: replace with clearer shared direction state plus gauge-specific motion state.
+- `direction_motion`: `keep`
+  Current role: resolved current motion sign.
+  Target role: shared resolved direction state for direction-aware widgets.
+- `direction_motion_prev`: `keep`
+  Current role: history-stabilization aid when direction changes.
+  Target role: keep if needed for buffers that need left/right continuity.
+- `gauge_angle`: `keep`
+  Current role: semantic motion state for gauge rotation.
+  Target role: primary example of `dt`-driven semantic motion.
+
+### Image / Life State
+
+- `image_wipe_row`: `keep`
+  Current role: in-progress transition position.
+  Target role: ordinary animation state advanced by cadence updates.
+- `image_from` / `image_to` / `image_colour_idx`: `keep`
+  Current role: frame-transition state.
+  Target role: keep; color change remains tied to frame replacement.
+- `life_iteration`: `keep`
+  Current role: automaton generation counter.
+  Target role: content/termination state, not timing state.
+
+### Warmup / Layout-Dependent State
+
+- `scope_warmed`: `keep`
+- `matrix_warmed`: `keep`
+- `sweep_warmed`: `keep`
+- `blocks_warmed`: `keep`
+  Current role: one-time initialization/warmup flags.
+  Target role: keep as non-timing initialization state.
+
+## Full Widget Coverage And First-Pass Defaults
+
+The rewrite will treat `widgets.yaml` as the source of truth for first-pass timing defaults. Any missing entry should be considered a spec bug, not an invitation for ad hoc constants in code.
+
+Coverage required in `widgets.yaml`:
+
+- text: `text`, `text_wide`, `text_scant`, `text_spew`
+- visual: `bars`, `gauge`, `matrix`, `blocks`, `scope`, `sweep`, `tunnel`
+- metrics: `gauges`, `sparkline`, `readouts`
+- image/life: `image`, `life`, `blank`
+- controller/meta: `cycle`
+
+Rules:
+
+- every animating widget gets a `cadence_factor`
+- widgets with semantic motion may also get `motion` settings
+- direction-aware widgets get explicit reroll settings
+- widgets without special timing behavior still get an explicit entry
+- `blank` and `cycle` may be marked non-animating but still need documented timing semantics
+
+## Acceptance Criteria
+
+The timing rewrite is done when the following are true:
+
+### Code-Structure Criteria
+
+- all widget/runtime timing uses passed-in monotonic `now`
+- widget modules no longer call `time.time()` for runtime animation or deadlines
+- the text burst system is deleted
+- `widgets.yaml` fully covers the supported widget modes
+- runtime cadence scheduling is centralized in one timing subsystem
+
+### Behavioral Criteria
+
+- `speed 1` and `speed 100` match the documented first-pass shared mapping closely enough to be recognizable in manual testing
+- widgets at the same speed differ only through documented factors or semantic motion rules
+- pause/resume does not cause visible jumps from oversized `dt`
+- `gauge` large/small variants rotate at the same perceived angular rate
+- text modes no longer rely on the old burst cadence model
+- image color cycling still changes only when the frame/image advances
+
+### Manual Validation Checklist
+
+Use the production copy as the comparison target, but permit intentional drift where this document explicitly prioritizes simplicity over exact matching.
+
+Minimum validation passes:
+
+1. `--scene science`
+   Confirm `gauge` and `matrix` feel intentionally different at the same speed and that gauge size does not affect angular rate.
+2. `--scene finance`
+   Confirm `scope` and `blocks` remain smooth and direction-aware widgets reverse cleanly.
+3. `--scene clocks`
+   Confirm cycle timing still changes widgets on explicit deadlines rather than drift-prone tick counts.
+4. `--scene gauges`
+   Confirm `gauges`, `sparkline`, and `readouts` still refresh their values sensibly after the metrics timing simplification.
+5. `--scene geometries` or `--scene tunnel`
+   Confirm `sweep` and `tunnel` remain cadence-driven and visually coherent after the shared scheduler change.
+6. any image scene
+   Confirm wipe transitions and color changes remain coupled to frame replacement.
+7. a layout using `text`, `text_scant`, `text_wide`, and `text_spew`
+   Confirm all text modes animate under the shared cadence framework and no burst helper remains in use.
+
+### Acceptable Drift
+
+The following differences are acceptable in the first rewrite:
+
+- exact cadence matching versus the old system
+- exact textwall forward/pause/reverse feel
+- exact metrics `COUNT` cadence
+- minor reroll-pattern differences caused by moving to shared direction settings
+
+The following are not acceptable:
+
+- hidden per-widget clock calls reappearing
+- new undocumented timing constants in widget code
+- speed meaning materially different things for two ordinary cadence-driven widgets without a documented factor
+- gauge size changing perceived rotation speed
+
 ## Working Design Principles
 
 - prefer one coherent model over many widget-specific timing schemes
