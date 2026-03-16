@@ -335,7 +335,8 @@ class VisualWidgets:
         return mode in self.VISUAL_MODES
 
     def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
-        del role, now
+        del role
+        now = 0.0 if now is None else now
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "blocks":
             self.ensure_blocks(area, rows, width)
@@ -349,7 +350,7 @@ class VisualWidgets:
             self.ensure_tunnel(area, rows, width)
         elif mode == "scope" and not area["scope_warmed"]:
             for _ in range(max(24, width + 24)):
-                self.update_scope(area, width)
+                self.update_scope(area, width, now)
             area["scope_warmed"] = True
         elif mode == "matrix" and not area["matrix_warmed"]:
             for _ in range(max(18, rows * 3)):
