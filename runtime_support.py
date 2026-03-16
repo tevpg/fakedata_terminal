@@ -533,6 +533,8 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "textwall_next_reverse_at": 0.0,
         "textwall_pause_until": 0.0,
         "textwall_reverse_left": 0,
+        "configured_speed": 0,
+        "current_speed": 0,
         "theme_override": theme_name,
         "text_override": None,
         "direction_override": None,

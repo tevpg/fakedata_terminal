@@ -149,13 +149,13 @@ class MetricsWidgets:
         area["gauge_reads"] = area["gauge_base_reads"]
         if mode == "readouts":
             self.refresh_readout_rows(area, rows)
+        had_last_values = bool(area["gauge_last_values"])
         if not area["gauge_spark"]:
             area["gauge_spark"] = [0.5]
             for _ in range(max(7, width - 1)):
                 area["gauge_spark"].append(self.next_gauge_spark(area))
-        had_last_values = bool(area["gauge_last_values"])
         self.sync_gauge_vectors(area)
-        if not had_last_values:
+        if not had_last_values or area["gauge_next_reads_at"] <= 0.0:
             interval = read_refresh_interval(mode, role, self.area_theme(area))
             area["gauge_next_reads_at"] = (now + interval) if interval is not None else 0.0
         if mode == "gauges" and area["gauge_next_feed_at"] <= 0.0:

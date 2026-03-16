@@ -17,7 +17,7 @@ defaults:
   timing:
     speed:
       min_iterations_per_second: 1.0
-      max_iterations_per_second: 50.0
+      max_iterations_per_second: 200.0
       curve: linear
       dt_clamp_seconds: 0.5
 
@@ -57,7 +57,7 @@ widgets:
       cadence_factor: 1.00
       motion:
         units: rpm
-        factor: 1.0
+        factor: 0.09
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
@@ -72,7 +72,7 @@ widgets:
     enabled: true
     timing:
       # Ordinary steady bucket: `_steady_mode_delay(...)`
-      cadence_factor: 0.67
+      cadence_factor: 1.0
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.

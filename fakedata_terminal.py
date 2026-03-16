@@ -257,7 +257,7 @@ def _pick_factored_scene_value(scene_key: str, region_key: str, region_values: l
 
 
 def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], current_base_speed: int,
-                             current_speed_for_role) -> str | None:
+                             current_speed_for_area) -> str | None:
     if not config_scene:
         return None
 
@@ -290,7 +290,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     for area in sorted(config_scene.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
         state = area_states.get(area["name"], {})
         role = state.get("role") or ("main" if area["x"] < 0.5 else "sidebar")
-        area_speed = state.get("speed_override") or current_speed_for_role(role)
+        area_speed = current_speed_for_area(state, role)
         area_theme = area.get("theme") if area.get("theme") is not None else config_scene.get("theme")
         area_text = area.get("text") if area.get("text") is not None else scene_text
         area_colour = area.get("colour") if area.get("colour") is not None else scene_colour
@@ -671,12 +671,27 @@ def main(stdscr):
         return area
 
     current_base_speed = SPEED_ARG
-    main_speed_ratio = MAIN_SPEED_ARG / SPEED_ARG
-    sidebar_speed_ratio = SIDEBAR_SPEED_ARG / SPEED_ARG
+    def _configured_speed_for_role(role: str) -> int:
+        return MAIN_SPEED_ARG if role == "main" else SIDEBAR_SPEED_ARG
 
-    def _current_speed_for_role(role: str) -> int:
-        ratio = main_speed_ratio if role == "main" else sidebar_speed_ratio
-        return _scaled_speed(current_base_speed, ratio)
+    def _configured_speed_for_area(area: dict, role: str) -> int:
+        return int(area.get("speed_override") or _configured_speed_for_role(role))
+
+    def _current_speed_for_area(area: dict, role: str) -> int:
+        current = int(area.get("current_speed") or 0)
+        if current:
+            return current
+        configured = _configured_speed_for_area(area, role)
+        area["configured_speed"] = configured
+        area["current_speed"] = configured
+        return configured
+
+    def _sync_area_speed_state(area: dict, role: str) -> None:
+        configured = _configured_speed_for_area(area, role)
+        previous = int(area.get("configured_speed") or 0)
+        if previous != configured or not area.get("current_speed"):
+            area["configured_speed"] = configured
+            area["current_speed"] = configured
 
     def _effective_widget_name(area: dict) -> str:
         return text_widgets.effective_mode(area)
@@ -701,7 +716,8 @@ def main(stdscr):
 
     def _reset_area_timing(area: dict, now: float):
         role = area.get("role", "main")
-        area_speed = area.get("speed_override") or _current_speed_for_role(role)
+        _sync_area_speed_state(area, role)
+        area_speed = _current_speed_for_area(area, role)
         widget_name = _effective_widget_name(area)
         interval = widget_interval(widget_name, area_speed)
         area["next_update"] = schedule_next(0.0, now, interval)
@@ -715,6 +731,7 @@ def main(stdscr):
             text_widgets.ensure_cycle(area, now)
         mode = text_widgets.effective_mode(area)
         area["role"] = role
+        _sync_area_speed_state(area, role)
         family = _family_for_mode(mode)
         if family is not None:
             family.ensure(area, rows, width, role, now)
@@ -729,7 +746,7 @@ def main(stdscr):
             mode in {"gauge", "scope", "sparkline", "tunnel"}
             and str(area.get("direction_override") or "right").lower() == "none"
         )
-        area_speed = area.get("speed_override") or _current_speed_for_role(role)
+        area_speed = _current_speed_for_area(area, role)
         if not frozen_by_direction:
             area["tick"] += 1
         _ensure_area(area, rows, width, role, now)
@@ -838,6 +855,87 @@ def main(stdscr):
                 max(0, (cols - len(label)) // 2),
                 label,
                 min(len(label), cols),
+                curses.color_pair(2) | curses.A_BOLD,
+            )
+        except curses.error:
+            pass
+
+    _speed_overlay_until = 0.0
+
+    def _show_speed_overlay(now: float) -> None:
+        nonlocal _speed_overlay_until
+        _speed_overlay_until = now + 1.0
+
+    def _adjust_runtime_speeds(delta: int, now: float) -> None:
+        speeds = [int(area.get("current_speed") or 0) for area in area_states.values()]
+        speeds = [speed for speed in speeds if speed > 0]
+        if not speeds:
+            return
+        ordered = sorted(speeds)
+        mid = len(ordered) // 2
+        if len(ordered) % 2:
+            median = float(ordered[mid])
+        else:
+            median = (ordered[mid - 1] + ordered[mid]) / 2.0
+        if median <= 0.0:
+            return
+        target_median = max(1.0, min(100.0, median + delta))
+        scale = target_median / median
+        original = {
+            name: int(area.get("current_speed") or 0)
+            for name, area in area_states.items()
+            if int(area.get("current_speed") or 0) > 0
+        }
+        use_floor_collapse = delta < 0 and target_median <= 1.0
+        for area in area_states.values():
+            current = int(area.get("current_speed") or 0)
+            if current <= 0:
+                continue
+            if use_floor_collapse:
+                area["current_speed"] = max(1, current - 1)
+            else:
+                updated = max(1, min(100, round(current * scale)))
+                if delta > 0 and updated == current and current < 100:
+                    updated = current + 1
+                elif delta < 0 and updated == current and current > 1:
+                    updated = current - 1
+                area["current_speed"] = max(1, min(100, updated))
+        if delta < 0 and not use_floor_collapse:
+            changed = any(
+                int(area_states[name].get("current_speed") or 0) != speed
+                for name, speed in original.items()
+            )
+            if not changed:
+                for name, speed in original.items():
+                    area_states[name]["current_speed"] = max(1, speed - 1)
+        for area in area_states.values():
+            _reset_area_timing(area, now)
+        nonlocal current_base_speed
+        refreshed = sorted(int(area.get("current_speed") or 0) for area in area_states.values() if int(area.get("current_speed") or 0) > 0)
+        if refreshed:
+            mid = len(refreshed) // 2
+            if len(refreshed) % 2:
+                current_base_speed = refreshed[mid]
+            else:
+                current_base_speed = round((refreshed[mid - 1] + refreshed[mid]) / 2.0)
+
+    def _draw_area_speed_overlay(area: dict, area_rows: int, y: int, x: int, width: int, role: str, now: float):
+        if _showcase_state["active"] or rows < 1:
+            return
+        if now >= _speed_overlay_until:
+            return
+        if area_rows <= 0 or width < 8:
+            return
+        label = f"[{_current_speed_for_area(area, role)}]"
+        draw_w = min(len(label), max(0, cols - 1))
+        if draw_w <= 0:
+            return
+        try:
+            stdscr.addnstr(
+                y + area_rows - 1,
+                max(x, x + width - draw_w - 1),
+                label[:draw_w],
+                draw_w,
                 curses.color_pair(2) | curses.A_BOLD,
             )
         except curses.error:
@@ -1006,6 +1104,7 @@ def main(stdscr):
             if spec.get("separator_after"):
                 _draw_separator(rows, spec["width"])
             _paint_area(area, spec["height"], spec["y"], spec["x"], spec["width"], spec["role"])
+            _draw_area_speed_overlay(area, spec["height"], spec["y"], spec["x"], spec["width"], spec["role"], now)
             _draw_area_label(spec["y"], spec["x"], spec["width"], area.get("label"))
         if CONFIG_SCENE and not _demo_state["active"]:
             _draw_config_separators(area_specs)
@@ -1044,7 +1143,7 @@ def main(stdscr):
                     CONFIG_SCENE,
                     area_states,
                     current_base_speed,
-                    _current_speed_for_role,
+                    _current_speed_for_area,
                 )
             break
         if _showcase_state["active"] and key in (curses.KEY_LEFT, ord('h'), ord('H')):
@@ -1062,15 +1161,13 @@ def main(stdscr):
                 _paused = True
                 _paused_at = time.monotonic()
         elif key in (ord('+'), ord('=')):
-            current_base_speed = min(100, current_base_speed + 1)
             speed_now = time.monotonic()
-            for area in area_states.values():
-                _reset_area_timing(area, speed_now)
+            _adjust_runtime_speeds(1, speed_now)
+            _show_speed_overlay(speed_now)
         elif key == ord('-'):
-            current_base_speed = max(1, current_base_speed - 1)
             speed_now = time.monotonic()
-            for area in area_states.values():
-                _reset_area_timing(area, speed_now)
+            _adjust_runtime_speeds(-1, speed_now)
+            _show_speed_overlay(speed_now)
 
         if (not _paused and _demo_state["active"]
                 and not _demo_state["done"]
