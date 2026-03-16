@@ -217,10 +217,10 @@ def resolve_direction_motion(area: dict, widget: str, now: float) -> int:
     if direction == "none":
         area["direction_motion"] = 0
         return 0
-    if direction in {"forward", "right"}:
+    if direction == "forward":
         area["direction_motion"] = 1
         return 1
-    if direction in {"backward", "backwards", "left"}:
+    if direction == "backward":
         area["direction_motion"] = -1
         return -1
 
@@ -234,9 +234,9 @@ def resolve_direction_motion(area: dict, widget: str, now: float) -> int:
         return int(area.get("direction_motion", 1))
 
     choices = [
-        ("backward", float(settings.get("left_probability", 0.0))),
+        ("backward", float(settings.get("backward_probability", 0.0))),
         ("none", float(settings.get("none_probability", 0.0))),
-        ("forward", float(settings.get("right_probability", 1.0))),
+        ("forward", float(settings.get("forward_probability", 1.0))),
     ]
     total = sum(max(0.0, weight) for _, weight in choices)
     if total <= 0.0:

@@ -52,7 +52,7 @@ THEME_CHOICES = [
 ]
 COLOUR_HELP = ", ".join(COLOUR_CHOICES)
 CANONICAL_DIRECTION_CHOICES = ["forward", "backward", "random", "none"]
-DIRECTION_CHOICES = ["forward", "backward", "backwards", "left", "right", "random", "none"]
+DIRECTION_CHOICES = ["forward", "backward", "random", "none"]
 DIRECTION_HELP = ", ".join(CANONICAL_DIRECTION_CHOICES)
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 

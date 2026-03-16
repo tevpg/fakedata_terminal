@@ -61,12 +61,12 @@ widgets:
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   scope:
     enabled: true
@@ -76,12 +76,12 @@ widgets:
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   sparkline:
     enabled: true
@@ -91,12 +91,12 @@ widgets:
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   tunnel:
     enabled: true
@@ -106,12 +106,12 @@ widgets:
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   text_wide:
     enabled: true
@@ -136,12 +136,12 @@ widgets:
         #
         # These should be treated as initial estimates, not as faithful
         # translations.
-        left_probability: 0.12
+        backward_probability: 0.12
         none_probability: 0.10
-        right_probability: 0.78
-        left_duration_range_seconds: [1.0, 4.0]
+        forward_probability: 0.78
+        backward_duration_range_seconds: [0.25, 0.75]
         none_duration_range_seconds: [1.0, 1.0]
-        right_duration_range_seconds: [5.0, 15.0]
+        forward_duration_range_seconds: [3.5, 6.0]
 
   matrix:
     enabled: true

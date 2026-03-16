@@ -41,10 +41,7 @@ WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
 CANONICAL_DIRECTION_CHOICES = {"forward", "backward", "random", "none"}
 _DIRECTION_ALIASES = {
     "forward": "forward",
-    "right": "forward",
     "backward": "backward",
-    "backwards": "backward",
-    "left": "backward",
     "random": "random",
     "none": "none",
 }

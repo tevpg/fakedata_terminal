@@ -197,6 +197,26 @@ scenes:
         widget: text_spew
       P9:
         widget: text_scant
+  science1:
+    layout: 3x3
+    glitch: 0.0
+    theme: science
+    speed: 27
+    text: '*** DO NOT USE DOORBELL ***'
+    direction: forward
+    colour: null
+    regions:
+      P1+P4+P2+P5+P3+P6:
+        widget: text_wide
+        direction: random
+      P7:
+        widget: readouts
+        text: TIMEFLUX REDUCTIONS
+        colour: multi-normal
+      P8:
+        widget: text_spew
+      P9:
+        widget: text_scant
 
   science2:
     note: >
