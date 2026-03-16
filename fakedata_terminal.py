@@ -748,7 +748,7 @@ def main(stdscr):
         elif family is visual_widgets:
             if not (frozen_by_direction and mode in {"gauge", "scope", "tunnel"}):
                 family.update(area, rows, width, role, now)
-        elif family is gauge_widgets:
+        elif family is metrics_widgets:
             family.update(
                 area,
                 rows,
