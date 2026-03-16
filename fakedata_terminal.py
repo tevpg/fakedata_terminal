@@ -276,7 +276,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
     ]):
         scene_direction = next(iter(direction_values))
     if scene_direction is None:
-        scene_direction = "right"
+        scene_direction = "forward"
     colour_values = {
         area.get("colour")
         for area in config_scene.get("areas", [])
@@ -744,7 +744,7 @@ def main(stdscr):
             return
         frozen_by_direction = (
             mode in {"gauge", "scope", "sparkline", "tunnel"}
-            and str(area.get("direction_override") or "right").lower() == "none"
+            and str(area.get("direction_override") or "forward").lower() == "none"
         )
         area_speed = _current_speed_for_area(area, role)
         if not frozen_by_direction:

@@ -130,9 +130,9 @@ widgets:
         #
         # The values below are an approximation that fit the new shared
         # direction-reroll model:
-        # - right ~= forward/up
+        # - forward ~= forward/up
         # - none ~= pause
-        # - left ~= reverse/down
+        # - backward ~= reverse/down
         #
         # These should be treated as initial estimates, not as faithful
         # translations.

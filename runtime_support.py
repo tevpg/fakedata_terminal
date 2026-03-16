@@ -282,7 +282,8 @@ def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold
     if resolved in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}:
         return None
     default_name = normalize_colour_spec(default) or "white"
-    pair_index = COLOUR_PAIR_INDICES.get(resolved, COLOUR_PAIR_INDICES[default_name])
+    fallback_pair = COLOUR_PAIR_INDICES.get(default_name, COLOUR_PAIR_INDICES["white"])
+    pair_index = COLOUR_PAIR_INDICES.get(resolved, fallback_pair)
     attr = curses_module.color_pair(pair_index)
     if resolved in {"yellow", "bright-yellow", "bright-white"}:
         attr |= curses_module.A_BOLD

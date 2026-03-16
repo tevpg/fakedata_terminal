@@ -213,14 +213,14 @@ def gauge_radians_per_second(speed: int, *, widget: str = "gauge") -> float:
 
 
 def resolve_direction_motion(area: dict, widget: str, now: float) -> int:
-    direction = str(area.get("direction_override") or "right").lower()
+    direction = str(area.get("direction_override") or "forward").lower()
     if direction == "none":
         area["direction_motion"] = 0
         return 0
-    if direction == "right":
+    if direction in {"forward", "right"}:
         area["direction_motion"] = 1
         return 1
-    if direction == "left":
+    if direction in {"backward", "backwards", "left"}:
         area["direction_motion"] = -1
         return -1
 
@@ -234,24 +234,24 @@ def resolve_direction_motion(area: dict, widget: str, now: float) -> int:
         return int(area.get("direction_motion", 1))
 
     choices = [
-        ("left", float(settings.get("left_probability", 0.0))),
+        ("backward", float(settings.get("left_probability", 0.0))),
         ("none", float(settings.get("none_probability", 0.0))),
-        ("right", float(settings.get("right_probability", 1.0))),
+        ("forward", float(settings.get("right_probability", 1.0))),
     ]
     total = sum(max(0.0, weight) for _, weight in choices)
     if total <= 0.0:
-        picked = "right"
+        picked = "forward"
     else:
         roll = random.uniform(0.0, total)
         running = 0.0
-        picked = "right"
+        picked = "forward"
         for name, weight in choices:
             running += max(0.0, weight)
             if roll <= running:
                 picked = name
                 break
 
-    area["direction_motion"] = {"left": -1, "none": 0, "right": 1}[picked]
+    area["direction_motion"] = {"backward": -1, "none": 0, "forward": 1}[picked]
     duration_key = f"{picked}_duration_range_seconds"
     values = settings.get(duration_key, [0.5, 3.0])
     try:

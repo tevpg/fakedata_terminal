@@ -282,7 +282,7 @@ scenes:
     theme: science
     speed: 55
     text: ''
-    direction: right
+    direction: forward
     colour: green
     regions:
       P1:

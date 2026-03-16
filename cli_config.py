@@ -8,8 +8,9 @@ import shutil
 import sys
 
 try:
-    from .runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label
+    from .runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label, normalize_colour_spec
     from .scene_config import (
+        _direction_value,
         config_defaults,
         canonical_layout_name,
         config_scene_names,
@@ -25,8 +26,9 @@ try:
         widget_names,
     )
 except ImportError:
-    from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label
+    from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label, normalize_colour_spec
     from scene_config import (
+        _direction_value,
         config_defaults,
         canonical_layout_name,
         config_scene_names,
@@ -49,8 +51,9 @@ THEME_CHOICES = [
     "space", "military", "navigation", "spaceteam",
 ]
 COLOUR_HELP = ", ".join(COLOUR_CHOICES)
-DIRECTION_CHOICES = ["left", "right", "random", "none"]
-DIRECTION_HELP = ", ".join(DIRECTION_CHOICES)
+CANONICAL_DIRECTION_CHOICES = ["forward", "backward", "random", "none"]
+DIRECTION_CHOICES = ["forward", "backward", "backwards", "left", "right", "random", "none"]
+DIRECTION_HELP = ", ".join(CANONICAL_DIRECTION_CHOICES)
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -140,7 +143,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--default-colour", "--default-color", type=str, default=None, metavar="VALUE",
         help=f"Default colour for panels without a region-specific colour. Recognized: {COLOUR_HELP}.")
     parser.add_argument(
-        "--direction", type=str, default=None, metavar="VALUE", choices=DIRECTION_CHOICES,
+        "--direction", type=str, default=None, metavar="VALUE",
         help=f"Default direction for widgets that support it. Recognized: {DIRECTION_HELP}.")
     parser.add_argument(
         "--default-widget", type=str, default=None, metavar="WIDGET",
@@ -206,7 +209,7 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "text": ["speed", "theme", "text"],
         "text_scant": ["speed", "theme", "text"],
         "text_spew": ["speed", "theme", "text"],
-        "text_wide": ["speed", "theme", "text"],
+        "text_wide": ["speed", "theme", "text", "direction"],
         "tunnel": ["speed", "colour", "text", "direction"],
     }
     return widget_attrs.get(widget, ["speed"])
@@ -342,6 +345,7 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "Wide text panel with larger blocks.",
             "",
             *modifier_lines,
+            "direction controls forward, backward, or paused scrolling.",
         ],
         "tunnel": [
             "Moving wireframe tunnel.",
@@ -383,7 +387,7 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
         f"  layout: {defaults.get('layout') if defaults.get('layout') is not None else '(none)'}",
         f"  speed: {defaults.get('speed', 50)}",
         f"  colour: {default_colour if default_colour is not None else '(none)'}",
-        f"  direction: {defaults.get('direction', 'right')}",
+        f"  direction: {defaults.get('direction', 'forward')}",
         f"  widget: {defaults.get('widget') if defaults.get('widget') is not None else '(none)'}",
     ])
     return lines
@@ -508,7 +512,7 @@ def _format_modifiers_section(width: int, *, colourize: bool) -> list[str]:
     lines = ["Modifiers", "---------"]
     sections = [
         _format_modifier_subsection("Colour", _format_colour_modifier(width - 4, colourize=colourize)),
-        _format_modifier_subsection("Direction", _columnize_items(DIRECTION_CHOICES, width - 4)),
+        _format_modifier_subsection("Direction", _columnize_items(CANONICAL_DIRECTION_CHOICES, width - 4)),
         _format_modifier_subsection(
             "Theme",
             _columnize_items(THEME_CHOICES[:], width - 4),
@@ -632,6 +636,14 @@ def _parse_equals(expr: str, parser, flag_name: str) -> tuple[str, str]:
     return left, right
 
 
+def _validate_colour_value(value: str, parser, flag_name: str) -> str:
+    normalized = normalize_colour_spec(value)
+    valid_colours = {normalize_colour_spec(choice) for choice in COLOUR_CHOICES}
+    if normalized not in valid_colours:
+        parser.error(f"{flag_name} must be a recognized colour name")
+    return normalized
+
+
 def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name: str,
                           config_paths: tuple[str, ...] | None = None) -> str:
     canonical_layout = canonical_layout_name(layout_name, config_paths)
@@ -735,18 +747,19 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
     for item in region_directions:
         target, direction_name = _parse_equals(item, parser, "--region-direction")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-direction", config_paths)
-        if direction_name not in DIRECTION_CHOICES:
-            parser.error(f"--region-direction must be one of: {', '.join(DIRECTION_CHOICES)}")
+        normalized_direction = _direction_value(direction_name)
+        if normalized_direction is None:
+            parser.error(f"--region-direction must be one of: {', '.join(CANONICAL_DIRECTION_CHOICES)}")
         if normalized_target not in regions_cfg:
             parser.error(f"--region-direction target '{target}' has no matching assignment")
-        regions_cfg[normalized_target]["direction"] = direction_name
+        regions_cfg[normalized_target]["direction"] = normalized_direction
 
     for item in region_colours:
         target, colour_name = _parse_equals(item, parser, "--region-colour")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-colour", config_paths)
         if normalized_target not in regions_cfg:
             parser.error(f"--region-colour target '{target}' has no matching assignment")
-        regions_cfg[normalized_target]["colour"] = colour_name
+        regions_cfg[normalized_target]["colour"] = _validate_colour_value(colour_name, parser, "--region-colour")
 
     for item in region_images:
         target, image_path = _parse_equals(item, parser, "--region-image")
@@ -859,7 +872,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     runtime_glitch = max(0.0, configured_defaults.get("glitch", 0.0))
     runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("colour")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
-    runtime_direction = args.direction if direction_explicit and args.direction is not None else configured_defaults.get("direction", "right")
+    runtime_direction = args.direction if direction_explicit and args.direction is not None else configured_defaults.get("direction", "forward")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
     if not image_explicit:
@@ -897,7 +910,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else (base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50))
         runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
         runtime_glitch = max(0.0, args.glitch if glitch_explicit and args.glitch is not None else (base_runtime["glitch"] if base_runtime else configured_defaults.get("glitch", 0.0)))
-        runtime_direction = args.direction if direction_explicit and args.direction is not None else (base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "right"))
+        runtime_direction = args.direction if direction_explicit and args.direction is not None else (base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "forward"))
 
         has_cli_overrides = bool(
             args.layout or args.region_widget or args.region_speed or args.region_text or args.region_theme or args.region_direction or args.region_colour or args.region_image or args.theme or speed_explicit or colour_explicit or widget_explicit or direction_explicit or text_explicit or glitch_explicit
@@ -937,6 +950,13 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     if not 1 <= runtime_speed <= 100:
         parser.error("--default-speed must be between 1 and 100")
+    if runtime_default_colour is not None:
+        runtime_default_colour = _validate_colour_value(runtime_default_colour, parser, "--default-colour")
+    if direction_explicit and args.direction is not None:
+        normalized_direction = _direction_value(args.direction)
+        if normalized_direction is None:
+            parser.error(f"--direction must be one of: {', '.join(CANONICAL_DIRECTION_CHOICES)}")
+        runtime_direction = normalized_direction
     if runtime_default_widget is not None and runtime_default_widget not in widget_names(config_paths):
         parser.error(f"--default-widget must be one of: {', '.join(widget_names(config_paths))}")
     if args.life_max < 1:
@@ -1008,7 +1028,7 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(f"  {bold}theme{reset}  : {config['theme']}")
     if config.get("default_colour") is not None:
         print(f"  {bold}colour{reset} : default {config['default_colour']}")
-    print(f"  {bold}direction{reset}: {config.get('direction', 'right')}")
+    print(f"  {bold}direction{reset}: {config.get('direction', 'forward')}")
     if config.get("default_widget") is not None:
         print(f"  {bold}widget{reset} : default {config['default_widget']}")
     if config["image_paths"]:
