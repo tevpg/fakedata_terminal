@@ -23,120 +23,120 @@ scenes:
 
   clocks:
     note: >
-      12 clock gauges with varied temporal and quantum instrumentation labels.
+      12 gauge widgets with varied temporal and quantum instrumentation labels.
     layout: 4x3
     theme: science
     glitch: 0
     regions:
       P1:
-        widget: clock
+        widget: gauge
         speed: 30
         colour: cyan
         text: "PHASE DRIFT"
       P2:
-        widget: clock
+        widget: gauge
         speed: 36
         colour: amber
         text: "TAU LAG"
       P3:
-        widget: clock
+        widget: gauge
         speed: 42
         colour: magenta
         text: "QBIT SPIN"
       P4:
-        widget: clock
+        widget: gauge
         speed: 48
         colour: lime
         text: "VAC DECAY"
       P5:
-        widget: clock
+        widget: gauge
         speed: 54
         colour: orange
         text: "LENS JITTER"
       P6:
-        widget: clock
+        widget: gauge
         speed: 60
         colour: yellow
         text: "RIFT CLOCK"
       P7:
-        widget: clock
+        widget: gauge
         speed: 66
         colour: white
         text: "CAUSAL BIAS"
       P8:
-        widget: clock
+        widget: gauge
         speed: 72
         colour: purple
         text: "WAVE DELAY"
       P9:
-        widget: clock
+        widget: gauge
         speed: 78
         colour: cyan
         text: "ION PHASE"
       P10:
-        widget: clock
+        widget: gauge
         speed: 84
         colour: orange
         text: "DELTA T"
       P11:
-        widget: clock
+        widget: gauge
         speed: 92
         colour: pink
         text: "TIMEFLUX"
       P12:
-        widget: clock
+        widget: gauge
         speed: 100
         colour: grey
         text: "GRAV SHIFT"
   clocks2:
     note: >
-      12 clock gauges with varied temporal and quantum instrumentation labels.
+      12 gauge widgets with varied temporal and quantum instrumentation labels.
     layout: 4x3
     theme: science
     glitch: 0
     regions:
       P1:
-        widget: clock
+        widget: gauge
         speed: 30
         colour: cyan
         text: "PHASE DRIFT"
       P2:
-        widget: clock
+        widget: gauge
         speed: 36
         colour: amber
         text: "TAU LAG"
       P3:
-        widget: clock
+        widget: gauge
         speed: 42
         colour: magenta
         text: "QBIT SPIN"
       P4:
-        widget: clock
+        widget: gauge
         speed: 48
         colour: lime
         text: "VAC DECAY"
       P5+p6+p8+p9:
-        widget: clock
+        widget: gauge
         speed: 54
         colour: red
         text: "TEMPORAL CRASH\nIRREGULARITY WARNING"
       P7:
-        widget: clock
+        widget: gauge
         speed: 100
         colour: white
         text: "CAUSAL BIAS"
       P10:
-        widget: clock
+        widget: gauge
         speed: 84
         colour: orange
         text: "DELTA T"
       P11:
-        widget: clock
+        widget: gauge
         speed: 70
         colour: pink
         text: "TIMEFLUX"
       P12:
-        widget: clock
+        widget: gauge
         speed: 40
         colour: grey
         text: "GRAV SHIFT"
@@ -183,7 +183,7 @@ scenes:
 
   science:
     note: >
-      Derived from: --scene science --main scroller --sidebar clock --sidebar-speed 80
+      Derived from: --scene science --main scroller --sidebar gauge --sidebar-speed 80
     layout: 3x3
     theme: science
     text: "*** DO NOT USE DOORBELL ***"
@@ -200,7 +200,7 @@ scenes:
 
   science2:
     note: >
-      3x2 science layout with image centre, fast clock, and life.
+      3x2 science layout with image centre, fast gauge, and life.
     layout: 3x2
     theme: science
     regions:
@@ -236,7 +236,7 @@ scenes:
       P2:
         widget: text
       P5:
-        widget: clock
+        widget: gauge
         speed: 70
       P6:
         widget: life
@@ -333,7 +333,7 @@ scenes:
         widget: bars
         text: "LEVELS"
       P6:
-        widget: clock
+        widget: gauge
         speed: 70
 
   test5:
@@ -343,7 +343,7 @@ scenes:
     theme: military
     regions:
       T:
-        widget: oscilloscope
+        widget: scope
       B:
         widget: readouts
         text: "SYSTEMS"
@@ -376,16 +376,16 @@ scenes:
         widget: readouts
         text: "DOSING"
       P7:
-        widget: clock
+        widget: gauge
 
   gauges:
     note: >
-      Three clocks + three sparklines
+      Three gauges + three sparklines
     layout: 3x3
     theme: pharmacy
     regions:
       P1+P2:
-        widget: clock
+        widget: gauge
         speed: 40
       P3:
         widget: sweep
@@ -397,10 +397,10 @@ scenes:
         widget: sparkline
         speed: 60
       P7+P8:
-        widget: clock
+        widget: gauge
         speed: 100
       P9:
-        widget: oscilloscope
+        widget: scope
         speed: 90
 
 widgets:
@@ -427,9 +427,9 @@ widgets:
     - image
     - life
     - bars
-    - clock
+    - gauge
     - matrix
-    - oscilloscope
+    - scope
     - blocks
     - sweep
     - tunnel

@@ -80,9 +80,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --scenes\n"
             "  %(prog)s --scene test1\n"
             "  %(prog)s --config ~/.config/fakedata-terminal/scenes.yaml --scene lab\n"
-            "  %(prog)s --layout 2x2 --region-widget P1=life --region-widget P2=blank --region-widget P3=text --region-widget P4=clock\n"
+            "  %(prog)s --layout 2x2 --region-widget P1=life --region-widget P2=blank --region-widget P3=text --region-widget P4=gauge\n"
             "  %(prog)s --scene test1 --region-widget P4=matrix --region-speed P4=80\n"
-            "  %(prog)s --layout 3x3 --region-widget L2=image --region-widget R=clock "
+            "  %(prog)s --layout 3x3 --region-widget L2=image --region-widget R=gauge "
             "--region-image L2=geom_07_diamond_lattice.png --region-image L2=geom_33_torus.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -194,12 +194,12 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "bars": ["speed", "theme"],
         "blank": ["text", "colour"],
         "blocks": ["speed", "colour"],
-        "clock": ["speed", "colour", "text", "direction"],
+        "gauge": ["speed", "colour", "text", "direction"],
         "cycle": ["speed", "theme", "colour", "cycle"],
         "image": ["speed", "image"],
         "life": ["speed", "colour"],
         "matrix": ["speed"],
-        "oscilloscope": ["speed", "theme", "text", "direction"],
+        "scope": ["speed", "theme", "text", "direction"],
         "readouts": ["theme", "text", "colour"],
         "sparkline": ["speed", "theme", "text", "direction"],
         "sweep": ["speed"],
@@ -272,8 +272,8 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "",
             *modifier_lines,
         ],
-        "clock": [
-            "Large digital clock display.",
+        "gauge": [
+            "Large digital gauge display.",
             "",
             *modifier_lines,
         ],
@@ -300,7 +300,7 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "",
             *modifier_lines,
         ],
-        "oscilloscope": [
+        "scope": [
             "Sweeping signal trace.",
             "",
             *modifier_lines,

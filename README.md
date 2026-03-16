@@ -7,7 +7,7 @@ FakeData Terminal renders animated, fake telemetry screens in the terminal. It c
 - Renders multi-panel terminal scenes using `curses`
 - Drives text widgets from named theme pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and scene presets from [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml)
-- Supports widget types including `text`, `clock`, `matrix`, `bars`, `life`, `oscilloscope`, `readouts`, `sweep`, `tunnel`, and `image`
+- Supports widget types including `text`, `gauge`, `matrix`, `bars`, `life`, `scope`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset scene or build a screen explicitly with `--layout`, `--region-widget`, and `--default-*`
 - Supports widget-level fallback defaults in YAML via the top-level `widgets:` section
 
@@ -73,7 +73,7 @@ Build a layout manually:
   python3 fakedata_terminal.py \
   --layout 2x2 \
   --region-widget P1=life \
-  --region-widget P2=clock \
+  --region-widget P2=gauge \
   --region-widget P3=text \
   --region-widget P4=matrix
 ```
@@ -95,7 +95,7 @@ Run an image panel:
   python3 fakedata_terminal.py \
   --layout 3x2 \
   --region-widget P3+P4=image \
-  --region-widget P5=clock \
+  --region-widget P5=gauge \
   --region-widget P6=text \
   --region-image P3+P4=data/geom_33_torus.png
 ```
@@ -202,7 +202,7 @@ These pieces fit together in a specific order:
 - `Panel`: a single rectangular tile in a layout, usually named `P1`, `P2`, and so on.
 - `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
 - `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `P2` or `P1+P2+P3`, or by an alias defined in the layout such as `L`, `R`, `C`, or `L2`. Each region is assigned exactly one widget.
-- `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `clock`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
+- `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `gauge`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
 - `Region attributes`: options attached to one region assignment, such as `speed`, `text`, `source_theme`, `colour`, `image`, and `cycle`.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.
 - `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide theme/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, `python3 fakedata_terminal.py --scenes` to browse just the configured scene pages, and `python3 fakedata_terminal.py --widgets` to browse the widget showcase.

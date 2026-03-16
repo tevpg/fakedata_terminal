@@ -1,4 +1,4 @@
-"""Clock widget renderer extracted from VisualWidgets."""
+"""Gauge widget renderer extracted from VisualWidgets."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ except ImportError:
     from runtime_support import multi_palette_specs
 
 
-class ClockWidget:
+class GaugeWidget:
     def __init__(
         self,
         *,
@@ -53,25 +53,25 @@ class ClockWidget:
             return
         forced_spin = self.spin_for_direction(direction)
         if forced_spin:
-            area["clock_spin"] = forced_spin
+            area["gauge_spin"] = forced_spin
             area["direction_motion"] = forced_spin
-        elif now >= area["clock_next_spin_change"]:
-            area["clock_spin"] = self.choose_spin()
-            area["clock_next_spin_change"] = now + random.uniform(0.5, 3.0)
-            if area["clock_spin"] > 0:
+        elif now >= area["gauge_next_spin_change"]:
+            area["gauge_spin"] = self.choose_spin()
+            area["gauge_next_spin_change"] = now + random.uniform(0.5, 3.0)
+            if area["gauge_spin"] > 0:
                 area["direction_motion"] = 1
-            elif area["clock_spin"] < 0:
+            elif area["gauge_spin"] < 0:
                 area["direction_motion"] = -1
-        area["clock_angle"] = (area["clock_angle"] + (0.12 * area["clock_spin"])) % (math.pi * 2)
-        area["clock_tick"] += 1
+        area["gauge_angle"] = (area["gauge_angle"] + (0.12 * area["gauge_spin"])) % (math.pi * 2)
+        area["gauge_tick"] += 1
         fresh = []
-        for ang, dist, ttl in area["clock_blips"]:
+        for ang, dist, ttl in area["gauge_blips"]:
             ttl -= 1
             if ttl > 0:
                 fresh.append((ang, dist, ttl))
-        area["clock_blips"] = fresh
+        area["gauge_blips"] = fresh
         if random.random() < 0.18:
-            area["clock_blips"].append((random.uniform(0, math.pi * 2), random.uniform(0.15, 0.95), random.randint(10, 24)))
+            area["gauge_blips"].append((random.uniform(0, math.pi * 2), random.uniform(0.15, 0.95), random.randint(10, 24)))
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int) -> None:
         canvas = [[" " for _ in range(width)] for _ in range(rows)]
@@ -119,7 +119,7 @@ class ClockWidget:
         if 0 <= r_mid < rows and 0 <= c_mid < width:
             canvas[r_mid][c_mid] = "◉"
             attrs[r_mid][c_mid] = self.curses.color_pair(2) | self.curses.A_BOLD
-        for ang, dist, ttl in area["clock_blips"]:
+        for ang, dist, ttl in area["gauge_blips"]:
             px = int(round(cx + math.cos(ang) * xrad * dist))
             py = int(round(cy + math.sin(ang) * yrad * dist))
             if 0 <= py < rows and 0 <= px < width:
@@ -129,15 +129,15 @@ class ClockWidget:
                     if 0 <= ny < rows and 0 <= nx < width and canvas[ny][nx] == " ":
                         canvas[ny][nx] = "·"
                         attrs[ny][nx] = self.curses.color_pair(2)
-        clock_text_row = min(rows - 1, max(0, int(round(cy + max(1.0, yrad * 0.72)))))
-        self.draw_centered_overlay_to_canvas(area, clock_text_row, width, canvas, attrs, rows=rows, anchor="center")
+        gauge_text_row = min(rows - 1, max(0, int(round(cy + max(1.0, yrad * 0.72)))))
+        self.draw_centered_overlay_to_canvas(area, gauge_text_row, width, canvas, attrs, rows=rows, anchor="center")
         for r in range(rows):
             for c in range(width):
                 dx = (c - cx) / max(1.0, xrad)
                 dy = (r - cy) / max(1.0, yrad)
                 dist = math.sqrt(dx * dx + dy * dy)
                 ang = math.atan2(dy, dx)
-                delta = abs((ang - area["clock_angle"] + math.pi) % (math.pi * 2) - math.pi)
+                delta = abs((ang - area["gauge_angle"] + math.pi) % (math.pi * 2) - math.pi)
                 if dist <= 1.0 and delta < 0.08:
                     canvas[r][c] = "█" if delta < 0.02 else "▓"
                     attrs[r][c] = self.curses.color_pair(2)

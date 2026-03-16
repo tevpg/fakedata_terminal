@@ -297,7 +297,7 @@ def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
                 names.add(str(key))
     names.update({
         "text", "text_wide", "text_scant", "text_spew", "image", "life",
-        "bars", "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel",
+        "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
         "sparkline", "readouts", "blank", "cycle",
     })
     return sorted(names)
@@ -695,7 +695,7 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
 def _supported_widget(widget: str) -> bool:
     return widget in {
         "text", "text_wide", "text_scant", "text_spew", "image", "life",
-        "bars", "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel",
+        "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
         "sparkline", "readouts", "blank", "cycle",
     }
 

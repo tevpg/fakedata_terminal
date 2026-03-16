@@ -9,7 +9,7 @@ import time
 try:
     from .runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from .widgets_visual_blocks import BlocksWidget
-    from .widgets_visual_clock import ClockWidget
+    from .widgets_visual_gauge import GaugeWidget
     from .widgets_visual_matrix import MatrixWidget
     from .widgets_visual_scope import ScopeWidget
     from .widgets_visual_sweep import SweepWidget
@@ -17,7 +17,7 @@ try:
 except ImportError:
     from runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from widgets_visual_blocks import BlocksWidget
-    from widgets_visual_clock import ClockWidget
+    from widgets_visual_gauge import GaugeWidget
     from widgets_visual_matrix import MatrixWidget
     from widgets_visual_scope import ScopeWidget
     from widgets_visual_sweep import SweepWidget
@@ -25,7 +25,7 @@ except ImportError:
 
 
 class VisualWidgets:
-    VISUAL_MODES = {"bars", "clock", "matrix", "blocks", "sweep", "tunnel", "oscilloscope"}
+    VISUAL_MODES = {"bars", "gauge", "matrix", "blocks", "sweep", "tunnel", "scope"}
 
     def __init__(
         self,
@@ -60,7 +60,7 @@ class VisualWidgets:
             blocks_palette_specs=blocks_palette_specs,
             colour_pair_indices=COLOUR_PAIR_INDICES,
         )
-        self.clock_widget = ClockWidget(
+        self.gauge_widget = GaugeWidget(
             curses_module=curses_module,
             stdscr=stdscr,
             normalize_colour_spec=normalize_colour_spec,
@@ -171,15 +171,15 @@ class VisualWidgets:
         if direction == "none":
             area["direction_motion"] = 0
             return 0
-        forced_spin = self.clock_spin_for_direction(direction)
+        forced_spin = self.gauge_spin_for_direction(direction)
         if forced_spin:
             area["direction_motion"] = forced_spin
             return forced_spin
         current = time.time() if now is None else now
-        if current >= area["clock_next_spin_change"]:
-            area["clock_spin"] = self.choose_clock_spin()
-            area["clock_next_spin_change"] = current + random.uniform(0.5, 3.0)
-        motion = area.get("clock_spin", 1)
+        if current >= area["gauge_next_spin_change"]:
+            area["gauge_spin"] = self.choose_gauge_spin()
+            area["gauge_next_spin_change"] = current + random.uniform(0.5, 3.0)
+        motion = area.get("gauge_spin", 1)
         if motion > 0:
             area["direction_motion"] = 1
             return 1
@@ -236,18 +236,18 @@ class VisualWidgets:
         self.matrix_widget.render(area, nrows, y, x, width)
 
     @staticmethod
-    def choose_clock_spin() -> int:
-        return ClockWidget.choose_spin()
+    def choose_gauge_spin() -> int:
+        return GaugeWidget.choose_spin()
 
     @staticmethod
-    def clock_spin_for_direction(direction: str | None) -> int:
-        return ClockWidget.spin_for_direction(direction)
+    def gauge_spin_for_direction(direction: str | None) -> int:
+        return GaugeWidget.spin_for_direction(direction)
 
-    def update_clock(self, area: dict):
-        self.clock_widget.update(area)
+    def update_gauge(self, area: dict):
+        self.gauge_widget.update(area)
 
-    def repaint_clock(self, area: dict, nrows: int, y: int, x: int, width: int):
-        self.clock_widget.render(area, nrows, y, x, width)
+    def repaint_gauge(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.gauge_widget.render(area, nrows, y, x, width)
 
     def ensure_blocks(self, area: dict, rows: int, width: int):
         self.blocks_widget.ensure(area, rows, width)
@@ -371,7 +371,7 @@ class VisualWidgets:
             self.ensure_sweep(area, rows, width)
         elif mode == "tunnel":
             self.ensure_tunnel(area, rows, width)
-        elif mode == "oscilloscope" and not area["scope_warmed"]:
+        elif mode == "scope" and not area["scope_warmed"]:
             for _ in range(max(24, width + 24)):
                 self.update_scope(area, width)
             area["scope_warmed"] = True
@@ -388,8 +388,8 @@ class VisualWidgets:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.update_bars(area)
-        elif mode == "clock":
-            self.update_clock(area)
+        elif mode == "gauge":
+            self.update_gauge(area)
         elif mode == "matrix":
             self.update_matrix(area, rows, width)
         elif mode == "blocks":
@@ -398,15 +398,15 @@ class VisualWidgets:
             self.update_sweep(area, rows, width, role)
         elif mode == "tunnel":
             self.update_tunnel(area, rows, width)
-        elif mode == "oscilloscope":
+        elif mode == "scope":
             self.update_scope(area, width)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.repaint_bars(area, rows, y, x, width)
-        elif mode == "clock":
-            self.repaint_clock(area, rows, y, x, width)
+        elif mode == "gauge":
+            self.repaint_gauge(area, rows, y, x, width)
         elif mode == "matrix":
             self.repaint_matrix(area, rows, y, x, width)
         elif mode == "blocks":
@@ -415,5 +415,5 @@ class VisualWidgets:
             self.repaint_sweep(area, rows, y, x, width, role)
         elif mode == "tunnel":
             self.repaint_tunnel(area, rows, y, x, width)
-        elif mode == "oscilloscope":
+        elif mode == "scope":
             self.repaint_scope(area, rows, y, x, width)

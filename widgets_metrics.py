@@ -1,4 +1,4 @@
-"""Gauge, sparkline, and readout widget helpers for FakeData Terminal."""
+"""Metrics, sparkline, and readout widget helpers for FakeData Terminal."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ except ImportError:
     from runtime_support import multi_palette_specs
 
 
-class GaugeWidgets:
+class MetricsWidgets:
     GAUGE_MODES = {"gauges", "sparkline", "readouts"}
 
     def __init__(

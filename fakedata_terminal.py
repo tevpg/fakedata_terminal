@@ -44,7 +44,7 @@ try:
         sync_areas as sync_area_states,
         sync_cycle_start_modes as sync_cycle_start_modes,
     )
-    from .widgets_gauge import GaugeWidgets
+    from .widgets_metrics import MetricsWidgets
     from .widgets_image import ImageWidgets
     from .widgets_text import TextWidgets
     from .widgets_visual import VisualWidgets
@@ -81,7 +81,7 @@ except ImportError:
         sync_areas as sync_area_states,
         sync_cycle_start_modes as sync_cycle_start_modes,
     )
-    from widgets_gauge import GaugeWidgets
+    from widgets_metrics import MetricsWidgets
     from widgets_image import ImageWidgets
     from widgets_text import TextWidgets
     from widgets_visual import VisualWidgets
@@ -114,15 +114,15 @@ DEMO_SCENES = [
     {"theme": "medicine",   "main": "readouts",      "sidebar": "text_scant",   "duration": 10.0},
     {"theme": "pharmacy",   "main": "text",          "sidebar": "sparkline",    "duration": 10.0},
     {"theme": "spaceteam",  "main": "bars",          "sidebar": "text_wide",    "duration": 10.0},
-    {"theme": "science",    "main": "clock",         "sidebar": "matrix",       "duration": 10.0},
-    {"theme": "finance",    "main": "oscilloscope",  "sidebar": "blocks",       "duration": 10.0},
+    {"theme": "science",    "main": "gauge",         "sidebar": "matrix",       "duration": 10.0},
+    {"theme": "finance",    "main": "scope",         "sidebar": "blocks",       "duration": 10.0},
     {"theme": "science",    "main": "sweep",         "sidebar": "none",         "duration": 10.0},
     {"theme": "navigation", "main": "readouts",      "sidebar": "none",         "duration": 10.0},
 ]
 
 SIDEBAR_CYCLE_MODES = [
     "text", "text_wide", "text_spew", "bars", "text_scant",
-    "clock", "matrix", "oscilloscope", "blocks", "sweep", "tunnel",
+    "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
 ]
 
 # ── Colour pair indices ───────────────────────────────────────────────────────
@@ -418,7 +418,7 @@ def main(stdscr):
         pass
 
     TEXT_MODES = {"text", "text_wide", "text_scant", "text_spew"}
-    STEADY_MODES = {"blocks", "clock", "oscilloscope", "sweep", "image", "life", "tunnel"}
+    STEADY_MODES = {"blocks", "gauge", "scope", "sweep", "image", "life", "tunnel"}
     THEME_MODES = {"text", "text_wide", "text_scant", "bars"}
     MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>[]{}/*+-=."
     SWEEP_SYMBOLS = "∑∏∫∮√∞≈≠≤≥∂∇∈∉∩∪⊂⊃⊆⊇⊕⊗⊥∥∀∃∝∠∅∴∵≜≙⊢⊨"
@@ -534,7 +534,7 @@ def main(stdscr):
         sweep_symbols=SWEEP_SYMBOLS,
     )
 
-    gauge_widgets = GaugeWidgets(
+    metrics_widgets = MetricsWidgets(
         curses_module=curses,
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
@@ -563,7 +563,7 @@ def main(stdscr):
     widget_families = [
         text_widgets,
         visual_widgets,
-        gauge_widgets,
+        metrics_widgets,
         image_widgets,
     ]
 
@@ -665,7 +665,7 @@ def main(stdscr):
 
     def _steady_mode_delay(mode: str, speed: int) -> float:
         delay = _centre_delay(speed)
-        if mode in {"clock", "blocks", "sweep", "tunnel"}:
+        if mode in {"gauge", "blocks", "sweep", "tunnel"}:
             return delay / 1.5
         return delay
 
@@ -680,10 +680,10 @@ def main(stdscr):
         if direction == "left":
             area["direction_motion"] = -1
             return -1
-        if now >= area["clock_next_spin_change"]:
-            area["clock_spin"] = visual_widgets.choose_clock_spin()
-            area["clock_next_spin_change"] = now + random.uniform(0.5, 3.0)
-        motion = area.get("clock_spin", 1)
+        if now >= area["gauge_next_spin_change"]:
+            area["gauge_spin"] = visual_widgets.choose_gauge_spin()
+            area["gauge_next_spin_change"] = now + random.uniform(0.5, 3.0)
+        motion = area.get("gauge_spin", 1)
         if motion > 0:
             area["direction_motion"] = 1
             return 1
@@ -735,7 +735,7 @@ def main(stdscr):
         if now < area["next_update"]:
             return
         frozen_by_direction = (
-            mode in {"clock", "oscilloscope", "sparkline", "tunnel"}
+            mode in {"gauge", "scope", "sparkline", "tunnel"}
             and str(area.get("direction_override") or "right").lower() == "none"
         )
         area_speed = area.get("speed_override") or _current_speed_for_role(role)
@@ -746,7 +746,7 @@ def main(stdscr):
         if family is text_widgets:
             family.update(area, rows, width, role, now)
         elif family is visual_widgets:
-            if not (frozen_by_direction and mode in {"clock", "oscilloscope", "tunnel"}):
+            if not (frozen_by_direction and mode in {"gauge", "scope", "tunnel"}):
                 family.update(area, rows, width, role, now)
         elif family is gauge_widgets:
             family.update(
