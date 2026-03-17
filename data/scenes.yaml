@@ -30,62 +30,74 @@ scenes:
     regions:
       P1:
         widget: gauge
-        speed: 30
+        speed: 38
+        direction: random
         colour: cyan
         text: "PHASE DRIFT"
       P2:
         widget: gauge
-        speed: 36
+        speed: 28
+        direction: backward
         colour: amber
         text: "TAU LAG"
       P3:
         widget: gauge
-        speed: 42
+        speed: 29
+        direction: backward
         colour: magenta
         text: "QBIT SPIN"
       P4:
         widget: gauge
-        speed: 48
+        speed: 35
+        direction: backward
         colour: lime
         text: "VAC DECAY"
       P5:
         widget: gauge
-        speed: 54
+        speed: 17
+        direction: backward
         colour: orange
         text: "LENS JITTER"
       P6:
         widget: gauge
-        speed: 60
+        speed: 39
+        direction: forward
         colour: yellow
         text: "RIFT CLOCK"
       P7:
         widget: gauge
-        speed: 66
+        speed: 100
+        direction: forward
         colour: white
         text: "CAUSAL BIAS"
       P8:
         widget: gauge
-        speed: 72
+        speed: 64
+        direction: forward
         colour: purple
         text: "WAVE DELAY"
       P9:
         widget: gauge
-        speed: 78
+        speed: 15
+        direction: backward
         colour: cyan
         text: "ION PHASE"
       P10:
         widget: gauge
-        speed: 84
+        speed: 4
+        direction: backward
         colour: orange
         text: "DELTA T"
       P11:
         widget: gauge
-        speed: 92
+        speed: 52
+        direction: backward
         colour: pink
         text: "TIMEFLUX"
       P12:
         widget: gauge
-        speed: 100
+        speed: 10
+        direction: backward
         colour: grey
         text: "GRAV SHIFT"
   clocks2:
@@ -139,6 +151,67 @@ scenes:
         widget: gauge
         speed: 40
         colour: grey
+        text: "GRAV SHIFT"
+  clocks3:
+    note: >
+      12 gauge widgets with varied temporal and quantum instrumentation labels.
+    layout: 4x3
+    theme: science
+    glitch: 0
+    regions:
+      P1:
+        widget: gauge
+        speed: 34
+        direction: random
+        colour: bright-white
+        text: "PHASE DRIFT"
+      P2:
+        widget: gauge
+        speed: 31
+        direction: random
+        colour: bright-white
+        text: "TAU LAG"
+      P3:
+        widget: gauge
+        speed: 77
+        direction: random
+        colour: magenta
+        text: "QBIT SPIN"
+      P4:
+        widget: gauge
+        speed: 24
+        direction: random
+        colour: bright-blue
+        text: "VAC DECAY"
+      P5+p6+p8+p9:
+        widget: gauge
+        speed: 71
+        direction: random
+        colour: cyan
+        text: "TEMPORAL CRASH\nIRREGULARITY WARNING"
+      P7:
+        widget: gauge
+        speed: 18
+        direction: random
+        colour: bright-red
+        text: "CAUSAL BIAS"
+      P10:
+        widget: gauge
+        speed: 85
+        direction: random
+        colour: green
+        text: "DELTA T"
+      P11:
+        widget: gauge
+        speed: 90
+        direction: random
+        colour: bright-cyan
+        text: "TIMEFLUX"
+      P12:
+        widget: gauge
+        speed: 82
+        direction: random
+        colour: bright-purple
         text: "GRAV SHIFT"
 
   cycle9:
@@ -261,6 +334,24 @@ scenes:
       P6:
         widget: life
         speed: 90
+
+  science3:
+    layout: 2x2
+    glitch: 0.0
+    theme: military
+    regions:
+      P1+P3:
+        widget: scope
+        speed: 10
+        text: PINEAPPLE OFFSET\nWARNINGS FOR CHRON CASCADE
+        colour: null
+        direction: backward
+      P2+P4:
+        widget: blocks
+        speed: 100
+        text: ''
+        colour: multi-dim
+        direction: forward
 
   geometries:
     note: >

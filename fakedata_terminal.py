@@ -23,7 +23,17 @@ if sys.platform == "win32":
 else:
     import curses
 
-import yaml
+if sys.platform == "win32":
+    try:
+        import yaml
+    except ImportError:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "pyyaml"],
+            stdout=subprocess.DEVNULL,
+        )
+        import yaml
+else:
+    import yaml
 
 try:
     from PIL import Image

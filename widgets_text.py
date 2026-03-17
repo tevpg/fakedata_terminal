@@ -348,8 +348,8 @@ class TextWidgets:
             return
         if mode == "text_spew":
             self.scroll_text_buffer(area, mode, width, role, "up")
-        elif mode == "text_wide":
-            motion = resolve_direction_motion(area, "text_wide", now)
+        elif mode in {"text", "text_scant", "text_wide"}:
+            motion = resolve_direction_motion(area, mode, now)
             if motion < 0:
                 self.scroll_text_buffer(area, mode, width, role, "down")
             elif motion > 0:

@@ -6,8 +6,20 @@ from functools import lru_cache
 import math
 from pathlib import Path
 import random
+import subprocess
+import sys
 
-import yaml
+if sys.platform == "win32":
+    try:
+        import yaml
+    except ImportError:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "pyyaml"],
+            stdout=subprocess.DEVNULL,
+        )
+        import yaml
+else:
+    import yaml
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent

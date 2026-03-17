@@ -46,6 +46,7 @@ except ImportError:
 
 
 DEFAULT_THEME = "science"
+IMAGE_DEPENDENCY_MESSAGE = "image dependencies not met"
 THEME_CHOICES = [
     "hacker", "science", "medicine", "pharmacy", "finance",
     "space", "military", "navigation", "spaceteam",
@@ -192,6 +193,32 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
     return None
 
 
+def _degrade_image_area(area: dict, message: str) -> None:
+    area["mode"] = "blank"
+    area["image_paths"] = []
+    area["unavailable_message"] = message
+    area["static_lines"] = [message]
+    area["static_align"] = "center"
+
+
+def _degrade_runtime_image_dependencies(runtime_scene: dict, message: str) -> None:
+    for area in runtime_scene.get("areas", []):
+        if area.get("mode") == "image":
+            _degrade_image_area(area, message)
+            continue
+        if area.get("mode") == "cycle" and area.get("cycle_widgets"):
+            degraded_widgets = [
+                "blank" if widget == "image" else widget
+                for widget in area["cycle_widgets"]
+            ]
+            if degraded_widgets != area["cycle_widgets"]:
+                area["cycle_widgets"] = degraded_widgets
+                area["unavailable_message"] = message
+                area["static_lines"] = [message]
+                area["static_align"] = "center"
+    runtime_scene["image_paths"] = []
+
+
 def _widget_attribute_names(widget: str) -> list[str]:
     widget_attrs = {
         "bars": ["speed", "theme"],
@@ -206,8 +233,8 @@ def _widget_attribute_names(widget: str) -> list[str]:
         "readouts": ["theme", "text", "colour"],
         "sparkline": ["speed", "theme", "text", "direction"],
         "sweep": ["speed"],
-        "text": ["speed", "theme", "text"],
-        "text_scant": ["speed", "theme", "text"],
+        "text": ["speed", "theme", "text", "direction"],
+        "text_scant": ["speed", "theme", "text", "direction"],
         "text_spew": ["speed", "theme", "text"],
         "text_wide": ["speed", "theme", "text", "direction"],
         "tunnel": ["speed", "colour", "text", "direction"],
@@ -330,11 +357,13 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "Dense scrolling text panel.",
             "",
             *modifier_lines,
+            "direction controls forward, backward, or paused scrolling.",
         ],
         "text_scant": [
             "Sparse text panel.",
             "",
             *modifier_lines,
+            "direction controls forward, backward, or paused scrolling.",
         ],
         "text_spew": [
             "Fast noisy text output.",
@@ -965,6 +994,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         parser.error("--exit must be >= 0")
 
     image_sources = config_scene_runtime["image_paths"] if not image_explicit else image_paths
+    image_dependencies_met = image_module is not None and image_checker()
     image_mode_active = any(area["mode"] == "image" for area in config_scene_runtime["areas"])
     if args.widgets or args.scenes:
         image_mode_active = any(
@@ -974,10 +1004,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         )
     if image_mode_active and not image_paths and not any(area.get("image_paths") for area in config_scene_runtime["areas"]):
         parser.error("image mode requires --image PATH [PATH ...] or --region-image REGION=PATH")
-    if image_mode_active and image_module is None:
-        parser.error("image mode requires Pillow to be installed")
-    if image_mode_active and not image_checker():
-        parser.error("image mode requires jp2a to be installed")
+    if image_mode_active and not image_dependencies_met:
+        _degrade_runtime_image_dependencies(config_scene_runtime, IMAGE_DEPENDENCY_MESSAGE)
+        if args.widgets or args.scenes:
+            for scene in widget_showcase["scenes"]:
+                _degrade_runtime_image_dependencies(scene, IMAGE_DEPENDENCY_MESSAGE)
 
     return {
         "speed": runtime_speed,

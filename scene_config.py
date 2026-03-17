@@ -6,9 +6,21 @@ from functools import lru_cache
 import glob
 import os
 from pathlib import Path
+import subprocess
+import sys
 from typing import Any
 
-import yaml
+if sys.platform == "win32":
+    try:
+        import yaml
+    except ImportError:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "pyyaml"],
+            stdout=subprocess.DEVNULL,
+        )
+        import yaml
+else:
+    import yaml
 
 try:
     from .runtime_support import COLOUR_CHOICES, normalize_colour_spec
