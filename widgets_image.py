@@ -393,8 +393,8 @@ class ImageWidgets:
         elif mode == "life":
             self.ensure_life(area, rows, width)
 
-    def update(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
-        del role, now
+    def update(self, area: dict, rows: int, width: int, role: str, now: float | None = None, dt: float = 0.0) -> None:
+        del role, now, dt
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "image":
             self.update_image(area, rows, width)

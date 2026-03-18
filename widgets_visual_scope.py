@@ -26,8 +26,8 @@ class ScopeWidget:
         self.get_gauge_config = get_gauge_config
         self.resolved_direction_motion = resolved_direction_motion
 
-    def update(self, area: dict, width: int) -> None:
-        motion = self.resolved_direction_motion(area)
+    def update(self, area: dict, width: int, now: float) -> None:
+        motion = self.resolved_direction_motion(area, now=now)
         keep = max(12, width + 12)
         cfg = self.get_gauge_config(self.area_theme(area))
         area["scope_signal"] = cfg[1]

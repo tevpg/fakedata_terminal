@@ -17,7 +17,7 @@ defaults:
   timing:
     speed:
       min_iterations_per_second: 1.0
-      max_iterations_per_second: 50.0
+      max_iterations_per_second: 200.0
       curve: linear
       dt_clamp_seconds: 0.5
 
@@ -27,6 +27,15 @@ widgets:
     timing:
       # Burst-driven; every update scrolls.
       cadence_factor: 0.55
+    behavior:
+      direction_random:
+        # First-pass shared text reroll model.
+        backward_probability: 0.12
+        none_probability: 0.10
+        forward_probability: 0.78
+        backward_duration_range_seconds: [1.0, 4.0]
+        none_duration_range_seconds: [1.0, 1.0]
+        forward_duration_range_seconds: [5.0, 15.0]
 
   text_scant:
     enabled: true
@@ -34,6 +43,15 @@ widgets:
       # Burst-driven, but only scrolls every 2 ticks in main and every 5 ticks
       # in sidebar. This value is an intentional compromise estimate.
       cadence_factor: 0.25
+    behavior:
+      direction_random:
+        # First-pass shared text reroll model.
+        backward_probability: 0.12
+        none_probability: 0.10
+        forward_probability: 0.78
+        backward_duration_range_seconds: [1.0, 4.0]
+        none_duration_range_seconds: [1.0, 1.0]
+        forward_duration_range_seconds: [5.0, 15.0]
 
   text_spew:
     enabled: true
@@ -57,31 +75,31 @@ widgets:
       cadence_factor: 1.00
       motion:
         units: rpm
-        factor: 1.0
+        factor: 0.09
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   scope:
     enabled: true
     timing:
       # Ordinary steady bucket: `_steady_mode_delay(...)`
-      cadence_factor: 0.67
+      cadence_factor: 1.0
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   sparkline:
     enabled: true
@@ -91,12 +109,12 @@ widgets:
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   tunnel:
     enabled: true
@@ -106,12 +124,12 @@ widgets:
     behavior:
       direction_random:
         # Taken directly from the current gauge/scope/tunnel-style direction logic.
-        left_probability: 0.40
+        backward_probability: 0.40
         none_probability: 0.10
-        right_probability: 0.50
-        left_duration_range_seconds: [0.5, 3.0]
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
-        right_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   text_wide:
     enabled: true
@@ -130,18 +148,18 @@ widgets:
         #
         # The values below are an approximation that fit the new shared
         # direction-reroll model:
-        # - right ~= forward/up
+        # - forward ~= forward/up
         # - none ~= pause
-        # - left ~= reverse/down
+        # - backward ~= reverse/down
         #
         # These should be treated as initial estimates, not as faithful
         # translations.
-        left_probability: 0.12
+        backward_probability: 0.12
         none_probability: 0.10
-        right_probability: 0.78
-        left_duration_range_seconds: [1.0, 4.0]
+        forward_probability: 0.78
+        backward_duration_range_seconds: [0.25, 0.75]
         none_duration_range_seconds: [1.0, 1.0]
-        right_duration_range_seconds: [5.0, 15.0]
+        forward_duration_range_seconds: [3.5, 6.0]
 
   matrix:
     enabled: true
@@ -165,7 +183,7 @@ widgets:
     enabled: true
     timing:
       # Burst-driven panel updates; read refresh and feed scroll are separate timers.
-      cadence_factor: 0.55
+      cadence_factor: 0.75
     behavior:
       read_refresh:
         # First-pass simplification of the current per-role refresh logic.

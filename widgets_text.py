@@ -7,7 +7,11 @@ import random
 import shutil
 import subprocess
 import sys
-import time
+
+try:
+    from .timing_support import cycle_start_deadline, next_cycle_deadline, resolve_direction_motion
+except ImportError:
+    from timing_support import cycle_start_deadline, next_cycle_deadline, resolve_direction_motion
 
 
 class TextWidgets:
@@ -234,7 +238,7 @@ class TextWidgets:
             return area.get("cycle_current") or "text"
         return area["mode"]
 
-    def ensure_cycle(self, area: dict):
+    def ensure_cycle(self, area: dict, now: float):
         include_image = bool(area.get("image_paths") or self.image_paths_getter())
         desired = area.get("cycle_widgets") or self.list_cycle_widget_names(include_image)
         if not include_image:
@@ -250,17 +254,17 @@ class TextWidgets:
             random.shuffle(area["cycle_order"])
             area["cycle_idx"] = 0
             area["cycle_current"] = area["cycle_order"][0] if area["cycle_order"] else "text"
-            area["cycle_next_change"] = time.time() + random.uniform(0.0, 10.0)
+            area["cycle_next_change"] = cycle_start_deadline(now)
             area["label"] = area["cycle_current"]
             area["next_update"] = 0.0
 
-    def advance_cycle(self, area: dict, forbidden: set[str] | None = None):
-        self.ensure_cycle(area)
+    def advance_cycle(self, area: dict, now: float, forbidden: set[str] | None = None):
+        self.ensure_cycle(area, now)
         forbidden = forbidden or set()
         if not area["cycle_order"]:
             area["cycle_current"] = "text"
             area["label"] = "text"
-            area["cycle_next_change"] = time.time() + 10.0
+            area["cycle_next_change"] = next_cycle_deadline(now)
             return
         candidates = [name for name in area["cycle_catalog"] if name not in forbidden and name != area.get("cycle_current")]
         if not candidates:
@@ -272,10 +276,10 @@ class TextWidgets:
         if next_widget in area["cycle_order"]:
             area["cycle_idx"] = area["cycle_order"].index(next_widget)
         area["label"] = area["cycle_current"]
-        area["cycle_next_change"] = time.time() + 10.0
+        area["cycle_next_change"] = next_cycle_deadline(now)
         area["next_update"] = 0.0
 
-    def ensure_text_buffer(self, area: dict, rows: int, mode: str, width: int, role: str):
+    def ensure_text_buffer(self, area: dict, rows: int, mode: str, width: int, role: str, now: float):
         buf = area["buf"]
         while len(buf) < rows:
             if mode == "text_spew":
@@ -284,8 +288,8 @@ class TextWidgets:
                 buf.append(self.new_area_text_entry(mode, width, area, role))
         while len(buf) > rows:
             buf.pop(0)
-        if mode == "text_wide" and area["textwall_next_reverse_at"] <= 0.0:
-            area["textwall_next_reverse_at"] = time.time() + random.uniform(5.0, 15.0)
+        if mode == "text_wide":
+            resolve_direction_motion(area, "text_wide", now)
 
     def scroll_text_buffer(self, area: dict, mode: str, width: int, role: str, direction: str):
         if not area["buf"]:
@@ -332,38 +336,26 @@ class TextWidgets:
         return mode in self.TEXT_MODES
 
     def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
-        del now
+        now = 0.0 if now is None else now
         mode = self.effective_mode(area)
         if mode in self.TEXT_MODES:
-            self.ensure_text_buffer(area, rows, mode, width, role)
+            self.ensure_text_buffer(area, rows, mode, width, role, now)
 
-    def update(self, area: dict, rows: int, width: int, role: str, now: float) -> None:
-        del rows
+    def update(self, area: dict, rows: int, width: int, role: str, now: float, dt: float) -> None:
+        del rows, dt
         mode = self.effective_mode(area)
         if mode not in self.TEXT_MODES:
             return
         if mode == "text_spew":
             self.scroll_text_buffer(area, mode, width, role, "up")
-        elif mode == "text_wide":
-            if area["textwall_reverse_left"] > 0:
+        elif mode in {"text", "text_scant", "text_wide"}:
+            motion = resolve_direction_motion(area, mode, now)
+            if motion < 0:
                 self.scroll_text_buffer(area, mode, width, role, "down")
-                area["textwall_reverse_left"] -= 1
-                if area["textwall_reverse_left"] <= 0:
-                    area["textwall_next_reverse_at"] = now + random.uniform(5.0, 15.0)
-            elif now >= area["textwall_next_reverse_at"]:
-                if area["textwall_pause_until"] <= 0.0:
-                    area["textwall_pause_until"] = now + 1.0
-                elif now >= area["textwall_pause_until"]:
-                    area["textwall_pause_until"] = 0.0
-                    area["textwall_reverse_left"] = random.randint(10, 80)
-                    self.scroll_text_buffer(area, mode, width, role, "down")
-                    area["textwall_reverse_left"] -= 1
-            else:
+            elif motion > 0:
                 self.scroll_text_buffer(area, mode, width, role, "up")
         else:
-            interval = 1 if mode == "text" else (5 if role == "sidebar" else 2)
-            if area["tick"] % interval == 0:
-                self.scroll_text_buffer(area, mode, width, role, "up")
+            self.scroll_text_buffer(area, mode, width, role, "up")
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         del role

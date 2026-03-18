@@ -58,13 +58,14 @@ class TunnelWidget:
         area["tunnel_colour_sig"] = None
         area["tunnel_band_attrs"] = []
 
-    def update(self, area: dict, rows: int, width: int) -> None:
+    def update(self, area: dict, rows: int, width: int, now: float) -> None:
         self.ensure(area, rows, width)
+        self.resolved_direction_motion(area, now=now)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int) -> None:
         self.ensure(area, rows, width)
         colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "multi"
-        motion = self.resolved_direction_motion(area)
+        motion = area.get("direction_motion", 1)
         single_attr = self.colour_attr_from_spec(self.curses, colour_spec, default="green", bold=True)
         palette_specs = tunnel_palette_specs(colour_spec)
         band_attrs = self.ensure_multi_attrs(area, colour_spec, palette_specs)

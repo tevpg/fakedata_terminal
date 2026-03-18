@@ -282,7 +282,8 @@ def colour_attr_from_spec(curses_module, spec: str | None, *, default: str, bold
     if resolved in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}:
         return None
     default_name = normalize_colour_spec(default) or "white"
-    pair_index = COLOUR_PAIR_INDICES.get(resolved, COLOUR_PAIR_INDICES[default_name])
+    fallback_pair = COLOUR_PAIR_INDICES.get(default_name, COLOUR_PAIR_INDICES["white"])
+    pair_index = COLOUR_PAIR_INDICES.get(resolved, fallback_pair)
     attr = curses_module.color_pair(pair_index)
     if resolved in {"yellow", "bright-yellow", "bright-white"}:
         attr |= curses_module.A_BOLD
@@ -477,6 +478,7 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "gauge_tick": 0,
         "gauge_spin": 1,
         "gauge_next_spin_change": 0.0,
+        "direction_next_change": 0.0,
         "direction_motion": 1,
         "direction_motion_prev": 1,
         "gauge_tick": 0,
@@ -493,6 +495,7 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "gauge_arrows": [],
         "gauge_last_values": [],
         "gauge_next_reads_at": 0.0,
+        "gauge_next_feed_at": 0.0,
         "gauge_count": 0,
         "gauge_prime_idx": 0,
         "blocks_bg": random.choice([1, 3, 7]),
@@ -509,6 +512,7 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "tunnel_palette_idx": random.randrange(6),
         "tunnel_drift_phase": random.uniform(0.0, math.tau),
         "next_update": 0.0,
+        "last_update_at": 0.0,
         "burst_fn": None,
         "burst_delay": 0.0,
         "burst_left": 0,
@@ -530,6 +534,8 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "textwall_next_reverse_at": 0.0,
         "textwall_pause_until": 0.0,
         "textwall_reverse_left": 0,
+        "configured_speed": 0,
+        "current_speed": 0,
         "theme_override": theme_name,
         "text_override": None,
         "direction_override": None,
