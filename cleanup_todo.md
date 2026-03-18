@@ -46,9 +46,10 @@ This separates:
 
 Standardize on one term per concept.
 
-- Use `theme`, not `source_theme`.
+- Use `theme`.
 - Use `color`, not mixed `colour`/`color`, internally.
-- Maintain `colour` as a fully supported input alias in YAML and CLI.
+- Use `colour` in user-facing YAML, CLI, docs, and exports.
+- Maintain `color` as a fully supported input alias in YAML and CLI.
 - Normalize both `color` and `colour` to internal `color`.
 - Use `widget`, `layout`, `scene`, `region` consistently in docs and CLI.
 - Use `modifiers` as the umbrella term for configurable per-widget/per-region options.
@@ -58,7 +59,7 @@ Recommended modifier names:
 - `speed`
 - `theme`
 - `text`
-- `color`
+- `colour`
 - `direction`
 - `image`
 - `cycle`
@@ -166,7 +167,7 @@ scenes:
       P7:
         widget: readouts
         text: TIMEFLUX REDUCTIONS
-        color: multi-normal
+        colour: multi-normal
 ```
 
 Rules:
@@ -238,7 +239,7 @@ widgets:
 
 In this model:
 
-- `speed` and `color` are region modifiers
+- `speed` and `colour` are region modifiers
 - `max_iterations` is a widget characteristic
 
 Other widget-owned behavior properties that should remain widget-level only:
@@ -278,7 +279,7 @@ Decide this explicitly.
 
 Recommended rule:
 
-- `speed`, `theme`, `text`, `color`, `direction` may be scene-wide and region-specific.
+- `speed`, `theme`, `text`, `colour`, `direction` may be scene-wide and region-specific.
 - `image` may be scene-wide as a fallback and region-specific.
 - `cycle` may be scene-wide only if every cycle widget should inherit it; otherwise region-only.
 
@@ -292,7 +293,7 @@ If scenes should tune cycle cadence, expose it as a supported scene/region modif
 
 CLI naming mixes three models:
 
-- `--default-speed`, `--default-color`, `--default-widget`
+- `--default-speed`, `--default-colour`, `--default-widget`
 - `--theme`, `--text`, `--image`, `--direction`
 - `--region-*`
 
@@ -312,7 +313,7 @@ Use parallel naming:
 - `--scene-speed`
 - `--scene-theme`
 - `--scene-text`
-- `--scene-color`
+- `--scene-colour`
 - `--scene-direction`
 - `--scene-image`
 - `--default-widget`
@@ -320,7 +321,7 @@ Use parallel naming:
 - `--region-speed`
 - `--region-theme`
 - `--region-text`
-- `--region-color`
+- `--region-colour`
 - `--region-direction`
 - `--region-image`
 
@@ -337,7 +338,7 @@ Compatibility plan:
   - `--text` -> `--scene-text`
   - `--direction` -> `--scene-direction`
   - `--image` -> `--scene-image`
-  - `--default-colour` -> `--scene-color` or `--default-color`, depending on final meaning
+  - `--default-colour` -> `--scene-colour` or `--default-colour`, depending on final meaning
 - Emit deprecation warnings before removing old names.
 
 
@@ -383,7 +384,7 @@ Update docs to match the normalized model.
 Tasks:
 
 - document `theme`, not `source_theme`
-- document `color`, with `colour` as compatibility alias if retained
+- document `colour` as the canonical public spelling, with `color` as a supported alias
 - remove references to nonexistent `cycle.duration`
 - document whether cycle timing is widget behavior or scene modifier
 - document exact precedence order once finalized
@@ -404,22 +405,21 @@ Completed:
 - Removed the stale `cycle.duration` help reference.
 - Removed packaged non-scene widget metadata from `data/scenes.yaml`.
 - Switched widget names/defaults to resolve through shared widget metadata.
-- Added internal `theme` alias support alongside `source_theme`.
+- Removed `source_theme`; `theme` is now the only theme key in config.
 - Consolidated runtime area/scene precedence resolution in `scene_config.py` through shared helpers, without changing behavior.
 
 Not completed:
 
 - Runtime enforcement of `enabled`
-- Canonical key renames (`theme`, `color`)
+- Canonical internal key renames (`theme`, `color`)
 - CLI renaming
 - Full precedence/schema cleanup
 
 ### Stage 1: Naming Cleanup
 
-- Add `theme` as the canonical YAML key.
-- Accept `source_theme` as a legacy alias.
-- Add `color` as the canonical YAML/CLI/docs spelling.
-- Keep `colour` as a fully supported input alias during and after migration.
+- Use `theme` as the only YAML key for theme selection/override.
+- Use `colour` as the canonical YAML/CLI/docs spelling.
+- Keep `color` as a fully supported input alias during and after migration.
 - Update README and showcase text.
 
 
@@ -441,7 +441,7 @@ Not completed:
 
 - Introduce `scenes.<name>.defaults`.
 - Make scene-wide modifier resolution uniform.
-- Remove remaining ad hoc post-processing like special default-color passes if no longer needed.
+- Remove remaining ad hoc post-processing like special default-colour passes if no longer needed.
 
 
 ### Stage 5: CLI Rename and Alias Period
@@ -463,8 +463,7 @@ Not completed:
 2. Remove non-scene metadata from `data/scenes.yaml`.
 
 3. Introduce normalized key aliases:
-   - `source_theme` -> `theme`
-   - `colour` -> `color`
+   - `colour` -> internal `color`
 
 4. Make precedence resolution explicit in one helper instead of spreading it across:
    - scene config resolution
@@ -517,7 +516,7 @@ Why this is the right first slice:
 
 1. Should cycle timing be scene-configurable, or remain widget behavior only?
 2. Should image source selection support the same full structure on CLI as YAML?
-3. Should `color` become the only public spelling, or should both stay first-class?
+3. Should `colour` remain the canonical public spelling while `color` stays a supported alias?
 4. Should scene-wide defaults live under `scenes.<name>.defaults`, or continue as direct scene fields?
 
 
@@ -528,7 +527,7 @@ Use this combination:
 - `layouts.yaml` for layout geometry only
 - `widgets.yaml` for widget metadata/defaults/behavior
 - `scenes.yaml` for app defaults and composed scenes
-- `theme` and `color` as canonical names
+- `theme` and `colour` as canonical public names
 - `--scene-*` plus `--region-*` as canonical CLI naming
 - one generated widget capability registry as the source of truth
 

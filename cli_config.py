@@ -236,7 +236,7 @@ def _format_widget_catalog_entry(widget: str) -> str:
 def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
     config_map = {
         "speed": "speed",
-        "theme": "source_theme",
+        "theme": "theme",
         "text": "text",
         "colour": "colour",
         "direction": "direction",
@@ -391,7 +391,7 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     lines.extend(["", "Config files:"])
     lines.extend(f"  {path}" for path in config_paths)
     defaults = config_defaults(config_paths)
-    default_colour = defaults.get("colour")
+    default_colour = defaults.get("color")
     if colourize and default_colour:
         default_colour = ansi_colour_label(str(default_colour), is_tty=sys.stdout.isatty())
     lines.extend([
@@ -529,7 +529,7 @@ def _format_modifiers_section(width: int, *, colourize: bool) -> list[str]:
         _format_modifier_subsection(
             "Theme",
             _columnize_items(THEME_CHOICES[:], width - 4),
-            note="theme/source vocabulary and behavior profile",
+            note="theme vocabulary and behavior profile",
         ),
         _format_modifier_subsection("Speed", ["1..100"], note="widget speed range"),
         _format_modifier_subsection("Text", ["use custom text in the widget"]),
@@ -685,7 +685,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
             if area.get("text"):
                 entry["text"] = area["text"]
             if area.get("theme"):
-                entry["source_theme"] = area["theme"]
+                entry["theme"] = area["theme"]
             if area.get("direction") and area.get("direction") != base_scene_direction:
                 entry["direction"] = area["direction"]
             if area.get("colour"):
@@ -755,7 +755,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
             parser.error(f"--region-theme must be one of: {', '.join(THEME_CHOICES)}")
         if normalized_target not in regions_cfg:
             parser.error(f"--region-theme target '{target}' has no matching assignment")
-        regions_cfg[normalized_target]["source_theme"] = theme_name
+        regions_cfg[normalized_target]["theme"] = theme_name
 
     for item in region_directions:
         target, direction_name = _parse_equals(item, parser, "--region-direction")
@@ -884,7 +884,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     runtime_text = args.text.strip() if text_explicit and args.text is not None else ""
     runtime_theme = args.theme or configured_defaults.get("theme", DEFAULT_THEME)
     runtime_glitch = max(0.0, configured_defaults.get("glitch", 0.0))
-    runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("colour")
+    runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("color")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
     runtime_direction = args.direction if direction_explicit and args.direction is not None else configured_defaults.get("direction", "forward")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}

@@ -48,7 +48,7 @@ DEFAULT_KEYS = {"layout", "theme", "speed", "image", "widget", "colour", "color"
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}
-REGION_KEYS = {"widget", "speed", "text", "source_theme", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
+REGION_KEYS = {"widget", "speed", "text", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
@@ -350,16 +350,16 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
     defaults = catalog.get("defaults", {})
     if not isinstance(defaults, dict):
         defaults = {}
-    colour = defaults.get("colour")
-    if colour is None:
-        colour = defaults.get("color")
+    color = defaults.get("color")
+    if color is None:
+        color = defaults.get("colour")
     layout_name = defaults.get("layout")
     return {
         "layout": canonical_layout_name(layout_name, config_paths) if layout_name is not None else None,
         "theme": defaults.get("theme", "science"),
         "speed": defaults.get("speed", 50),
         "widget": defaults.get("widget"),
-        "colour": colour,
+        "color": color,
         "image": defaults.get("image"),
         "glitch": defaults.get("glitch", 0.0),
         "direction": _direction_value(defaults.get("direction")) or "forward",
@@ -373,7 +373,7 @@ def _direction_value(value: Any) -> str | None:
     return _DIRECTION_ALIASES.get(text)
 
 
-def _colour_value(value: Any) -> str | None:
+def _color_value(value: Any) -> str | None:
     if value is None:
         return None
     normalized = normalize_colour_spec(str(value))
@@ -400,7 +400,6 @@ def _config_key_to_modifier(key: str) -> str | None:
     mapping = {
         "speed": "speed",
         "text": "text",
-        "source_theme": "theme",
         "theme": "theme",
         "direction": "direction",
         "colour": "color",
@@ -461,8 +460,8 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                     if glitch_value < 0:
                         issues.append(f"{config_label}: defaults.glitch must be >= 0")
             _speed_issues(defaults.get("speed"), f"{config_label}: defaults.speed", issues)
-            defaults_colour = defaults.get("colour", defaults.get("color"))
-            if defaults_colour is not None and _colour_value(defaults_colour) is None:
+            defaults_color = defaults.get("color", defaults.get("colour"))
+            if defaults_color is not None and _color_value(defaults_color) is None:
                 issues.append(f"{config_label}: defaults.colour must be a recognized colour name")
             direction = defaults.get("direction")
             if direction is not None and _direction_value(direction) is None:
@@ -520,8 +519,8 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         if glitch_value < 0:
                             issues.append(f"{config_label}: scene '{scene_name}' glitch must be >= 0")
                 _speed_issues(scene_cfg.get("speed"), f"{config_label}: scene '{scene_name}' speed", issues)
-                scene_colour = scene_cfg.get("colour", scene_cfg.get("color"))
-                if scene_colour is not None and _colour_value(scene_colour) is None:
+                scene_color = scene_cfg.get("color", scene_cfg.get("colour"))
+                if scene_color is not None and _color_value(scene_color) is None:
                     issues.append(f"{config_label}: scene '{scene_name}' colour must be a recognized colour name")
                 direction = scene_cfg.get("direction")
                 if direction is not None and _direction_value(direction) is None:
@@ -540,8 +539,8 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         continue
                     _unknown_keys(region_cfg, REGION_KEYS, f"scenes.{scene_name}.regions.{region_name}", issues)
                     _speed_issues(region_cfg.get("speed"), f"{config_label}: scene '{scene_name}' region '{region_name}' speed", issues)
-                    region_colour = region_cfg.get("colour", region_cfg.get("color"))
-                    if region_colour is not None and _colour_value(region_colour) is None:
+                    region_color = region_cfg.get("color", region_cfg.get("colour"))
+                    if region_color is not None and _color_value(region_color) is None:
                         issues.append(
                             f"{config_label}: scene '{scene_name}' region '{region_name}' colour must be a recognized colour name"
                         )
@@ -624,8 +623,8 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 )
                 _unknown_keys(widget_cfg, WIDGET_DEFAULT_KEYS, f"widgets.{widget_name}", issues)
                 _speed_issues(widget_cfg.get("speed"), f"{config_label}: widgets.{widget_name}.speed", issues)
-                widget_colour = widget_cfg.get("colour", widget_cfg.get("color"))
-                if widget_colour is not None and _colour_value(widget_colour) is None:
+                widget_color = widget_cfg.get("color", widget_cfg.get("colour"))
+                if widget_color is not None and _color_value(widget_color) is None:
                     issues.append(f"{config_label}: widgets.{widget_name}.colour must be a recognized colour name")
                 direction = widget_cfg.get("direction")
                 if direction is not None and _direction_value(direction) is None:
@@ -832,8 +831,6 @@ def _region_theme(region_cfg: Any) -> str | None:
     if not isinstance(region_cfg, dict):
         return None
     value = region_cfg.get("theme")
-    if value is None:
-        value = region_cfg.get("source_theme")
     return str(value) if value is not None else None
 
 
@@ -845,7 +842,7 @@ def _first_non_none(*values: Any) -> Any:
 
 
 def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, Any], *,
-                            default_colour: str | None, scene_direction: str, default_images: list[str]) -> dict[str, Any]:
+                            default_color: str | None, scene_direction: str, default_images: list[str]) -> dict[str, Any]:
     area_images: list[str] = []
     if widget == "image":
         area_images = _region_image_paths(region_cfg)
@@ -868,7 +865,7 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
             widget_cfg.get("text"),
         ),
         "theme": _first_non_none(_region_theme(region_cfg), _region_theme(widget_cfg)),
-        "colour": _first_non_none(_region_colour(region_cfg), _region_colour(widget_cfg), default_colour),
+        "color": _first_non_none(_region_color(region_cfg), _region_color(widget_cfg), default_color),
         "direction": _first_non_none(_region_direction(region_cfg), _region_direction(widget_cfg), scene_direction),
         "image_paths": area_images,
         "cycle_widgets": cycle_widgets,
@@ -888,7 +885,7 @@ def _build_area_definition(*, name: str, widget: str, panels: list[str], rect: d
         "speed": modifiers["speed"],
         "text": modifiers["text"],
         "theme": modifiers["theme"],
-        "colour": modifiers["colour"],
+        "colour": modifiers["color"],
         "direction": modifiers["direction"],
         "image_paths": modifiers["image_paths"],
         "cycle_widgets": modifiers["cycle_widgets"],
@@ -906,7 +903,7 @@ def _resolve_scene_runtime_defaults(scene_cfg: dict[str, Any], defaults: dict[st
         "text": scene_cfg.get("text", ""),
         "glitch": scene_cfg.get("glitch", defaults.get("glitch", 0.0)),
         "default_widget": defaults.get("widget"),
-        "default_colour": _region_colour(scene_cfg) or defaults.get("colour"),
+        "default_color": _region_color(scene_cfg) or defaults.get("color"),
         "direction": _region_direction(scene_cfg) or defaults.get("direction", "forward"),
     }
 
@@ -1018,12 +1015,12 @@ def _region_cycle_widgets(region_cfg: Any) -> list[str]:
     return [str(widget) for widget in widgets]
 
 
-def _region_colour(region_cfg: Any) -> str | None:
+def _region_color(region_cfg: Any) -> str | None:
     if not isinstance(region_cfg, dict):
         return None
-    value = region_cfg.get("colour")
+    value = region_cfg.get("color")
     if value is None:
-        value = region_cfg.get("color")
+        value = region_cfg.get("colour")
     return str(value) if value is not None else None
 
 
@@ -1052,7 +1049,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
 
     scene_speed = scene_cfg.get("speed", defaults.get("speed", 50))
     theme = scene_cfg.get("theme", defaults.get("theme", "science"))
-    scene_colour = _region_colour(scene_cfg) or defaults.get("colour")
+    scene_color = _region_color(scene_cfg) or defaults.get("color", defaults.get("colour"))
 
     if layout == "full":
         full_cfg = regions.get("full")
@@ -1070,7 +1067,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             "main_speed": full_cfg.get("speed") if isinstance(full_cfg, dict) else None,
             "sidebar_speed": None,
             "text": scene_cfg.get("text", ""),
-            "colour": scene_colour,
+            "colour": scene_color,
             "image_paths": _expand_image_spec(full_cfg.get("image")) if isinstance(full_cfg, dict) else [],
         }
 
@@ -1094,7 +1091,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             "main_speed": left_cfg.get("speed") if isinstance(left_cfg, dict) else None,
             "sidebar_speed": right_cfg.get("speed") if isinstance(right_cfg, dict) else None,
             "text": scene_cfg.get("text", ""),
-            "colour": scene_colour,
+            "colour": scene_color,
             "image_paths": (
                 _expand_image_spec(left_cfg.get("image")) if left_widget == "image" and isinstance(left_cfg, dict) else
                 _expand_image_spec(right_cfg.get("image")) if right_widget == "image" and isinstance(right_cfg, dict) else
@@ -1143,7 +1140,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                            regions_cfg: dict[str, Any], parser, *,
                            theme: str, speed: int | float, text: str,
                            glitch: int | float = 0.0,
-                           default_widget: str | None = None, default_colour: str | None = None,
+                           default_widget: str | None = None, default_color: str | None = None,
                            direction: str = "forward",
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
@@ -1169,7 +1166,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
             widget,
             region_cfg,
             widget_cfg,
-            default_colour=default_colour,
+            default_color=default_color,
             scene_direction=scene_direction,
             default_images=default_images,
         )
@@ -1204,7 +1201,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 default_widget,
                 None,
                 widget_cfg,
-                default_colour=default_colour,
+                default_color=default_color,
                 scene_direction=scene_direction,
                 default_images=default_images,
             )
@@ -1241,7 +1238,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
                            scene_name: str = "<cli>", theme: str = "science",
                            speed: int | float = 50, text: str = "",
                            glitch: int | float = 0.0,
-                           default_widget: str | None = None, default_colour: str | None = None,
+                           default_widget: str | None = None, default_color: str | None = None,
                            direction: str = "forward",
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
@@ -1253,7 +1250,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     return _resolve_runtime_scene(
         scene_name, canonical_name, layout_cfg, regions_cfg, parser,
         theme=theme, speed=speed, text=text, glitch=glitch,
-        default_widget=default_widget, default_colour=default_colour, direction=direction,
+        default_widget=default_widget, default_color=default_color, direction=direction,
         config_paths=config_paths,
     )
 
@@ -1283,7 +1280,7 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
         text=resolved["text"],
         glitch=resolved["glitch"],
         default_widget=resolved["default_widget"],
-        default_colour=resolved["default_colour"],
+        default_color=resolved["default_color"],
         direction=resolved["direction"],
         config_paths=config_paths,
     )

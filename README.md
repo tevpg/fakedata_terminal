@@ -138,7 +138,7 @@ The runtime is config-first:
 - Regions alias one or more panels
 - Scenes bind widgets and options to regions
 - Config precedence is: packaged config, then local overlays, then CLI flags
-- Widget defaults can supply fallback `speed`, `text`, `colour`, `source_theme`, `image`, and `cycle` settings per widget type
+- Widget defaults can supply fallback `speed`, `text`, `colour`, `theme`, `image`, and `cycle` settings per widget type. `color` is also accepted as an alias.
 
 The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/scenes.yaml`](/home/tags/fakedata_terminal/data/scenes.yaml). Validation, overlay merging, and runtime adaptation are handled in [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
 
@@ -169,7 +169,7 @@ widgets:
     speed: 65
 
   readouts:
-    source_theme: finance
+    theme: finance
 
   image:
     image:
@@ -184,8 +184,8 @@ Supported widget-default keys are:
 
 - `speed`
 - `text`
-- `source_theme`
-- `colour` or `color`
+- `theme`
+- `colour` (`color` also accepted)
 - `image`
 - `cycle`
 
@@ -203,7 +203,7 @@ These pieces fit together in a specific order:
 - `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
 - `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `P2` or `P1+P2+P3`, or by an alias defined in the layout such as `L`, `R`, `C`, or `L2`. Each region is assigned exactly one widget.
 - `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `gauge`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
-- `Region attributes`: options attached to one region assignment, such as `speed`, `text`, `source_theme`, `colour`, `image`, and `cycle`.
+- `Region attributes`: options attached to one region assignment, such as `speed`, `text`, `theme`, `colour`, `image`, and `cycle`. `color` is also accepted as an alias.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.
 - `Scene`: a named screen configuration. A scene picks one layout, assigns widgets to regions in that layout, and can also supply scene-wide theme/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --scene NAME` to run one, `python3 fakedata_terminal.py --list` to list them, `python3 fakedata_terminal.py --scenes` to browse just the configured scene pages, and `python3 fakedata_terminal.py --widgets` to browse the widget showcase.
 

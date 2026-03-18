@@ -317,7 +317,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
 
     factored_scene_theme = _pick_factored_scene_value(
         "theme",
-        "source_theme",
+        "theme",
         [entry["theme"] for entry in effective_regions],
         config_scene.get("theme"),
     )
@@ -370,7 +370,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
             region_body["speed"] = entry["speed"]
 
         if factored_scene_theme is _UNFACTORED or entry["theme"] != factored_scene_theme:
-            region_body["source_theme"] = entry["theme"]
+            region_body["theme"] = entry["theme"]
 
         if factored_scene_text is _UNFACTORED or entry["text"] != factored_scene_text:
             region_body["text"] = _escape_export_text_modifier(entry["text"])
