@@ -794,7 +794,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         text=text,
         glitch=glitch,
         default_widget=default_widget,
-        default_colour=default_colour,
+        default_color=default_colour,
         direction=direction,
         config_paths=config_paths,
     )
