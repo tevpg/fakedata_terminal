@@ -48,7 +48,8 @@ Standardize on one term per concept.
 
 - Use `theme`, not `source_theme`.
 - Use `color`, not mixed `colour`/`color`, internally.
-- Keep `colour` as a deprecated input alias only if needed for compatibility.
+- Maintain `colour` as a fully supported input alias in YAML and CLI.
+- Normalize both `color` and `colour` to internal `color`.
 - Use `widget`, `layout`, `scene`, `region` consistently in docs and CLI.
 - Use `modifiers` as the umbrella term for configurable per-widget/per-region options.
 
@@ -104,6 +105,7 @@ Proposed shape:
 ```yaml
 widgets:
   text:
+    enabled: true
     supports: [speed, theme, text, direction]
     defaults:
       speed: 55
@@ -117,6 +119,7 @@ widgets:
         forward_probability: 0.78
 
   image:
+    enabled: true
     supports: [speed, image]
     defaults:
       image:
@@ -128,9 +131,12 @@ widgets:
 
 Rules:
 
+- `enabled` is a per-widget availability flag reserved for future use.
+- `enabled` should be parsed and validated now, even if runtime behavior does not change yet.
 - `supports` is the source of truth for docs, validation, and CLI help.
 - `defaults` contains widget-level fallback modifiers.
 - `behavior` contains internal tunables not meant to be scene-specific unless explicitly exposed.
+- Widget behavior may include widget-owned characteristics that are not region modifiers, such as `life.behavior.restart.max_iterations`.
 
 
 ### `data/scenes.yaml`
@@ -193,12 +199,16 @@ Example:
 ```yaml
 widgets:
   gauge:
+    enabled: true
     supports: [speed, color, text, direction]
   scope:
+    enabled: true
     supports: [speed, theme, text, direction]
   sweep:
+    enabled: true
     supports: [speed]
   cycle:
+    enabled: true
     supports: [speed, theme, color, cycle]
 ```
 
@@ -208,6 +218,39 @@ Usage:
 - Widget showcase/docs render supported modifiers from `supports`.
 - CLI help text is generated from the same data.
 - Runtime resolution uses the same data to decide what is legal.
+
+Non-modifier widget characteristics should remain in widget behavior, not in scene or CLI config.
+
+Example:
+
+```yaml
+widgets:
+  life:
+    enabled: true
+    supports: [speed, color]
+    defaults: {}
+    behavior:
+      restart:
+        on_stable_or_loop: true
+        on_max_iterations: true
+        max_iterations: 200
+```
+
+In this model:
+
+- `speed` and `color` are region modifiers
+- `max_iterations` is a widget characteristic
+
+Other widget-owned behavior properties that should remain widget-level only:
+
+- `blocks` blackout/dark-block bias
+- `gauge` blip spawn probability
+- `gauge` blip lifetime range
+- `sweep` wake/trail spawn probabilities
+- `image` transition mode and related transition behavior
+
+These should live in `widgets.yaml` behavior sections or remain in code until they are intentionally made configurable.
+They should not be exposed in scenes, regions, or CLI flags by default.
 
 
 ### Application Order
@@ -311,6 +354,8 @@ Option B:
 
 Option A is clearer and closer to current behavior.
 
+Do not expose widget-internal behavior tunables such as `life` max iterations, `blocks` blackout bias, `gauge` blip behavior, `sweep` wake probabilities, or image transition behavior on the CLI unless there is a demonstrated need for scene/runtime tuning.
+
 
 ## Validation Changes
 
@@ -347,21 +392,40 @@ Tasks:
 
 ## Migration Plan
 
+### Status
+
+Completed:
+
+- Added per-widget `enabled`, `supports`, and `defaults` placeholders in `widgets.yaml`.
+- Added a shared widget metadata loader/validator.
+- Switched CLI widget showcase/help to read supported modifiers from shared metadata.
+- Added metadata validation at startup.
+- Added compatibility-safe support checks in scene/widget-default validation.
+- Removed the stale `cycle.duration` help reference.
+
+Not completed:
+
+- Runtime enforcement of `enabled`
+- Moving widget defaults out of `data/scenes.yaml`
+- Canonical key renames (`theme`, `color`)
+- CLI renaming
+- Precedence cleanup
+
 ### Stage 1: Naming Cleanup
 
 - Add `theme` as the canonical YAML key.
 - Accept `source_theme` as a legacy alias.
 - Add `color` as the canonical YAML/CLI/docs spelling.
-- Keep `colour` as an alias during migration.
+- Keep `colour` as a fully supported input alias during and after migration.
 - Update README and showcase text.
 
 
 ### Stage 2: Centralize Capability Metadata
 
-- Move widget capability metadata into `data/widgets.yaml`.
-- Add `supports` and `defaults` blocks per widget.
-- Make CLI help and widget showcase read from that data.
-- Delete hard-coded widget modifier tables from `cli_config.py`.
+- Extend the shared widget metadata beyond capability/help validation.
+- Make widget-default resolution read canonical defaults from shared metadata.
+- Decide whether scene config, widget config, or both remain sources of widget defaults during migration.
+- Add tests around metadata loading and validation.
 
 
 ### Stage 3: Move Widget Defaults Out of `scenes.yaml`
@@ -388,39 +452,63 @@ Tasks:
 
 ## Concrete Code Tasks
 
-1. Create a widget metadata loader that reads:
-   - supported modifiers
-   - widget defaults
-   - internal behavior/timing
-
-2. Replace hard-coded modifier tables in:
-   - `cli_config.py`
-   - widget showcase/help text
-   - validation logic
-
-3. Split `scene_config.py` responsibilities:
+1. Split `scene_config.py` responsibilities:
    - layout catalog loading
    - scene catalog loading
    - widget metadata loading
    - runtime merge/resolution
 
-4. Remove non-scene metadata from `data/scenes.yaml`.
+2. Remove non-scene metadata from `data/scenes.yaml`.
 
-5. Introduce normalized key aliases:
+3. Introduce normalized key aliases:
    - `source_theme` -> `theme`
    - `colour` -> `color`
 
-6. Make precedence resolution explicit in one helper instead of spreading it across:
+4. Make precedence resolution explicit in one helper instead of spreading it across:
    - scene config resolution
    - runtime layout resolution
    - CLI post-processing
 
-7. Add tests for:
+5. Add tests for:
    - precedence
    - unsupported modifiers
+   - disabled-widget placeholder parsing
    - alias handling
    - CLI backward compatibility
    - generated widget capability docs
+
+
+## Recommended First Implementation
+
+Status: completed.
+
+Start with capability centralization only. Do not rename CLI flags or move config files yet.
+
+Scope:
+
+1. Define per-widget metadata in `data/widgets.yaml`:
+   - `enabled`
+   - `supports`
+   - `defaults`
+
+2. Add a loader/helper that exposes that metadata to:
+   - CLI widget showcase/help
+   - scene validation
+   - widget capability documentation
+
+3. Keep runtime behavior unchanged:
+   - `enabled` is accepted and validated, but not enforced yet
+   - existing CLI names stay as they are
+   - existing precedence stays as it is
+   - existing file locations stay as they are
+
+Why this is the right first slice:
+
+- it is low risk
+- it removes duplicated hard-coded modifier tables
+- it immediately improves consistency between docs, validation, and CLI help
+- it creates the schema foundation needed for later cleanup
+- it introduces `enabled` early without forcing behavior changes yet
 
 
 ## Open Decisions

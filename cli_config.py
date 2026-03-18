@@ -25,6 +25,7 @@ try:
         validate_scene_catalog,
         widget_names,
     )
+    from .widget_metadata import validate_widget_metadata, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label, normalize_colour_spec
     from scene_config import (
@@ -43,6 +44,7 @@ except ImportError:
         validate_scene_catalog,
         widget_names,
     )
+    from widget_metadata import validate_widget_metadata, widget_supports
 
 
 DEFAULT_THEME = "science"
@@ -220,26 +222,10 @@ def _degrade_runtime_image_dependencies(runtime_scene: dict, message: str) -> No
 
 
 def _widget_attribute_names(widget: str) -> list[str]:
-    widget_attrs = {
-        "bars": ["speed", "theme"],
-        "blank": ["text", "colour"],
-        "blocks": ["speed", "colour"],
-        "gauge": ["speed", "colour", "text", "direction"],
-        "cycle": ["speed", "theme", "colour", "cycle"],
-        "image": ["speed", "image"],
-        "life": ["speed", "colour"],
-        "matrix": ["speed"],
-        "scope": ["speed", "theme", "text", "direction"],
-        "readouts": ["theme", "text", "colour"],
-        "sparkline": ["speed", "theme", "text", "direction"],
-        "sweep": ["speed"],
-        "text": ["speed", "theme", "text", "direction"],
-        "text_scant": ["speed", "theme", "text", "direction"],
-        "text_spew": ["speed", "theme", "text"],
-        "text_wide": ["speed", "theme", "text", "direction"],
-        "tunnel": ["speed", "colour", "text", "direction"],
-    }
-    return widget_attrs.get(widget, ["speed"])
+    attrs = []
+    for attr in widget_supports(widget):
+        attrs.append("colour" if attr == "color" else attr)
+    return attrs or ["speed"]
 
 
 def _format_widget_catalog_entry(widget: str) -> str:
@@ -275,8 +261,6 @@ def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
     cli_items = [cli_map[attr] for attr in attrs if attr in cli_map]
     if widget == "image":
         config_items.append("image.glob, image.path")
-    if widget == "cycle":
-        config_items.append("cycle.duration")
 
     return [
         f"Modifiers (in config files): {', '.join(config_items)}",
@@ -841,8 +825,9 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     args = parser.parse_args(raw_argv)
 
     issues = validate_scene_catalog(config_paths)
+    issues.extend(validate_widget_metadata())
     if issues:
-        parser.error("scenes.yaml validation failed:\n  " + "\n  ".join(issues))
+        parser.error("configuration validation failed:\n  " + "\n  ".join(issues))
 
     if args.list:
         _print_list(config_paths)

@@ -24,8 +24,10 @@ else:
 
 try:
     from .runtime_support import COLOUR_CHOICES, normalize_colour_spec
+    from .widget_metadata import widget_supports
 except ImportError:
     from runtime_support import COLOUR_CHOICES, normalize_colour_spec
+    from widget_metadata import widget_supports
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -397,6 +399,39 @@ def _speed_issues(value: Any, label: str, issues: list[str]) -> None:
         issues.append(f"{label} must be between 1 and 100")
 
 
+def _modifier_is_set(value: Any) -> bool:
+    return value not in (None, "", [], {})
+
+
+def _config_key_to_modifier(key: str) -> str | None:
+    mapping = {
+        "speed": "speed",
+        "text": "text",
+        "source_theme": "theme",
+        "theme": "theme",
+        "direction": "direction",
+        "colour": "color",
+        "color": "color",
+        "image": "image",
+        "paths": "image",
+        "path": "image",
+        "glob": "image",
+        "cycle": "cycle",
+    }
+    return mapping.get(key)
+
+
+def _validate_supported_modifiers(widget_name: str, mapping: dict[str, Any], context: str, issues: list[str]) -> None:
+    supported = set(widget_supports(widget_name))
+    for key, value in mapping.items():
+        if key == "widget" or not _modifier_is_set(value):
+            continue
+        modifier = _config_key_to_modifier(str(key))
+        if modifier is None or modifier in supported:
+            continue
+        issues.append(f"{context} uses unsupported modifier '{key}' for widget '{widget_name}'")
+
+
 def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[str]:
     catalog = load_scene_catalog(config_paths)
     issues: list[str] = []
@@ -531,6 +566,13 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         issues.append(
                             f"{config_label}: scene '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
                         )
+                    else:
+                        _validate_supported_modifiers(
+                            str(widget),
+                            region_cfg,
+                            f"{config_label}: scene '{scene_name}' region '{region_name}'",
+                            issues,
+                        )
                     cycle_spec = region_cfg.get("cycle")
                     if cycle_spec is not None and not isinstance(cycle_spec, dict):
                         issues.append(
@@ -581,6 +623,12 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 if not _supported_widget(widget_name):
                     issues.append(f"{config_label}: widgets.{widget_name} is not a supported widget name")
                     continue
+                _validate_supported_modifiers(
+                    widget_name,
+                    widget_cfg,
+                    f"{config_label}: widgets.{widget_name}",
+                    issues,
+                )
                 _unknown_keys(widget_cfg, WIDGET_DEFAULT_KEYS, f"widgets.{widget_name}", issues)
                 _speed_issues(widget_cfg.get("speed"), f"{config_label}: widgets.{widget_name}.speed", issues)
                 widget_colour = widget_cfg.get("colour", widget_cfg.get("color"))

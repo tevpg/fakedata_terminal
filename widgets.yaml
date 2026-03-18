@@ -24,6 +24,8 @@ defaults:
 widgets:
   text:
     enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
     timing:
       # Burst-driven; every update scrolls.
       cadence_factor: 0.55
@@ -39,6 +41,8 @@ widgets:
 
   text_scant:
     enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
     timing:
       # Burst-driven, but only scrolls every 2 ticks in main and every 5 ticks
       # in sidebar. This value is an intentional compromise estimate.
@@ -55,6 +59,8 @@ widgets:
 
   text_spew:
     enabled: true
+    supports: [speed, theme, text]
+    defaults: {}
     timing:
       # The old code special-cases this to `next_update = now`, effectively
       # making it loop-bound rather than cadence-bound. In the shared model it
@@ -64,12 +70,16 @@ widgets:
 
   bars:
     enabled: true
+    supports: [speed, theme, text]
+    defaults: {}
     timing:
       # Burst-driven; values update on each burst step.
       cadence_factor: 0.55
 
   gauge:
     enabled: true
+    supports: [speed, color, text, direction]
+    defaults: {}
     timing:
       # Fast steady bucket: `_steady_mode_delay(...)/1.5`
       cadence_factor: 1.00
@@ -88,6 +98,8 @@ widgets:
 
   scope:
     enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
     timing:
       # Ordinary steady bucket: `_steady_mode_delay(...)`
       cadence_factor: 1.0
@@ -103,6 +115,8 @@ widgets:
 
   sparkline:
     enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
     timing:
       # Burst-driven panel updates; separate read-refresh deadlines remain explicit.
       cadence_factor: 0.55
@@ -118,6 +132,8 @@ widgets:
 
   tunnel:
     enabled: true
+    supports: [speed, color, text, direction]
+    defaults: {}
     timing:
       # Fast steady bucket: `_steady_mode_delay(...)/1.5`
       cadence_factor: 1.00
@@ -133,6 +149,8 @@ widgets:
 
   text_wide:
     enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
     timing:
       # Burst-driven forward motion with special reverse/pause deadlines.
       cadence_factor: 0.55
@@ -163,24 +181,32 @@ widgets:
 
   matrix:
     enabled: true
+    supports: [speed]
+    defaults: {}
     timing:
       # Ordinary steady bucket: `_steady_mode_delay(...)`
       cadence_factor: 0.67
 
   blocks:
     enabled: true
+    supports: [speed, color, direction, text]
+    defaults: {}
     timing:
       # Fast steady bucket: `_steady_mode_delay(...)/1.5`
       cadence_factor: 1.00
 
   sweep:
     enabled: true
+    supports: [speed]
+    defaults: {}
     timing:
       # Fast steady bucket: `_steady_mode_delay(...)/1.5`
       cadence_factor: 1.00
 
   gauges:
     enabled: true
+    supports: [speed, theme, text, color]
+    defaults: {}
     timing:
       # Burst-driven panel updates; read refresh and feed scroll are separate timers.
       cadence_factor: 0.75
@@ -196,6 +222,8 @@ widgets:
 
   readouts:
     enabled: true
+    supports: [theme, text, color]
+    defaults: {}
     timing:
       # Burst-driven panel updates; read refresh is a separate explicit deadline.
       cadence_factor: 0.55
@@ -207,6 +235,8 @@ widgets:
 
   image:
     enabled: true
+    supports: [speed, image]
+    defaults: {}
     timing:
       # Ordinary steady bucket: `_steady_mode_delay(...)`
       cadence_factor: 0.67
@@ -217,6 +247,8 @@ widgets:
 
   life:
     enabled: true
+    supports: [speed, color]
+    defaults: {}
     timing:
       # Ordinary steady bucket: `_steady_mode_delay(...)`
       cadence_factor: 0.67
@@ -227,6 +259,8 @@ widgets:
 
   blank:
     enabled: true
+    supports: [text, color]
+    defaults: {}
     timing:
       cadence_factor: 0.0
     behavior:
@@ -234,6 +268,8 @@ widgets:
 
   cycle:
     enabled: true
+    supports: [speed, theme, color, cycle]
+    defaults: {}
     timing:
       cadence_factor: 0.0
     behavior:
