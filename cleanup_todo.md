@@ -402,14 +402,17 @@ Completed:
 - Added metadata validation at startup.
 - Added compatibility-safe support checks in scene/widget-default validation.
 - Removed the stale `cycle.duration` help reference.
+- Removed packaged non-scene widget metadata from `data/scenes.yaml`.
+- Switched widget names/defaults to resolve through shared widget metadata.
+- Added internal `theme` alias support alongside `source_theme`.
+- Consolidated runtime area/scene precedence resolution in `scene_config.py` through shared helpers, without changing behavior.
 
 Not completed:
 
 - Runtime enforcement of `enabled`
-- Moving widget defaults out of `data/scenes.yaml`
 - Canonical key renames (`theme`, `color`)
 - CLI renaming
-- Precedence cleanup
+- Full precedence/schema cleanup
 
 ### Stage 1: Naming Cleanup
 
@@ -424,22 +427,21 @@ Not completed:
 
 - Extend the shared widget metadata beyond capability/help validation.
 - Make widget-default resolution read canonical defaults from shared metadata.
-- Decide whether scene config, widget config, or both remain sources of widget defaults during migration.
+- Remove the remaining compatibility dependency on scene-config widget defaults if no external overlays still need it.
 - Add tests around metadata loading and validation.
 
 
 ### Stage 3: Move Widget Defaults Out of `scenes.yaml`
 
-- Remove top-level `widgets:` from `data/scenes.yaml`.
-- Move widget defaults into `data/widgets.yaml`.
-- Update `scene_config.py` to load widget defaults from the new location.
+- Remove any remaining fallback assumptions that widget defaults may come from scene catalogs.
+- Update docs and overlays to treat `data/widgets.yaml` as the canonical widget-default location.
 
 
 ### Stage 4: Normalize Scene Defaults
 
 - Introduce `scenes.<name>.defaults`.
 - Make scene-wide modifier resolution uniform.
-- Remove ad hoc post-processing like special default-color passes if no longer needed.
+- Remove remaining ad hoc post-processing like special default-color passes if no longer needed.
 
 
 ### Stage 5: CLI Rename and Alias Period

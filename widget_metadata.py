@@ -79,6 +79,10 @@ def widget_enabled(widget: str) -> bool:
     return enabled if isinstance(enabled, bool) else True
 
 
+def public_widget_names() -> list[str]:
+    return sorted(PUBLIC_WIDGETS)
+
+
 def widget_supports(widget: str) -> list[str]:
     entry = widget_metadata(widget)
     supports = entry.get("supports")
@@ -94,6 +98,12 @@ def widget_supports(widget: str) -> list[str]:
         if normalized:
             return normalized
     return LEGACY_SUPPORTS.get(widget, ["speed"])
+
+
+def widget_defaults(widget: str) -> dict[str, Any]:
+    entry = widget_metadata(widget)
+    defaults = entry.get("defaults")
+    return defaults if isinstance(defaults, dict) else {}
 
 
 def validate_widget_metadata() -> list[str]:

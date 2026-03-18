@@ -24,10 +24,10 @@ else:
 
 try:
     from .runtime_support import COLOUR_CHOICES, normalize_colour_spec
-    from .widget_metadata import widget_supports
+    from .widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CHOICES, normalize_colour_spec
-    from widget_metadata import widget_supports
+    from widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_supports
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -48,7 +48,7 @@ DEFAULT_KEYS = {"layout", "theme", "speed", "image", "widget", "colour", "color"
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}
-REGION_KEYS = {"widget", "speed", "text", "source_theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
+REGION_KEYS = {"widget", "speed", "text", "source_theme", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
@@ -313,34 +313,27 @@ def layout_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any
 
 
 def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_scene_catalog(config_paths)
-    widgets = catalog.get("widgets", {})
-    names = set()
-    if isinstance(widgets, dict):
-        for key, value in widgets.items():
-            if isinstance(value, list):
-                names.update(str(item) for item in value)
-            elif isinstance(value, dict) and _supported_widget(str(key)):
-                names.add(str(key))
-    names.update({
-        "text", "text_wide", "text_scant", "text_spew", "image", "life",
-        "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
-        "sparkline", "readouts", "blank", "cycle",
-    })
-    return sorted(names)
+    del config_paths
+    return public_widget_names()
 
 
 def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
     catalog = load_scene_catalog(config_paths)
     widgets = catalog.get("widgets", {})
-    defaults: dict[str, dict[str, Any]] = {}
+    defaults: dict[str, dict[str, Any]] = {
+        widget_name: dict(widget_metadata_defaults(widget_name))
+        for widget_name in public_widget_names()
+        if widget_metadata_defaults(widget_name)
+    }
     if not isinstance(widgets, dict):
         return defaults
     for key, value in widgets.items():
         widget_name = str(key)
         if not isinstance(value, dict) or not _supported_widget(widget_name):
             continue
-        defaults[widget_name] = value
+        merged = dict(defaults.get(widget_name, {}))
+        merged.update(value)
+        defaults[widget_name] = merged
     return defaults
 
 
@@ -835,6 +828,89 @@ def _region_image_paths(region_cfg: Any) -> list[str]:
     return []
 
 
+def _region_theme(region_cfg: Any) -> str | None:
+    if not isinstance(region_cfg, dict):
+        return None
+    value = region_cfg.get("theme")
+    if value is None:
+        value = region_cfg.get("source_theme")
+    return str(value) if value is not None else None
+
+
+def _first_non_none(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, Any], *,
+                            default_colour: str | None, scene_direction: str, default_images: list[str]) -> dict[str, Any]:
+    area_images: list[str] = []
+    if widget == "image":
+        area_images = _region_image_paths(region_cfg)
+        if not area_images:
+            area_images = _region_image_paths(widget_cfg)
+        if not area_images:
+            area_images = default_images[:]
+
+    cycle_widgets: list[str] = []
+    if widget == "cycle":
+        cycle_widgets = _region_cycle_widgets(region_cfg) or _region_cycle_widgets(widget_cfg)
+
+    return {
+        "speed": _first_non_none(
+            region_cfg.get("speed") if isinstance(region_cfg, dict) else None,
+            widget_cfg.get("speed"),
+        ),
+        "text": _first_non_none(
+            region_cfg.get("text") if isinstance(region_cfg, dict) else None,
+            widget_cfg.get("text"),
+        ),
+        "theme": _first_non_none(_region_theme(region_cfg), _region_theme(widget_cfg)),
+        "colour": _first_non_none(_region_colour(region_cfg), _region_colour(widget_cfg), default_colour),
+        "direction": _first_non_none(_region_direction(region_cfg), _region_direction(widget_cfg), scene_direction),
+        "image_paths": area_images,
+        "cycle_widgets": cycle_widgets,
+    }
+
+
+def _build_area_definition(*, name: str, widget: str, panels: list[str], rect: dict[str, float], region_cfg: Any,
+                           modifiers: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": name,
+        "mode": widget,
+        "panels": panels,
+        "x": rect["x"],
+        "y": rect["y"],
+        "w": rect["w"],
+        "h": rect["h"],
+        "speed": modifiers["speed"],
+        "text": modifiers["text"],
+        "theme": modifiers["theme"],
+        "colour": modifiers["colour"],
+        "direction": modifiers["direction"],
+        "image_paths": modifiers["image_paths"],
+        "cycle_widgets": modifiers["cycle_widgets"],
+        "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
+        "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
+        "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,
+        "static_align": region_cfg.get("static_align") if isinstance(region_cfg, dict) else None,
+    }
+
+
+def _resolve_scene_runtime_defaults(scene_cfg: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "theme": scene_cfg.get("theme", defaults.get("theme", "science")),
+        "speed": scene_cfg.get("speed", defaults.get("speed", 50)),
+        "text": scene_cfg.get("text", ""),
+        "glitch": scene_cfg.get("glitch", defaults.get("glitch", 0.0)),
+        "default_widget": defaults.get("widget"),
+        "default_colour": _region_colour(scene_cfg) or defaults.get("colour"),
+        "direction": _region_direction(scene_cfg) or defaults.get("direction", "forward"),
+    }
+
+
 def _config_label(config_paths: tuple[str, ...] | None) -> str:
     normalized = _normalize_config_paths(config_paths)
     if len(normalized) == 1:
@@ -1089,47 +1165,22 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
         widget_cfg = widget_defaults.get(widget, {})
         panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, scene_name)
         rect = _rect_for_panels(layout_cfg, panel_names, parser, scene_name, region_name)
-        area_images = []
-        if widget == "image" and isinstance(region_cfg, dict):
-            area_images = _region_image_paths(region_cfg)
-        if widget == "image" and not area_images:
-            area_images = _region_image_paths(widget_cfg)
-        if widget == "image" and not area_images:
-            area_images = default_images[:]
-        area = {
-            "name": region_name,
-            "mode": widget,
-            "panels": panel_names,
-            "x": rect["x"],
-            "y": rect["y"],
-            "w": rect["w"],
-            "h": rect["h"],
-            "speed": (
-                region_cfg.get("speed")
-                if isinstance(region_cfg, dict) and region_cfg.get("speed") is not None
-                else widget_cfg.get("speed")
-            ),
-            "text": (
-                region_cfg.get("text")
-                if isinstance(region_cfg, dict) and region_cfg.get("text") is not None
-                else widget_cfg.get("text")
-            ),
-            "theme": (
-                region_cfg.get("source_theme")
-                if isinstance(region_cfg, dict) and region_cfg.get("source_theme") is not None
-                else widget_cfg.get("source_theme")
-            ),
-            "colour": _region_colour(region_cfg) or _region_colour(widget_cfg) or default_colour,
-            "direction": _region_direction(region_cfg) or _region_direction(widget_cfg) or scene_direction,
-            "image_paths": area_images,
-            "cycle_widgets": (
-                _region_cycle_widgets(region_cfg) or _region_cycle_widgets(widget_cfg)
-            ) if widget == "cycle" else [],
-            "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
-            "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
-            "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,
-            "static_align": region_cfg.get("static_align") if isinstance(region_cfg, dict) else None,
-        }
+        modifiers = _resolve_area_modifiers(
+            widget,
+            region_cfg,
+            widget_cfg,
+            default_colour=default_colour,
+            scene_direction=scene_direction,
+            default_images=default_images,
+        )
+        area = _build_area_definition(
+            name=region_name,
+            widget=widget,
+            panels=panel_names,
+            rect=rect,
+            region_cfg=region_cfg,
+            modifiers=modifiers,
+        )
         overlap = set(panel_names) & set(seen)
         if overlap:
             parser.error(f"scene '{scene_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
@@ -1149,31 +1200,29 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
         for panel_name in uncovered:
             panel_cfg = panel_map[panel_name]
             widget_cfg = widget_defaults.get(default_widget, {})
-            area_images = _region_image_paths(widget_cfg) if default_widget == "image" else []
-            if default_widget == "image" and not area_images:
-                area_images = default_images[:]
-            areas.append({
-                "name": panel_name,
-                "mode": default_widget,
-                "panels": [panel_name],
-                "x": float(panel_cfg["x"]),
-                "y": float(panel_cfg["y"]),
-                "w": float(panel_cfg["w"]),
-                "h": float(panel_cfg["h"]),
-                "speed": widget_cfg.get("speed"),
-                "text": widget_cfg.get("text"),
-                "theme": widget_cfg.get("source_theme"),
-                "colour": _region_colour(widget_cfg) or default_colour,
-                "direction": _region_direction(widget_cfg) or scene_direction,
-                "image_paths": area_images,
-                "cycle_widgets": _region_cycle_widgets(widget_cfg) if default_widget == "cycle" else [],
-                "label": None,
-                "unavailable_message": None,
-                "static_lines": None,
-                "static_align": None,
-            })
+            modifiers = _resolve_area_modifiers(
+                default_widget,
+                None,
+                widget_cfg,
+                default_colour=default_colour,
+                scene_direction=scene_direction,
+                default_images=default_images,
+            )
+            areas.append(_build_area_definition(
+                name=panel_name,
+                widget=default_widget,
+                panels=[panel_name],
+                rect={
+                    "x": float(panel_cfg["x"]),
+                    "y": float(panel_cfg["y"]),
+                    "w": float(panel_cfg["w"]),
+                    "h": float(panel_cfg["h"]),
+                },
+                region_cfg=None,
+                modifiers=modifiers,
+            ))
             if default_widget == "image":
-                image_paths.extend(area_images)
+                image_paths.extend(modifiers["image_paths"])
 
     return {
         "scene_name": scene_name,
@@ -1223,17 +1272,18 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
 
     layout_name = scene_cfg.get("layout")
     regions_cfg = scene_cfg.get("regions", {})
+    resolved = _resolve_scene_runtime_defaults(scene_cfg, defaults)
     return resolve_runtime_layout(
         layout_name,
         regions_cfg,
         parser,
         scene_name=scene_name,
-        theme=scene_cfg.get("theme", defaults.get("theme", "science")),
-        speed=scene_cfg.get("speed", defaults.get("speed", 50)),
-        text=scene_cfg.get("text", ""),
-        glitch=scene_cfg.get("glitch", defaults.get("glitch", 0.0)),
-        default_widget=defaults.get("widget"),
-        default_colour=_region_colour(scene_cfg) or defaults.get("colour"),
-        direction=_region_direction(scene_cfg) or defaults.get("direction", "forward"),
+        theme=resolved["theme"],
+        speed=resolved["speed"],
+        text=resolved["text"],
+        glitch=resolved["glitch"],
+        default_widget=resolved["default_widget"],
+        default_colour=resolved["default_colour"],
+        direction=resolved["direction"],
         config_paths=config_paths,
     )
