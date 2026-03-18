@@ -8,7 +8,6 @@
   - direction-reroll timings/probabilities
   - read-refresh/feed-scroll intervals
 - audit for any remaining ad hoc tick/count-based timing behavior that should move under the shared model
-- decide which timing controls, if any, should ever become scene-configurable instead of remaining widget-level behavior
 - add regression coverage for:
   - timing behavior across widgets
   - pause/resume semantics
@@ -24,13 +23,14 @@
 - per-widget timing/behavior metadata in `widgets.yaml`
 - explicit deadline-based handling for timed events
 - shared speed mapping plus per-widget cadence factors
+- timing configuration remains widget-level
+- the only screen-wide timing control is runtime `+` / `-`
 
 ## Open Decisions
 
 1. Which timing/behavior values still need tuning by observation?
-2. Should any timing controls become scene-configurable, or should they remain widget-level only?
-3. Are there any widgets that still need semantic-motion treatment beyond the current ones?
-4. What minimum regression coverage is enough before further timing changes?
+2. Are there any widgets that still need semantic-motion treatment beyond the current ones?
+3. What minimum regression coverage is enough before further timing changes?
 
 ## Next Good Steps
 

@@ -1,12 +1,12 @@
-# Starter config sketch for a layout/region/scene driven version of
+# Starter config sketch for a layout/region/screen driven version of
 # fakedata-terminal.py.
 #
 # Design rules captured here:
 # - layouts define panel geometry
 # - regions are named aliases for one or more panels
 # - widgets can define per-widget fallback attributes
-# - scenes bind widgets/options to regions
-# - defaults < widget defaults < scene < CLI override
+# - screens bind widgets/options to regions
+# - defaults < widget defaults < screen < CLI override
 # - panel aggregation is explicit; no implicit expansion from "none"
 # - stable packaged layouts live in data/layouts.yaml
 
@@ -19,7 +19,7 @@ defaults:
   image:
     glob: "geom*.png"
 
-scenes:
+screens:
 
   clocks:
     note: >
@@ -256,7 +256,7 @@ scenes:
 
   science:
     note: >
-      Derived from: --scene science --main scroller --sidebar gauge --sidebar-speed 80
+      Derived from: --screen science --main scroller --sidebar gauge --sidebar-speed 80
     layout: 3x3
     theme: science
     text: "*** DO NOT USE DOORBELL ***"
@@ -374,7 +374,7 @@ scenes:
 
   geometries:
     note: >
-      Derived from: --scene hacker --main image --image geom*png --sidebar gauges
+      Derived from: screen preset with image widget regions and packaged image defaults
     layout: L2x2_R3
     theme: hacker
     regions:
@@ -432,7 +432,7 @@ scenes:
 
   test2:
     note: >
-      Full-screen single-widget skeleton scene.
+      Full-screen single-widget skeleton screen.
     layout: full
     theme: finance
     regions:

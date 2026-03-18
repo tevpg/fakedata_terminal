@@ -1,0 +1,145 @@
+# Overall Roadmap
+
+This is the master roadmap across:
+
+- `configuration_model.md`
+- `cleanup_todo.md`
+- `timing_todo.md`
+
+Use it to decide implementation order. The detailed design lives in `configuration_model.md`. The detailed worklists live in the other TODO docs.
+
+## Phase Order
+
+### Phase 1: User-facing model cleanup
+
+Drive from:
+
+- `configuration_model.md`
+- `cleanup_todo.md` Chunk 1
+- `cleanup_todo.md` Chunk 2
+
+Deliverables:
+
+- `screen` terminology everywhere user-facing
+- `--screen-layout`, `--screen-theme`, `--screen-glitch`
+- broad flags removed where they no longer fit the model
+- no-args orientation output
+
+Why first:
+
+- it locks the vocabulary before more structural work lands
+- it prevents doing deeper cleanup against names that will change again
+
+### Phase 2: Config architecture cleanup
+
+Drive from:
+
+- `configuration_model.md`
+- `cleanup_todo.md` Chunk 3
+- `cleanup_todo.md` Chunk 5
+
+Deliverables:
+
+- `widgets.yaml` fully participates in overlays
+- widget metadata/defaults/timing come from the config model
+- runtime precedence matches the documented model
+
+Why second:
+
+- validation and timing work should sit on top of the final config structure
+
+### Phase 3: Startup validation pass
+
+Drive from:
+
+- `configuration_model.md` Post-Parse Validation
+- `cleanup_todo.md` Chunk 4
+
+Deliverables:
+
+- resolved-screen lint before rendering
+- screen/layout compatibility checks
+- widget/modifier compatibility checks
+- image/dependency validation
+- cycle/disabled-widget validation
+
+Why third:
+
+- once names and config structure are stable, validation can target the final resolved model cleanly
+
+### Phase 4: Timing cleanup and tuning
+
+Drive from:
+
+- `timing_todo.md`
+- `configuration_model.md`
+
+Deliverables:
+
+- no remaining ad hoc timing paths that should live under the shared timing model
+- tuned widget timing values
+- timing remains widget-level apart from runtime `+` / `-`
+
+Why fourth:
+
+- timing work should not fight with ongoing config-schema churn
+
+### Phase 5: Hardening and closure
+
+Drive from:
+
+- `cleanup_todo.md` Chunk 6
+- `timing_todo.md`
+
+Deliverables:
+
+- regression tests
+- cleaned docs/examples/comments
+- removed transitional code paths
+
+Why last:
+
+- tests and cleanup are most stable after the architecture is no longer moving
+
+## Aggressive Chunking Strategy
+
+If you want large but still manageable code changes, use these implementation batches:
+
+1. CLI/vocabulary batch
+   - rename user-facing terms and flags
+   - update help/docs/examples
+   - change no-args behavior
+
+2. Config split batch
+   - make `widgets.yaml` first-class in overlays
+   - remove old widget-default compatibility paths
+   - align precedence code with the documented model
+
+3. Validation batch
+   - add post-parse resolved-screen lint
+   - make startup failures comprehensive and early
+
+4. Timing batch
+   - move remaining timing stragglers under the shared timing model
+   - tune values
+   - add timing-focused regression coverage
+
+5. Final hardening batch
+   - remove stale code/docs/tests
+   - add remaining regression coverage
+
+## Dependency Notes
+
+- Do not do timing tuning before the config split is stable.
+- Do not add deep validation logic against old CLI names that are about to be removed.
+- Do not treat docs cleanup as separate from vocabulary cleanup; they should land together.
+- Keep `configuration_model.md` as the source of truth for precedence and scope.
+- Do not introduce `screens.<name>.defaults`; the direct screen-field model is settled.
+- When implementing `--region-image` glob support, assume quoted patterns are resolved by the application.
+
+## Document Roles
+
+- `configuration_model.md`: target architecture, terminology, precedence, validation principles
+- `cleanup_todo.md`: config/CLI/validation implementation backlog
+- `timing_todo.md`: timing implementation and tuning backlog
+- `overall_todo.doc`: master execution order across the other three docs

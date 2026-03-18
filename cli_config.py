@@ -60,7 +60,7 @@ DIRECTION_HELP = ", ".join(CANONICAL_DIRECTION_CHOICES)
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
-def _scene_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
+def _screen_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
     return config_scene_names(config_paths)
 
 
@@ -73,9 +73,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         description=(
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
-            "Use --scene for a preset, or --layout plus --region-widget overrides to build a screen explicitly. "
+            "Use --screen for a preset, or --screen-layout plus --region-widget overrides to build a screen explicitly. "
             "Run --widgets to browse the widget showcase, "
-            "or --scenes to browse only the configured scene pages."
+            "or --screens to browse only the configured screen pages."
         ),
         epilog=(
             "Examples:\n"
@@ -83,19 +83,19 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "  %(prog)s --config ./lab.yaml --list\n"
             "  %(prog)s --layouts\n"
             "  %(prog)s --widgets\n"
-            "  %(prog)s --scenes\n"
-            "  %(prog)s --scene test1\n"
-            "  %(prog)s --config ~/.config/fakedata-terminal/scenes.yaml --scene lab\n"
-            "  %(prog)s --layout 2x2 --region-widget P1=life --region-widget P2=blank --region-widget P3=text --region-widget P4=gauge\n"
-            "  %(prog)s --scene test1 --region-widget P4=matrix --region-speed P4=80\n"
-            "  %(prog)s --layout 3x3 --region-widget L2=image --region-widget R=gauge "
+            "  %(prog)s --screens\n"
+            "  %(prog)s --screen test1\n"
+            "  %(prog)s --config ~/.config/fakedata-terminal/screens.yaml --screen lab\n"
+            "  %(prog)s --screen-layout 2x2 --region-widget P1=life --region-widget P2=blank --region-widget P3=text --region-widget P4=gauge\n"
+            "  %(prog)s --screen test1 --region-widget P4=matrix --region-speed P4=80\n"
+            "  %(prog)s --screen-layout 3x3 --region-widget L2=image --region-widget R=gauge "
             "--region-image L2=geom_07_diamond_lattice.png --region-image L2=geom_33_torus.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--list", action="store_true",
-        help="List configured scenes, layouts, widgets, and colours in columns, then exit.")
+        help="List configured screens, layouts, widgets, and colours in columns, then exit.")
     parser.add_argument(
         "--config", action="append", default=[], metavar="PATH",
         help=("Load an extra config overlay. Repeatable. Relative image paths inside that file are "
@@ -107,17 +107,17 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--widgets", action="store_true",
         help="Browse the widget showcase.")
     parser.add_argument(
-        "--scenes", action="store_true",
-        help="Browse only the configured scene pages.")
+        "--screens", action="store_true",
+        help="Browse only the configured screen pages.")
     parser.add_argument(
-        "--scene", type=str, default=None, choices=_scene_choices(config_paths),
-        help="Config-defined scene preset.")
+        "--screen", type=str, default=None, choices=_screen_choices(config_paths),
+        help="Config-defined screen preset.")
     parser.add_argument(
-        "--layout", type=str, default=None,
-        help="Explicit layout for the generalized panel runtime.")
+        "--screen-layout", dest="screen_layout", type=str, default=None,
+        help="Explicit layout for the screen being built.")
     parser.add_argument(
-        "--theme", type=str, default=None, choices=THEME_CHOICES,
-        help=f"Theme. Defaults to {DEFAULT_THEME} unless a scene supplies one.")
+        "--screen-theme", dest="screen_theme", type=str, default=None, choices=THEME_CHOICES,
+        help=f"Screen theme. Defaults to {DEFAULT_THEME} unless a screen supplies one.")
     parser.add_argument(
         "--region-widget", dest="region_widget", action="append", default=[], metavar="REGION=WIDGET",
         help="Assign a widget to a specific region or panel group. Repeatable.")
@@ -140,14 +140,8 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--region-image", dest="region_image", action="append", default=[], metavar="REGION=PATH",
         help="Add an image path for a specific image region. Repeatable.")
     parser.add_argument(
-        "--default-speed", type=int, default=None, metavar="N",
-        help="Default speed 1 (slowest) to 100 (no delay) for panels without a region-specific speed.")
-    parser.add_argument(
         "--default-colour", "--default-color", type=str, default=None, metavar="VALUE",
         help=f"Default colour for panels without a region-specific colour. Recognized: {COLOUR_HELP}.")
-    parser.add_argument(
-        "--direction", type=str, default=None, metavar="VALUE",
-        help=f"Default direction for widgets that support it. Recognized: {DIRECTION_HELP}.")
     parser.add_argument(
         "--default-widget", type=str, default=None, metavar="WIDGET",
         help="Default widget for panels that are not assigned explicitly.")
@@ -155,16 +149,10 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--life-max", type=int, default=200, metavar="N",
         help="Maximum iterations before life mode reseeds. Default 200.")
     parser.add_argument(
-        "--text", type=str, default=None, metavar="MSG",
-        help="Text override: injected into text-heavy widgets, used as readouts heading text, and shown by blank widgets.")
-    parser.add_argument(
-        "--image", nargs="+", default=None, metavar="PATH",
-        help="Global image paths fallback for image widgets lacking region-specific image sources.")
-    parser.add_argument(
-        "--glitch", type=float, default=0.0, const=5.0, nargs="?", metavar="N",
+        "--screen-glitch", dest="screen_glitch", type=float, default=0.0, const=5.0, nargs="?", metavar="N",
         help=("Glitch interval in seconds. Every ~N seconds a rectangular region "
               "of the display is briefly corrupted then restored. "
-              "0 = disabled (default). --glitch alone defaults to 5s."))
+              "0 = disabled (default). --screen-glitch alone defaults to 5s."))
     parser.add_argument(
         "--exit", type=float, default=None, metavar="N",
         help="Exit automatically after approximately N seconds.")
@@ -178,6 +166,16 @@ def _print_list(config_paths: tuple[str, ...] | None = None) -> None:
 
 def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
     print(format_layout_diagrams(config_paths))
+
+
+def _print_no_args_message() -> None:
+    print("fakedata_terminal creates text screens of fake data displays for cinema backgrounds")
+    print()
+    print("fakedata_terminal --screens to see prebuilt screens")
+    print("fakedata_terminal --widgets to see available widgets")
+    print("fakedata_terminal --layouts to see available layouts")
+    print("fakedata_terminal --list to list inventory of choices")
+    print("fakedata_terminal --help for help")
 
 def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     return widget_names(config_paths)
@@ -244,12 +242,12 @@ def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
         "cycle": "cycle.widgets",
     }
     cli_map = {
-        "speed": "--default-speed, --region-speed",
-        "theme": "--theme, --region-theme",
-        "text": "--text, --region-text",
+        "speed": "--region-speed",
+        "theme": "--screen-theme, --region-theme",
+        "text": "--region-text",
         "colour": "--default-colour, --region-colour",
-        "direction": "--direction, --region-direction",
-        "image": "--image, --region-image",
+        "direction": "--region-direction",
+        "image": "--region-image",
     }
     if not attrs:
         return [
@@ -381,7 +379,7 @@ def _pad_showcase_description(lines: list[str], header_lines: int) -> list[str]:
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
     width = shutil.get_terminal_size((100, 24)).columns
     lines = []
-    lines.extend(_format_catalog_section("Scenes (--scenes to view all the preset scenes)", config_scene_names(config_paths), width))
+    lines.extend(_format_catalog_section("Screens (--screens to view all the preset screens)", config_scene_names(config_paths), width))
     lines.append("")
     lines.extend(_format_catalog_section("Layouts (--layouts to see the layouts)", layout_names(config_paths), width))
     lines.append("")
@@ -397,7 +395,6 @@ def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = 
     lines.extend([
         "",
         "Configured defaults:",
-        f"  layout: {defaults.get('layout') if defaults.get('layout') is not None else '(none)'}",
         f"  speed: {defaults.get('speed', 50)}",
         f"  colour: {default_colour if default_colour is not None else '(none)'}",
         f"  direction: {defaults.get('direction', 'forward')}",
@@ -596,11 +593,11 @@ def _build_widget_scenes(theme: str, speed: int, text: str, image_paths: list[st
     return scenes
 
 
-def _build_scene_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
+def _build_screen_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
     scenes = []
     for scene_name in config_scene_names(config_paths):
         runtime = resolve_config_scene(scene_name, parser, config_paths)
-        runtime["showcase_header_lines"] = [f"scene: {scene_name}"]
+        runtime["showcase_header_lines"] = [f"screen: {scene_name}"]
         scenes.append(runtime)
     return scenes
 
@@ -622,11 +619,11 @@ def _build_widget_showcase(theme: str, speed: int, text: str, image_paths: list[
     }
 
 
-def _build_scene_showcase(parser, config_paths: tuple[str, ...] | None = None) -> dict:
+def _build_screen_showcase(parser, config_paths: tuple[str, ...] | None = None) -> dict:
     resolved_paths = config_paths or ()
-    scenes = _build_scene_scenes(parser, resolved_paths)
+    scenes = _build_screen_scenes(parser, resolved_paths)
     if not scenes:
-        parser.error("--scenes found no configured scenes to show")
+        parser.error("--screens found no configured screens to show")
     return {
         "active": True,
         "scenes": scenes,
@@ -837,12 +834,18 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         _print_layouts(config_paths)
         raise SystemExit(0)
 
-    if args.widgets and args.scenes:
-        parser.error("choose only one standalone showcase mode: --widgets or --scenes")
+    if not raw_argv:
+        _print_no_args_message()
+        raise SystemExit(0)
 
-    if (args.widgets or args.scenes) and (
-        args.scene is not None or
-        args.layout is not None or
+    glitch_explicit = any(a == "--screen-glitch" or a.startswith("--screen-glitch=") for a in raw_argv)
+
+    if args.widgets and args.screens:
+        parser.error("choose only one standalone showcase mode: --widgets or --screens")
+
+    if (args.widgets or args.screens) and (
+        args.screen is not None or
+        args.screen_layout is not None or
         args.region_widget or
         args.region_speed or
         args.region_text or
@@ -850,47 +853,29 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         args.region_direction or
         args.region_colour or
         args.region_image or
-        args.direction is not None or
-        args.default_speed is not None or
         args.default_colour is not None or
-        args.default_widget is not None
+        args.default_widget is not None or
+        args.screen_theme is not None or
+        glitch_explicit
     ):
-        parser.error("standalone showcase modes (--widgets, --scenes) do not combine with --scene, --layout, or region overrides")
+        parser.error("standalone showcase modes (--widgets, --screens) do not combine with --screen, --screen-layout, or region overrides")
 
-    if not args.widgets and not args.scenes and args.scene is None and args.layout is None and config_defaults(config_paths).get("layout") is None:
-        parser.error("specify either --scene, --layout, --widgets, or --scenes, or configure defaults.layout")
-
-    speed_explicit = any(a == "--default-speed" or a.startswith("--default-speed=") for a in raw_argv)
     colour_explicit = any(a in {"--default-colour", "--default-color"} or a.startswith("--default-colour=") or a.startswith("--default-color=") for a in raw_argv)
     widget_explicit = any(a == "--default-widget" or a.startswith("--default-widget=") for a in raw_argv)
-    direction_explicit = any(a == "--direction" or a.startswith("--direction=") for a in raw_argv)
-    text_explicit = any(a == "--text" or a.startswith("--text=") for a in raw_argv)
-    image_explicit = any(a == "--image" or a.startswith("--image=") for a in raw_argv)
-    glitch_explicit = any(a == "--glitch" or a.startswith("--glitch=") for a in raw_argv)
+    theme_explicit = any(a == "--screen-theme" or a.startswith("--screen-theme=") for a in raw_argv)
 
     configured_defaults = config_defaults(config_paths)
     default_images = default_image_paths(config_paths)
-    image_paths = []
-    if args.image is not None and len(args.image) < 1:
-        parser.error("--image expects at least one file path")
-    if image_explicit and args.image:
-        for raw_path in args.image:
-            path = os.path.abspath(os.path.expanduser(raw_path))
-            if not os.path.isfile(path):
-                parser.error(f"image file not found: {raw_path}")
-            image_paths.append(path)
+    image_paths = default_images[:]
 
-    runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else configured_defaults.get("speed", 50)
-    runtime_text = args.text.strip() if text_explicit and args.text is not None else ""
-    runtime_theme = args.theme or configured_defaults.get("theme", DEFAULT_THEME)
+    runtime_speed = configured_defaults.get("speed", 50)
+    runtime_text = ""
+    runtime_theme = args.screen_theme or configured_defaults.get("theme", DEFAULT_THEME)
     runtime_glitch = max(0.0, configured_defaults.get("glitch", 0.0))
     runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("color")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
-    runtime_direction = args.direction if direction_explicit and args.direction is not None else configured_defaults.get("direction", "forward")
+    runtime_direction = configured_defaults.get("direction", "forward")
     widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
-
-    if not image_explicit:
-        image_paths = default_images[:]
 
     if args.widgets:
         widget_showcase = _build_widget_showcase(
@@ -905,33 +890,33 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         )
         config_scene_runtime = widget_showcase["initial"]
         runtime_layout_name = config_scene_runtime["layout"]
-    elif args.scenes:
-        widget_showcase = _build_scene_showcase(
+    elif args.screens:
+        widget_showcase = _build_screen_showcase(
             parser,
             config_paths,
         )
         config_scene_runtime = widget_showcase["initial"]
         runtime_layout_name = config_scene_runtime["layout"]
     else:
-        base_runtime = resolve_config_scene(args.scene, parser, config_paths) if args.scene else None
-        runtime_layout_name = args.layout or (base_runtime["layout"] if base_runtime else configured_defaults.get("layout"))
+        base_runtime = resolve_config_scene(args.screen, parser, config_paths) if args.screen else None
+        runtime_layout_name = args.screen_layout or (base_runtime["layout"] if base_runtime else None)
         if runtime_layout_name is not None:
             runtime_layout_name = canonical_layout_name(runtime_layout_name, config_paths)
         if not runtime_layout_name:
             parser.error("no layout available")
 
-        runtime_theme = args.theme or (base_runtime["theme"] if base_runtime else configured_defaults.get("theme", DEFAULT_THEME))
-        runtime_speed = args.default_speed if speed_explicit and args.default_speed is not None else (base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50))
-        runtime_text = args.text.strip() if text_explicit and args.text is not None else (base_runtime["text"] if base_runtime else "")
-        runtime_glitch = max(0.0, args.glitch if glitch_explicit and args.glitch is not None else (base_runtime["glitch"] if base_runtime else configured_defaults.get("glitch", 0.0)))
-        runtime_direction = args.direction if direction_explicit and args.direction is not None else (base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "forward"))
+        runtime_theme = args.screen_theme or (base_runtime["theme"] if base_runtime else configured_defaults.get("theme", DEFAULT_THEME))
+        runtime_speed = base_runtime["speed"] if base_runtime else configured_defaults.get("speed", 50)
+        runtime_text = base_runtime["text"] if base_runtime else ""
+        runtime_glitch = max(0.0, args.screen_glitch if glitch_explicit and args.screen_glitch is not None else (base_runtime["glitch"] if base_runtime else configured_defaults.get("glitch", 0.0)))
+        runtime_direction = base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "forward")
 
         has_cli_overrides = bool(
-            args.layout or args.region_widget or args.region_speed or args.region_text or args.region_theme or args.region_direction or args.region_colour or args.region_image or args.theme or speed_explicit or colour_explicit or widget_explicit or direction_explicit or text_explicit or glitch_explicit
+            args.screen_layout or args.region_widget or args.region_speed or args.region_text or args.region_theme or args.region_direction or args.region_colour or args.region_image or theme_explicit or colour_explicit or widget_explicit or glitch_explicit
         )
         if base_runtime is None or has_cli_overrides:
             config_scene_runtime = _apply_panel_widget_overrides(
-                base_runtime if (base_runtime and not args.layout) else None,
+                base_runtime if (base_runtime and not args.screen_layout) else None,
                 args.region_widget,
                 args.region_speed,
                 args.region_text,
@@ -941,7 +926,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
                 args.region_image,
                 parser,
                 layout_name=runtime_layout_name,
-                scene_name=args.scene or f"<cli:{runtime_layout_name}>",
+                scene_name=args.screen or f"<cli:{runtime_layout_name}>",
                 theme=runtime_theme,
                 speed=runtime_speed,
                 text=runtime_text,
@@ -962,15 +947,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     if runtime_speed is None:
         runtime_speed = config_scene_runtime["speed"]
 
-    if not 1 <= runtime_speed <= 100:
-        parser.error("--default-speed must be between 1 and 100")
     if runtime_default_colour is not None:
         runtime_default_colour = _validate_colour_value(runtime_default_colour, parser, "--default-colour")
-    if direction_explicit and args.direction is not None:
-        normalized_direction = _direction_value(args.direction)
-        if normalized_direction is None:
-            parser.error(f"--direction must be one of: {', '.join(CANONICAL_DIRECTION_CHOICES)}")
-        runtime_direction = normalized_direction
     if runtime_default_widget is not None and runtime_default_widget not in widget_names(config_paths):
         parser.error(f"--default-widget must be one of: {', '.join(widget_names(config_paths))}")
     if args.life_max < 1:
@@ -978,20 +956,20 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     if args.exit is not None and args.exit < 0:
         parser.error("--exit must be >= 0")
 
-    image_sources = config_scene_runtime["image_paths"] if not image_explicit else image_paths
+    image_sources = config_scene_runtime["image_paths"] or image_paths
     image_dependencies_met = image_module is not None and image_checker()
     image_mode_active = any(area["mode"] == "image" for area in config_scene_runtime["areas"])
-    if args.widgets or args.scenes:
+    if args.widgets or args.screens:
         image_mode_active = any(
             area["mode"] == "image"
             for scene in widget_showcase["scenes"]
             for area in scene["areas"]
         )
     if image_mode_active and not image_paths and not any(area.get("image_paths") for area in config_scene_runtime["areas"]):
-        parser.error("image mode requires --image PATH [PATH ...] or --region-image REGION=PATH")
+        parser.error("image mode requires configured default image sources or --region-image REGION=PATH")
     if image_mode_active and not image_dependencies_met:
         _degrade_runtime_image_dependencies(config_scene_runtime, IMAGE_DEPENDENCY_MESSAGE)
-        if args.widgets or args.scenes:
+        if args.widgets or args.screens:
             for scene in widget_showcase["scenes"]:
                 _degrade_runtime_image_dependencies(scene, IMAGE_DEPENDENCY_MESSAGE)
 
@@ -1005,14 +983,14 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "sidebar_mode": None,
         "theme": config_scene_runtime["theme"],
         "direction": config_scene_runtime.get("direction", runtime_direction),
-        "scene_name": "<widgets>" if args.widgets else ("<scenes>" if args.scenes else (args.scene or f"<cli:{runtime_layout_name}>")),
+        "scene_name": "<widgets>" if args.widgets else ("<screens>" if args.screens else (args.screen or f"<cli:{runtime_layout_name}>")),
         "themes": THEME_CHOICES[:],
         "config_scene": config_scene_runtime,
         "layout_name": config_scene_runtime["layout"],
         "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_scene_runtime["areas"]),
         "demo_state": {"active": False, "scenes": [], "idx": 0, "scene": None, "next": float("inf"), "done": False},
         "widget_showcase": widget_showcase,
-        "glitch_interval": runtime_glitch if not (args.widgets or args.scenes) else max(0.0, args.glitch if glitch_explicit and args.glitch is not None else 0.0),
+        "glitch_interval": runtime_glitch if not (args.widgets or args.screens) else max(0.0, args.screen_glitch if glitch_explicit and args.screen_glitch is not None else 0.0),
         "exit_after": args.exit,
         "image_paths": image_sources,
         "configured_defaults": configured_defaults,
@@ -1040,7 +1018,7 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(f"  {dim}{'─' * 54}{reset}")
     print(f"  {bold}speed{reset}  : default {config['speed']}/100", end="")
     print(f"  ({_show_delay(config['speed'])})")
-    print(f"  {bold}scene{reset}  : {config['scene_name']}")
+    print(f"  {bold}screen{reset} : {config['scene_name']}")
     print(f"  {bold}theme{reset}  : {config['theme']}")
     if config.get("default_colour") is not None:
         print(f"  {bold}colour{reset} : default {config['default_colour']}")

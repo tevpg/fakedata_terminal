@@ -90,7 +90,7 @@ Terminology note:
 
 The CLI should be understood as an invocation-time override layer:
 
-- choose a screen or layout
+- choose a screen, or construct an ad hoc screen
 - replace screen-wide values for this run
 - replace region assignments or region attributes for this run
 
@@ -185,7 +185,6 @@ This is the main precedence rule users care about.
 
 Use `defaults` for cross-screen application defaults such as:
 
-- default layout
 - default theme
 - default speed
 - default widget for uncovered panels
@@ -226,13 +225,11 @@ Use screen-wide keys for values that describe the whole screen:
 
 Screen-wide values should mean "for this screen as a whole", not "fallback for every region modifier".
 
-Important current behavior:
+Target behavior:
 
 - screen-wide `theme`, `speed`, `text`, `glitch`, and `direction` are runtime screen values
-- per-region modifier fallback is primarily handled by widget defaults plus region values
-- screen-wide `colour` and `direction` do act as per-area fallback in the current runtime path
-
-That asymmetry is worth remembering when reasoning about the current implementation.
+- per-region modifier fallback is handled by widget defaults plus region values
+- screen-wide values should not silently act as per-area fallback unless the model explicitly says so
 
 ### `screens.<name>.regions.<region>.*`
 
@@ -256,23 +253,13 @@ These are one-run overrides of broad screen/default behavior.
 Examples:
 
 - `--screen`
-- `--layout`
-- `--theme`
-- `--default-speed`
-- `--text`
-- `--glitch`
-- `--direction`
+- `--screen-layout`
+- `--screen-theme`
+- `--screen-glitch`
 - `--default-widget`
 - `--default-colour`
-- `--image`
 
 Use them when you want to patch the current run without editing YAML.
-
-Planning note:
-
-- this broad flag set is too permissive
-- screen text, direction, and image selection should move to YAML screen globals or region-level CLI/YAML inputs instead of broad one-shot flags
-- screen-wide speed also appears to be the wrong abstraction and should not be reinforced by CLI naming
 
 ### CLI region flags
 
@@ -307,13 +294,12 @@ The intended order is:
 2. local YAML overlays
 3. app-wide `defaults.*`
 4. widget-type defaults from `widgets.<widget>.*`
-5. CLI broad/default flags such as `--theme`, `--default-speed`, `--default-colour`, `--default-widget`, `--image`, `--direction`, and `--glitch`
+5. CLI broad/default flags such as `--screen-theme`, `--screen-glitch`, `--default-colour`, and `--default-widget`
 
 The result of this pass should be a set of effective defaults, not yet a fully resolved screen.
 
 Those defaults include things like:
 
-- default layout
 - default theme
 - default speed
 - default colour
@@ -377,9 +363,8 @@ Modifiers mean:
 
 Layout selection should be understood as:
 
-1. packaged/app default layout from `defaults.layout`
-2. screen layout from `screens.<name>.layout`
-3. explicit CLI `--layout`
+1. screen layout from `screens.<name>.layout`
+2. explicit CLI `--screen-layout`
 
 Region/widget selection should be understood as:
 
@@ -392,6 +377,12 @@ Important detail:
 - the default widget is not a competing region assignment
 - it only fills panels left unassigned after explicit screen and CLI region assignments are resolved
 
+Planning note:
+
+- remove the concept of a configured default layout
+- a default layout is only useful for the special case of running `fakedata_terminal` with no arguments
+- that no-args case should be handled by a short usage/inventory message instead of implicit layout selection
+
 ## Modifier Precedence by Area
 
 For a specific area modifier such as `speed`, `theme`, `colour`, `direction`, `text`, `image`, or `cycle`, the target order is:
@@ -403,7 +394,7 @@ For a specific area modifier such as `speed`, `theme`, `colour`, `direction`, `t
 5. CLI region override
 6. runtime hardcoded fallback
 
-For the current implementation, the most accurate compact summary is:
+The target compact summary is:
 
 - widget defaults are the main YAML fallback for per-area modifiers
 - screen region values override widget defaults
@@ -423,23 +414,47 @@ The target CLI model should follow these rules:
 In practice that means:
 
 - `--screen` selects a named composition
-- `--layout` replaces the screen layout or uses a layout without a screen
+- `--screen-layout` replaces the layout field of the screen being built for this invocation
+- `--screen-theme` and `--screen-glitch` replace screen-wide runtime values for this invocation
 - `--default-*` flags describe broad fallback behavior
 - `--region-*` flags are always more specific than non-region flags
 
+Structural rule:
+
+- there should be at most one layout selection per invocation
+- `--screen-layout` is that one invocation-scoped layout selector
+- if no `--screen` is supplied, `--screen-layout` creates an ad hoc screen using that layout plus any region/default overrides
+- if `--screen` is supplied, `--screen-layout` overrides that screen's `layout` field for this invocation
+
+### No-args behavior
+
+Running `fakedata_terminal` with no arguments should print a short orientation message rather than trying to infer a default layout or default screen.
+
+Target output:
+
+```text
+fakedata_terminal creates text screens of fake data displays for cinema backgrounds
+
+fakedata_terminal --screens to see prebuilt screens
+fakedata_terminal --widgets to see available widgets
+fakedata_terminal --layouts to see available layouts
+fakedata_terminal --list to list inventory of choices
+fakedata_terminal --help for help
+```
+
 ## CLI Naming Review
 
-The current broad runtime flags mix together three different jobs:
+The CLI cleanup work is mostly about removing or renaming older broad runtime flags that mixed together three different jobs:
 
 - selecting structure
 - overriding screen-wide values
 - defining fallback defaults
 
-That makes the naming harder to read than it should be. The table below separates those jobs by current behavior and proposes names that make the scope explicit.
+That naming was harder to read than it should be. The table below captures the required cleanup to reach the target model.
 
 | Current name | Current behavior | Proposed name |
 | --- | --- | --- |
-| `--layout` | structural override | `--layout` |
+| `--layout` | structural override | `--screen-layout` |
 | `--theme` | screen-wide override | `--screen-theme` |
 | `--default-speed` | screen-wide override, despite the name | remove |
 | `--text` | screen-wide override | remove |
@@ -451,19 +466,20 @@ That makes the naming harder to read than it should be. The table below separate
 
 ### Recommended changes
 
-The broad CLI should be made consistent around one rule:
+The target broad CLI follows one rule:
 
 - flags that replace screen-wide values should be named `--screen-*`
 - flags that provide fallback values should be named `--default-*`
 - structural selectors should keep structural names
 
-That leads to the following recommendations.
+That leads to the following required changes.
 
-### Keep as-is
+### Retain in the target model
 
-- `--layout`
-  - It is structural, not a fallback.
-  - The current name is already clear.
+- `--layout` -> `--screen-layout`
+  - Every normal invocation builds a screen.
+  - The flag should read as overriding the layout field of that screen.
+  - It should remain the single layout selector for the invocation.
 
 - `--default-widget`
   - This is a real default.
@@ -473,11 +489,9 @@ That leads to the following recommendations.
   - This is also a real default.
   - It is applied only when an area still has no colour.
 
-### Rename, but keep the current behavior
-
 - `--theme` -> `--screen-theme`
   - It overrides the screen/runtime theme for the current run.
-  - It does not behave like a fallback default once a screen is selected.
+  - It is not a fallback default once a screen is selected.
 
 - `--glitch` -> `--screen-glitch`
   - It overrides the screen-level glitch interval.
@@ -508,9 +522,10 @@ That leads to the following recommendations.
 If `--image` is removed in favor of `--region-image`, the region-scoped flag should become more flexible:
 
 - allow `--region-image` to accept a glob as well as a single path
-- document how shell expansion interacts with the flag
-- decide whether wildcard expansion is expected from the shell, from the application, or both
-- ensure quoted patterns such as `--region-image 'assets/*.png'` remain usable
+- document that shell wildcard expansion applies before the application sees arguments
+- treat quoted patterns such as `--region-image 'assets/*.png'` as regular globs to be resolved by the application
+- advise users to quote glob patterns when they want the application, not the shell, to resolve them
+- keep YAML and CLI glob semantics aligned as closely as practical
 
 ### Rename and removal policy
 
@@ -528,6 +543,7 @@ Anything outside that scope can adopt the new names when it is next updated.
 
 The intended cleanup is therefore direct:
 
+- rename `--layout` to `--screen-layout`
 - rename `--theme` to `--screen-theme`
 - rename `--glitch` to `--screen-glitch`
 - remove `--text`
@@ -540,7 +556,15 @@ The implementation work should:
 1. rename the supported public flags and config keys in-tree
 2. update help text, docs, examples, and packaged YAML to use only the new names
 3. expand `--region-image` to cover glob inputs with clearly documented wildcard semantics
-4. remove references to the old names rather than preserving compatibility shims
+4. add the post-parse resolved-screen validation pass described below
+5. remove references to the old names rather than preserving compatibility shims
+
+That includes:
+
+- keep only one layout selector per invocation
+- reject incompatible `--screen` and `--screen-layout` combinations before rendering starts
+- reject invalid resolved widget/modifier combinations before rendering starts
+- eagerly validate image inputs and image dependencies before rendering starts
 
 ### What should not be introduced
 
@@ -554,6 +578,55 @@ For example, adding both:
 would reinforce a concept that is not actually meaningful if speed should be region-specific.
 
 The cleaner model is to avoid broad speed flags entirely and keep speed in YAML defaults, widget defaults, and region-level overrides.
+
+Screen-wide timing control should not be expanded beyond the existing runtime `+` / `-` adjustment behavior.
+
+Timing configuration should otherwise remain widget-level rather than screen-configurable.
+
+## Post-Parse Validation
+
+The runtime should perform a full resolved-screen lint pass after parsing CLI arguments and applying overrides, but before any rendering begins.
+
+This is a startup validation step for the requested invocation, not a late runtime check.
+
+The goal is to catch every possible error before curses setup, animation startup, or partial rendering.
+
+The validation target is the final screen spec that would be rendered for this invocation.
+
+That pass should check at least:
+
+- do the resolved region assignments fit the resolved layout
+- if a screen is invoked with `--screen-layout`, are its region assignments compatible with that layout
+- are widget modifiers valid for the resolved widget assigned to each region
+- are image files present and readable
+- can image inputs be converted to ASCII with the currently available dependencies
+- does every `cycle.widgets` entry name a real supported widget
+- do cycle definitions avoid invalid members such as recursive or disallowed widget choices
+
+Modifier validation should follow these special rules:
+
+- modifiers supplied only through defaults are not errors just because a particular resolved widget does not use them
+- stale modifiers left attached to a region whose widget was overridden are not errors if they are merely inert leftovers
+
+Example:
+
+- if YAML assigns region `P1` to widget `gauge` with `direction: backward`
+- and the CLI changes that region to `life`
+- then `direction: backward` should not be treated as a fatal error for that invocation if it is only an inherited unused appendage
+
+Image validation should be eager:
+
+- verify that referenced files exist during the pre-render lint pass
+- attempt the ASCII conversion path during that pass as well
+- this should surface missing `jp2a`, missing Pillow support, unreadable files, or decode failures before rendering starts
+
+Error reporting should describe the resolved invocation context, for example:
+
+- screen/layout incompatibility
+- invalid modifier for resolved widget
+- missing image dependency
+- unreadable image file
+- unknown cycle widget
 
 ## Naming Rules
 
@@ -582,28 +655,28 @@ And one slightly longer version:
 4. screens compose a screen
 5. CLI overrides the chosen screen for one execution
 
-## Transitional Notes
+## Transition Work
 
-The codebase is still moving toward this full target split.
+The codebase should be brought into this model by making the remaining structural changes explicit:
 
-Today:
+- adopt `data/screens.yaml` and `screens.<name>.*` terminology everywhere user-facing
+- finish extracting widget metadata and widget defaults into `widgets.yaml`
+- rename CLI flags to the target spellings used in this document
+- remove broad flags that do not fit the model
+- implement the resolved-screen validation pass before any rendering begins
+- update packaged configs, examples, tests, and docs so they express only the target model
 
-- `data/layouts.yaml` and `data/screens.yaml` are part of the automatic packaged base
-- top-level `widgets:` entries in the merged screen catalog already participate in precedence for widget defaults
-- widget metadata still also exists in code and draft `widgets.yaml` work is in progress
+Resolved decisions that should now be treated as fixed during implementation:
 
-So this document should be read as:
-
-- the intended stable model
-- closely aligned with current behavior
-- but stricter and clearer than the current implementation in a few places
+- do not add `screens.<name>.defaults`; screen-wide values remain direct screen fields
+- leave `enabled` runtime enforcement undecided for now; do not block current cleanup work on it
+- `--region-image` should accept ordinary glob patterns, with quoted CLI patterns resolved by the application
+- keep timing configuration widget-level; the only screen-wide timing control is runtime `+` / `-`
 
 ## Non-Goals
 
 This document does not try to settle every schema question. In particular, it does not require a final answer yet on:
 
-- whether screens should gain `screens.<name>.defaults`
 - whether `enabled` is validation-only or also enforced at runtime
-- the final CLI naming cleanup
 
 Those decisions should be made in a way that preserves the model above, not replaces it.

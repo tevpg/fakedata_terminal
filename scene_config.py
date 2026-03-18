@@ -1,4 +1,4 @@
-"""Load YAML scene definitions, merge overlays, and adapt them to the runtime."""
+"""Load YAML screen definitions, merge overlays, and adapt them to the runtime."""
 
 from __future__ import annotations
 
@@ -32,18 +32,18 @@ except ImportError:
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 LAYOUT_CONFIG_PATH = PACKAGE_DIR / "data" / "layouts.yaml"
-SCENE_CONFIG_PATH = PACKAGE_DIR / "data" / "scenes.yaml"
+SCREEN_CONFIG_PATH = PACKAGE_DIR / "data" / "screens.yaml"
 PACKAGE_CONFIG_PATHS = (
     LAYOUT_CONFIG_PATH,
-    SCENE_CONFIG_PATH,
+    SCREEN_CONFIG_PATH,
 )
-USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "scenes.yaml"
+USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "screens.yaml"
 PROJECT_CONFIG_NAMES = (
     ".fakedata-terminal.yaml",
     ".fakedata-terminal.yml",
 )
 
-TOP_LEVEL_KEYS = {"defaults", "layouts", "scenes", "widgets"}
+TOP_LEVEL_KEYS = {"defaults", "layouts", "screens", "widgets"}
 DEFAULT_KEYS = {"layout", "theme", "speed", "image", "widget", "colour", "color", "glitch", "direction"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
@@ -182,11 +182,11 @@ def _normalize_config_paths(config_paths: list[str] | tuple[str, ...] | None) ->
 def _load_catalog_file(config_path: str) -> dict[str, Any]:
     path = Path(config_path)
     if not path.is_file():
-        raise ValueError(f"Scene config file not found: {path}")
+        raise ValueError(f"Screen config file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Scene config root must be a mapping: {path}")
+        raise ValueError(f"Screen config root must be a mapping: {path}")
     return _normalize_catalog_paths(data, path)
 
 
@@ -212,10 +212,10 @@ def load_scene_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str,
 
 def config_scene_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     catalog = load_scene_catalog(config_paths)
-    scenes = catalog.get("scenes", {})
-    if not isinstance(scenes, dict):
+    screens = catalog.get("screens", {})
+    if not isinstance(screens, dict):
         return []
-    return list(scenes.keys())
+    return list(screens.keys())
 
 
 def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -495,110 +495,110 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 if not isinstance(regions, dict):
                     issues.append(f"{config_label}: layout '{layout_name}' regions must be a mapping")
 
-    scenes = catalog.get("scenes", {})
-    if scenes is not None:
-        if not isinstance(scenes, dict):
-            issues.append(f"{config_label}: scenes must be a mapping")
+    screens = catalog.get("screens", {})
+    if screens is not None:
+        if not isinstance(screens, dict):
+            issues.append(f"{config_label}: screens must be a mapping")
         else:
             layout_names_set = set(layout_names(config_paths))
-            for scene_name, scene_cfg in scenes.items():
+            for scene_name, scene_cfg in screens.items():
                 if not isinstance(scene_cfg, dict):
-                    issues.append(f"{config_label}: scene '{scene_name}' must be a mapping")
+                    issues.append(f"{config_label}: screen '{scene_name}' must be a mapping")
                     continue
-                _unknown_keys(scene_cfg, SCENE_KEYS, f"scenes.{scene_name}", issues)
+                _unknown_keys(scene_cfg, SCENE_KEYS, f"screens.{scene_name}", issues)
                 layout_name = scene_cfg.get("layout")
                 if layout_name and canonical_layout_name(layout_name, config_paths) is None:
-                    issues.append(f"{config_label}: scene '{scene_name}' references unknown layout '{layout_name}'")
+                    issues.append(f"{config_label}: screen '{scene_name}' references unknown layout '{layout_name}'")
                 glitch = scene_cfg.get("glitch")
                 if glitch is not None:
                     try:
                         glitch_value = float(glitch)
                     except (TypeError, ValueError):
-                        issues.append(f"{config_label}: scene '{scene_name}' glitch must be a number")
+                        issues.append(f"{config_label}: screen '{scene_name}' glitch must be a number")
                     else:
                         if glitch_value < 0:
-                            issues.append(f"{config_label}: scene '{scene_name}' glitch must be >= 0")
-                _speed_issues(scene_cfg.get("speed"), f"{config_label}: scene '{scene_name}' speed", issues)
+                            issues.append(f"{config_label}: screen '{scene_name}' glitch must be >= 0")
+                _speed_issues(scene_cfg.get("speed"), f"{config_label}: screen '{scene_name}' speed", issues)
                 scene_color = scene_cfg.get("color", scene_cfg.get("colour"))
                 if scene_color is not None and _color_value(scene_color) is None:
-                    issues.append(f"{config_label}: scene '{scene_name}' colour must be a recognized colour name")
+                    issues.append(f"{config_label}: screen '{scene_name}' colour must be a recognized colour name")
                 direction = scene_cfg.get("direction")
                 if direction is not None and _direction_value(direction) is None:
                     issues.append(
-                        f"{config_label}: scene '{scene_name}' direction must be one of: forward, backward, random, none"
+                        f"{config_label}: screen '{scene_name}' direction must be one of: forward, backward, random, none"
                     )
                 regions = scene_cfg.get("regions", {})
                 if not isinstance(regions, dict):
-                    issues.append(f"{config_label}: scene '{scene_name}' regions must be a mapping")
+                    issues.append(f"{config_label}: screen '{scene_name}' regions must be a mapping")
                     continue
                 for region_name, region_cfg in regions.items():
                     if not isinstance(region_cfg, dict):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' must be a mapping"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' must be a mapping"
                         )
                         continue
-                    _unknown_keys(region_cfg, REGION_KEYS, f"scenes.{scene_name}.regions.{region_name}", issues)
-                    _speed_issues(region_cfg.get("speed"), f"{config_label}: scene '{scene_name}' region '{region_name}' speed", issues)
+                    _unknown_keys(region_cfg, REGION_KEYS, f"screens.{scene_name}.regions.{region_name}", issues)
+                    _speed_issues(region_cfg.get("speed"), f"{config_label}: screen '{scene_name}' region '{region_name}' speed", issues)
                     region_color = region_cfg.get("color", region_cfg.get("colour"))
                     if region_color is not None and _color_value(region_color) is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' colour must be a recognized colour name"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' colour must be a recognized colour name"
                         )
                     direction = region_cfg.get("direction")
                     if direction is not None and _direction_value(direction) is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' direction must be one of: forward, backward, random, none"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' direction must be one of: forward, backward, random, none"
                         )
                     widget = region_cfg.get("widget")
                     if widget is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' is missing 'widget'"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' is missing 'widget'"
                         )
                     elif not _supported_widget(str(widget)):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
                         )
                     else:
                         _validate_supported_modifiers(
                             str(widget),
                             region_cfg,
-                            f"{config_label}: scene '{scene_name}' region '{region_name}'",
+                            f"{config_label}: screen '{scene_name}' region '{region_name}'",
                             issues,
                         )
                     cycle_spec = region_cfg.get("cycle")
                     if cycle_spec is not None and not isinstance(cycle_spec, dict):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' cycle must be a mapping"
+                                f"{config_label}: screen '{scene_name}' region '{region_name}' cycle must be a mapping"
                         )
                     elif isinstance(cycle_spec, dict):
-                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"scenes.{scene_name}.regions.{region_name}.cycle", issues)
+                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"screens.{scene_name}.regions.{region_name}.cycle", issues)
                         widgets = cycle_spec.get("widgets")
                         if widgets is not None and not isinstance(widgets, list):
                             issues.append(
-                                f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets must be a list"
+                                f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets must be a list"
                             )
                         elif isinstance(widgets, list):
                             if str(widget) != "cycle":
                                 issues.append(
-                                    f"{config_label}: scene '{scene_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
+                                    f"{config_label}: screen '{scene_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
                                 )
                             for idx, cycle_widget in enumerate(widgets):
                                 cycle_widget_name = str(cycle_widget)
                                 if not _supported_widget(cycle_widget_name):
                                     issues.append(
-                                        f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
+                                        f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
                                     )
                                 elif cycle_widget_name in {"cycle", "blank"}:
                                     issues.append(
-                                        f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
+                                        f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
                                     )
                     image_spec = region_cfg.get("image")
                     if image_spec is not None and not isinstance(image_spec, dict):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' image must be a mapping"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' image must be a mapping"
                         )
                     elif isinstance(image_spec, dict):
-                        _unknown_keys(image_spec, IMAGE_KEYS, f"scenes.{scene_name}.regions.{region_name}.image", issues)
+                        _unknown_keys(image_spec, IMAGE_KEYS, f"screens.{scene_name}.regions.{region_name}.image", issues)
 
     widgets = catalog.get("widgets", {})
     if widgets is not None:
@@ -912,7 +912,7 @@ def _config_label(config_paths: tuple[str, ...] | None) -> str:
     normalized = _normalize_config_paths(config_paths)
     if len(normalized) == 1:
         return Path(normalized[0]).name
-    return "merged scene config"
+    return "merged screen config"
 
 
 def _resolve_config_path(pathish: Any, base_dir: Path) -> str:
@@ -979,9 +979,9 @@ def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict
             if any(key in widget_cfg for key in ("paths", "path", "glob")):
                 _normalize_image_mapping(widget_cfg, base_dir)
             _normalize_image_mapping(widget_cfg.get("image"), base_dir)
-    scenes = catalog.get("scenes")
-    if isinstance(scenes, dict):
-        for scene_cfg in scenes.values():
+    screens = catalog.get("screens")
+    if isinstance(screens, dict):
+        for scene_cfg in screens.values():
             if not isinstance(scene_cfg, dict):
                 continue
             regions = scene_cfg.get("regions")
@@ -1032,7 +1032,7 @@ def _region_direction(region_cfg: Any) -> str | None:
 
 def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
-    scenes = catalog.get("scenes", {})
+    scenes = catalog.get("screens", {})
     defaults = catalog.get("defaults", {})
 
     if scene_name not in scenes:
@@ -1040,12 +1040,12 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
 
     scene_cfg = scenes[scene_name]
     if not isinstance(scene_cfg, dict):
-        parser.error(f"scene '{scene_name}' must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{scene_name}' must be a mapping in {_config_label(config_paths)}")
 
     layout = scene_cfg.get("layout")
     regions = scene_cfg.get("regions", {})
     if not isinstance(regions, dict):
-        parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     scene_speed = scene_cfg.get("speed", defaults.get("speed", 50))
     theme = scene_cfg.get("theme", defaults.get("theme", "science"))
@@ -1055,9 +1055,9 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
         full_cfg = regions.get("full")
         widget = _widget_name(full_cfg)
         if not widget:
-            parser.error(f"scene '{scene_name}' uses layout 'full' but has no 'full' widget assignment")
+            parser.error(f"screen '{scene_name}' uses layout 'full' but has no 'full' widget assignment")
         if not _supported_widget(widget) or widget in {"sparkline", "readouts"}:
-            parser.error(f"scene '{scene_name}' uses widget '{widget}', which is not supported by the legacy runtime")
+            parser.error(f"screen '{scene_name}' uses widget '{widget}', which is not supported by the legacy runtime")
         return {
             "scene_name": scene_name,
             "theme": theme,
@@ -1077,11 +1077,11 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
         left_widget = _widget_name(left_cfg)
         right_widget = _widget_name(right_cfg)
         if not left_widget or not right_widget:
-            parser.error(f"scene '{scene_name}' uses layout 'split_left_right' but must define both 'left' and 'right'")
+            parser.error(f"screen '{scene_name}' uses layout 'split_left_right' but must define both 'left' and 'right'")
         if (not _supported_widget(left_widget) or left_widget in {"sparkline", "readouts"}
                 or not _supported_widget(right_widget) or right_widget in {"sparkline", "readouts"}):
             bad = left_widget if (not _supported_widget(left_widget) or left_widget in {"sparkline", "readouts"}) else right_widget
-            parser.error(f"scene '{scene_name}' uses widget '{bad}', which is not supported by the legacy runtime")
+            parser.error(f"screen '{scene_name}' uses widget '{bad}', which is not supported by the legacy runtime")
         return {
             "scene_name": scene_name,
             "theme": theme,
@@ -1100,7 +1100,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
         }
 
     parser.error(
-        f"scene '{scene_name}' uses layout '{layout}', which is not yet supported by the current runtime; "
+        f"screen '{scene_name}' uses layout '{layout}', which is not yet supported by the current runtime; "
         "currently supported config layouts: full, split_left_right"
     )
 
@@ -1108,10 +1108,10 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
 def _parse_region_spec(layout_name: str, layout_cfg: dict[str, Any], region_name: str, parser, scene_name: str) -> list[str]:
     normalized = _normalize_region_expr_in_layout(layout_name, layout_cfg, region_name)
     if normalized is None:
-        parser.error(f"scene '{scene_name}' references unknown region '{region_name}'")
+        parser.error(f"screen '{scene_name}' references unknown region '{region_name}'")
     panel_names = normalized.split("+")
     if not panel_names:
-        parser.error(f"scene '{scene_name}' has empty region spec for '{region_name}'")
+        parser.error(f"screen '{scene_name}' has empty region spec for '{region_name}'")
     return panel_names
 
 
@@ -1131,7 +1131,7 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
     bbox = (x1 - x0) * (y1 - y0)
     if abs(covered - bbox) > 0.0005:
         parser.error(
-            f"scene '{scene_name}' region '{region_name}' does not resolve to a single rectangle"
+            f"screen '{scene_name}' region '{region_name}' does not resolve to a single rectangle"
         )
     return {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
 
@@ -1144,7 +1144,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                            direction: str = "forward",
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
-        parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
     widget_defaults = widget_defaults_catalog(config_paths)
@@ -1156,9 +1156,9 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     for region_name, region_cfg in regions_cfg.items():
         widget = _widget_name(region_cfg)
         if not widget:
-            parser.error(f"scene '{scene_name}' region '{region_name}' has no widget")
+            parser.error(f"screen '{scene_name}' region '{region_name}' has no widget")
         if not _supported_widget(widget):
-            parser.error(f"scene '{scene_name}' uses unsupported widget '{widget}'")
+            parser.error(f"screen '{scene_name}' uses unsupported widget '{widget}'")
         widget_cfg = widget_defaults.get(widget, {})
         panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, scene_name)
         rect = _rect_for_panels(layout_cfg, panel_names, parser, scene_name, region_name)
@@ -1180,7 +1180,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
         )
         overlap = set(panel_names) & set(seen)
         if overlap:
-            parser.error(f"scene '{scene_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
+            parser.error(f"screen '{scene_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
         seen.extend(panel_names)
         if widget == "image":
             image_paths.extend(area["image_paths"])
@@ -1190,7 +1190,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     if uncovered:
         if not default_widget:
             parser.error(
-                f"scene '{scene_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
+                f"screen '{scene_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
             )
         if not _supported_widget(default_widget):
             parser.error(f"default widget '{default_widget}' is unsupported")
@@ -1257,7 +1257,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
 
 def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
-    scenes = catalog.get("scenes", {})
+    scenes = catalog.get("screens", {})
     defaults = config_defaults(config_paths)
 
     if scene_name not in scenes:
@@ -1265,7 +1265,7 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
 
     scene_cfg = scenes[scene_name]
     if not isinstance(scene_cfg, dict):
-        parser.error(f"scene '{scene_name}' must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{scene_name}' must be a mapping in {_config_label(config_paths)}")
 
     layout_name = scene_cfg.get("layout")
     regions_cfg = scene_cfg.get("regions", {})

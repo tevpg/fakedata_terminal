@@ -1,42 +1,23 @@
 # Config Cleanup TODO
 
-## Remaining Work
+This document is the implementation backlog for bringing the codebase into the target model defined in `configuration_model.md`.
 
-- decide and implement the final scene schema
-  - specifically whether to add `scenes.<name>.defaults`
-- make `widgets.yaml` fully participate in the overlay model
-  - packaged widget config as base
-  - user/project/`--config` widget config layered over it
-- remove the remaining compatibility path for widget defaults from scene catalogs after widget overlays are in place
-- add startup validation for disabled-widget references
-  - scene uses a widget that merged widget config marks `enabled: false`
-  - cycle widget lists include disabled widgets
-  - default widget is disabled
-- add startup validation for mutual compatibility across YAML and CLI options
-  - reject modifier/widget mismatches that can be known before runtime
-  - example: `--region-image` on a region whose widget is neither `image` nor `cycle`
-  - example: region/scene config requests a modifier the selected widget does not support
-- decide whether `enabled` should affect runtime behavior or remain metadata-only
-- clean up CLI naming and semantics
-- go carefully over precedence and sequencing of:
-  - packaged YAML
-  - user/project/`--config` YAML overlays
-  - scene defaults
-  - region overrides
-  - CLI defaults and CLI region overrides
-- finish public docs/examples cleanup so `colour` is treated as canonical everywhere user-facing
-- add focused tests for:
-  - precedence resolution
-  - metadata-driven validation
-  - `colour`/`color` alias handling
-  - CLI/config backward-compatibility where still intended
+It is intentionally execution-oriented:
 
-## Target Model
+- the target model is already decided unless explicitly called out below
+- tasks should be implemented in chunks that leave the codebase runnable
+- startup validation should catch every avoidable error before rendering begins
+
+## Target State
 
 - `data/layouts.yaml`: geometry only
-- `data/widgets.yaml`: widget metadata, widget defaults, widget behavior/timing
-- `data/scenes.yaml`: app defaults and composed scenes
-- widget metadata/defaults/behavior remain overrideable via YAML overlays
+- `data/widgets.yaml`: widget metadata, widget defaults, widget behavior, widget timing
+- `data/screens.yaml`: app defaults and named screens
+- user/project/`--config` overlays participate in the same merge model for layouts, widgets, screens, and defaults
+- runtime terminology is `screen`, not `scene`, in user-facing config and CLI
+- the CLI builds one resolved screen per invocation
+- the CLI has exactly one layout selector per invocation: `--screen-layout`
+- the runtime validates the fully resolved screen after parsing and before rendering
 
 ## Naming Rules To Preserve
 
@@ -45,39 +26,133 @@
 - public/user-facing canonical spelling: `colour`
 - public/user-facing supported alias: `color`
 
+Apart from `colour`/`color` and supported colour-name aliases, the cleanup work should not preserve old public names as compatibility aliases.
+
 ## Validation Principle
 
 - detect errors at startup rather than while running, whenever possible
 
-Justification:
+That includes:
 
-- this is intended to run in the background of a film scene
-- it is undesirable to discover an avoidable error during a take if it could have been detected and fixed at startup
-
-Startup validation should catch as much as practical, including:
-
-- dependency problems
+- bad YAML structure
 - missing files or bad file paths
-- disabled widgets still referenced by scenes/defaults/cycle lists
-- unsupported modifier/widget combinations
-- invalid region/widget/config interactions that can be known before runtime
+- unsupported widget/modifier combinations that can be known before rendering
+- screen/layout incompatibilities
+- disabled widgets still referenced by resolved config
+- missing image dependencies or unreadable image inputs
 
-## Open Decisions
+## Execution Chunks
 
-1. Should `scenes.<name>.defaults` exist, or should scene-wide values remain direct scene fields?
-2. Should `enabled` be enforced at runtime in addition to startup validation?
-3. Exactly how should widget YAML overlays be discovered and merged?
-4. What should the final precedence order be across YAML layers and CLI overrides?
-5. What should the final CLI naming model be:
-   - keep current names
-   - move to `--scene-*` plus `--region-*`
-   - some hybrid
+### Chunk 1: Rename the user-facing model
 
-## Next Good Steps
+- replace user-facing `scene` terminology with `screen`
+- adopt `data/screens.yaml` and `screens.<name>.*` terminology consistently
+- update CLI/help/docs/examples to use:
+  - `--screen`
+  - `--screen-layout`
+  - `--screen-theme`
+  - `--screen-glitch`
+- remove the no-args implicit default-layout path
+- replace no-args behavior with the short orientation message described in `configuration_model.md`
 
-1. Decide the scene schema.
-2. Make widget metadata/behavior overlayable and validate disabled-widget references at startup.
-3. Remove the scene-catalog widget-default compatibility path.
-4. Review and lock down precedence/sequence rules across YAML and CLI.
-5. Clean up CLI naming after the scene schema is settled.
-6. Add tests before any further user-facing schema/CLI changes.
+Exit condition:
+
+- help text, packaged YAML, examples, and docs all speak the target vocabulary
+
+### Chunk 2: Lock the target CLI surface
+
+- rename `--layout` to `--screen-layout`
+- rename `--theme` to `--screen-theme`
+- rename `--glitch` to `--screen-glitch`
+- remove `--text`
+- remove `--direction` and `--screen-direction`
+- remove `--image` once `--region-image` can cover the intended use cases
+- remove `--default-speed` and `--screen-speed`
+- keep `--default-widget`
+- keep `--default-colour`
+- keep region-scoped overrides as the narrow patch layer
+
+Exit condition:
+
+- the supported CLI surface matches `configuration_model.md`
+
+### Chunk 3: Finish the config split and overlay model
+
+- make `widgets.yaml` a first-class packaged base file
+- merge widget overlays from user/project/`--config` sources the same way as layouts and screens
+- remove the remaining compatibility path that sources widget defaults from screen catalogs
+- ensure widget metadata, defaults, and timing are resolved from widget config rather than scattered fallback code
+
+Exit condition:
+
+- widget metadata/defaults/timing are sourced through the same overlay model as the rest of config
+
+### Chunk 4: Implement resolved-screen startup validation
+
+- add a post-parse, pre-render lint pass for the final resolved screen
+- validate screen/layout compatibility
+- validate resolved widget/modifier compatibility
+- validate disabled-widget references in defaults, screens, regions, and cycle lists
+- validate image files exist and are readable
+- eagerly exercise the image-to-ASCII path to surface missing `jp2a`, missing Pillow support, or decode failures
+- validate cycle widget lists contain real supported widgets only
+- allow inert leftover modifiers when a region widget is overridden and the leftover modifier is merely unused baggage
+
+Examples that should fail before rendering:
+
+- a screen references region aliases not present in the resolved layout
+- a cycle widget names an unsupported or disabled widget
+- a default widget is disabled
+- an image path does not exist
+
+Exit condition:
+
+- avoidable invocation/config errors are rejected before curses initialization
+
+### Chunk 5: Lock precedence and resolution behavior
+
+- align code paths with the precedence model in `configuration_model.md`
+- ensure defaults resolve before structure and modifiers
+- ensure `screens.<name>.*` provides screen-wide runtime values, not hidden per-region fallback
+- ensure widget defaults are the main per-region fallback layer
+- ensure region overrides are the narrowest and strongest config layer
+- ensure `--default-colour` behaves as the remaining broad late fallback only if that is still the intended model
+
+Exit condition:
+
+- runtime behavior matches the target mental model and precedence document
+
+### Chunk 6: Finish docs and tests
+
+- update packaged configs and examples to express only the target model
+- remove stale comments and transitional docs
+- add focused tests for:
+  - precedence resolution
+  - screen/layout compatibility validation
+  - resolved widget/modifier validation
+  - disabled-widget validation
+  - image validation and dependency failures
+  - `colour`/`color` alias handling
+  - CLI naming and no-args behavior
+
+Exit condition:
+
+- no stale user-facing model remains in docs/examples/tests
+
+## Resolved Decisions
+
+1. Do not add `screens.<name>.defaults`.
+   Screen-wide values remain direct screen fields.
+2. Leave `enabled` runtime enforcement undecided for now.
+   Do not block current cleanup work on that choice.
+3. `--region-image` should support regular glob patterns.
+   Advise users to quote glob patterns when they want the application to resolve them rather than the shell.
+4. Timing configuration remains widget-level.
+   The only screen-wide timing control is runtime `+` / `-`.
+
+## Immediate Next Steps
+
+1. Implement Chunk 1 and Chunk 2 together so the user-facing model changes in one aggressive pass.
+2. Implement Chunk 3 immediately after, so the code structure matches the renamed model.
+3. Implement Chunk 4 before further feature work.
+4. Use Chunk 5 and Chunk 6 to stabilize behavior and close out the transition.

@@ -402,7 +402,7 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
 
         scene_body["regions"][area["name"]] = region_body
 
-    export_doc = {"scenes": {scene_name: scene_body}}
+    export_doc = {"screens": {scene_name: scene_body}}
     dumped = yaml.safe_dump(export_doc, sort_keys=False, allow_unicode=False)
     return _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
 
@@ -814,7 +814,7 @@ def main(stdscr):
         else:
             side_label = side_mode if side_mode != "none" else "(none)"
         line3 = f" --sidebar {side_label} "
-        line4 = f" --theme {vocab_val} "
+        line4 = f" --screen-theme {vocab_val} "
         width = max(len(line1), len(line2), len(line3), len(line4)) + 1
         border_top = "┌" + "─" * (width - 1) + "┐"
         border_bot = "└" + "─" * (width - 1) + "┘"
