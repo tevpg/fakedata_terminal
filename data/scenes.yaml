@@ -353,6 +353,25 @@ scenes:
         colour: multi-dim
         direction: forward
 
+  science4:
+    layout: 2x2
+    glitch: 0.0
+    theme: military
+    regions:
+      P1+P3:
+        widget: scope
+        speed: 10
+        text: CHRONIMETRIC MATRIX COMPRIMISED\n\nPINEAPPLE OFFSET\n\nWARNINGS FROM
+          DOORBELL
+        colour: null
+        direction: backward
+      P2+P4:
+        widget: blocks
+        speed: 100
+        text: ''
+        colour: multi-dim
+        direction: forward
+
   geometries:
     note: >
       Derived from: --scene hacker --main image --image geom*png --sidebar gauges
