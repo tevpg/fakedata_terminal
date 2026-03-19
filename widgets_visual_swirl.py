@@ -1,4 +1,4 @@
-"""Orbit widget renderer."""
+"""Swirl widget renderer."""
 
 from __future__ import annotations
 
@@ -8,11 +8,12 @@ except ImportError:
     from widgets_visual_orbit import OrbitalFieldWidget
 
 
-class OrbitWidget(OrbitalFieldWidget):
+class SwirlWidget(OrbitalFieldWidget):
     ORBIT_FACTOR = 1.0
-    FALLOFF_EXPONENT = 0.1
-    DIFFERENTIAL_BASE = 0.55
-    DIFFERENTIAL_SPREAD = 2.10
+    FALLOFF_EXPONENT = 0.45
+    DIFFERENTIAL_BASE = 0.60
+    DIFFERENTIAL_SPREAD = 2.40
+    RADIAL_DECAY_PER_SECOND = -7.5
 
     def __init__(self, *, curses_module, stdscr, colour_attr_from_spec, normalize_colour_spec):
         super().__init__(
@@ -20,6 +21,6 @@ class OrbitWidget(OrbitalFieldWidget):
             stdscr=stdscr,
             colour_attr_from_spec=colour_attr_from_spec,
             normalize_colour_spec=normalize_colour_spec,
-            widget_name="orbit",
-            state_prefix="orbit",
+            widget_name="swirl",
+            state_prefix="swirl",
         )

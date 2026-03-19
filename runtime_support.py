@@ -477,6 +477,8 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "rotate_sig": None,
         "rotate_cells": [],
         "rotate_angle": 0.0,
+        "swirl_sig": None,
+        "swirl_cells": [],
         "sweep_warmed": False,
         "cycle_catalog": [],
         "cycle_widgets": [],

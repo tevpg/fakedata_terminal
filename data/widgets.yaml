@@ -119,6 +119,25 @@ widgets:
         none_duration_range_seconds: [0.5, 3.0]
         forward_duration_range_seconds: [0.5, 3.0]
 
+  swirl:
+    enabled: true
+    supports: [speed, color, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for spiral orbital motion.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
   gauge:
     enabled: true
     supports: [speed, color, text, direction]
@@ -309,6 +328,7 @@ widgets:
           - orbit
           - rotate
           - scope
+          - swirl
           - sparkline
           - tunnel
           - text_wide
