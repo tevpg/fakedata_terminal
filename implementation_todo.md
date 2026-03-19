@@ -50,6 +50,7 @@ Persistent reference material lives elsewhere:
 - 'swirl' widget
 - gauge multi-all coloured, the sweep arm changes colour to match the colour of current portion of rim
 - flash on/off chaotic disruptive, as though screen is basically going haywire and breaking down
+- new object class `sequence`: a series of scenes (or scene definitions?) advanced by keypress or possibly by timer.  Keypress seems more useful, if it goes to something like a dramatic change when actor initiates something....  a timer might loop through a series of scenes, like 'cycle' is for widgets.
 
 ## Open Questions
 

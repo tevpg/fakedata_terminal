@@ -788,34 +788,102 @@ def _first_non_none(*values: Any) -> Any:
     return None
 
 
+def _modifier_source(region_cfg: Any, key: str) -> str | None:
+    if not isinstance(region_cfg, dict):
+        return None
+    sources = region_cfg.get("__modifier_sources__")
+    if not isinstance(sources, dict):
+        return None
+    value = sources.get(key)
+    return str(value) if value is not None else None
+
+
 def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, Any], *,
                             default_color: str | None, screen_direction: str, default_images: list[str]) -> dict[str, Any]:
+    speed = region_cfg.get("speed") if isinstance(region_cfg, dict) else None
+    if speed is not None:
+        speed_source = _modifier_source(region_cfg, "speed") or "region"
+    else:
+        speed = widget_cfg.get("speed")
+        speed_source = "widget_default" if speed is not None else None
+
+    text = region_cfg.get("text") if isinstance(region_cfg, dict) else None
+    if text is not None:
+        text_source = _modifier_source(region_cfg, "text") or "region"
+    else:
+        text = widget_cfg.get("text")
+        text_source = "widget_default" if text is not None else None
+
+    theme = _region_theme(region_cfg)
+    if theme is not None:
+        theme_source = _modifier_source(region_cfg, "theme") or "region"
+    else:
+        theme = _region_theme(widget_cfg)
+        theme_source = "widget_default" if theme is not None else None
+
+    color = _region_color(region_cfg)
+    if color is not None:
+        color_source = _modifier_source(region_cfg, "color") or "region"
+    else:
+        color = _region_color(widget_cfg)
+        if color is not None:
+            color_source = "widget_default"
+        else:
+            color = default_color
+            color_source = "default" if color is not None else None
+
+    direction = _region_direction(region_cfg)
+    if direction is not None:
+        direction_source = _modifier_source(region_cfg, "direction") or "region"
+    else:
+        direction = _region_direction(widget_cfg)
+        if direction is not None:
+            direction_source = "widget_default"
+        else:
+            direction = screen_direction
+            direction_source = "screen" if direction is not None else None
+
     area_images: list[str] = []
+    image_source: str | None = None
     if widget == "image":
         area_images = _region_image_paths(region_cfg)
         if not area_images:
             area_images = _region_image_paths(widget_cfg)
+            if area_images:
+                image_source = "widget_default"
+        else:
+            image_source = _modifier_source(region_cfg, "image") or "region"
         if not area_images:
             area_images = default_images[:]
+            if area_images:
+                image_source = "default"
 
     cycle_widgets: list[str] = []
+    cycle_source: str | None = None
     if widget == "cycle":
         cycle_widgets = _region_cycle_widgets(region_cfg) or _region_cycle_widgets(widget_cfg)
+        if _region_cycle_widgets(region_cfg):
+            cycle_source = _modifier_source(region_cfg, "cycle") or "region"
+        elif cycle_widgets:
+            cycle_source = "widget_default"
 
     return {
-        "speed": _first_non_none(
-            region_cfg.get("speed") if isinstance(region_cfg, dict) else None,
-            widget_cfg.get("speed"),
-        ),
-        "text": _first_non_none(
-            region_cfg.get("text") if isinstance(region_cfg, dict) else None,
-            widget_cfg.get("text"),
-        ),
-        "theme": _first_non_none(_region_theme(region_cfg), _region_theme(widget_cfg)),
-        "color": _first_non_none(_region_color(region_cfg), _region_color(widget_cfg), default_color),
-        "direction": _first_non_none(_region_direction(region_cfg), _region_direction(widget_cfg), screen_direction),
+        "speed": speed,
+        "text": text,
+        "theme": theme,
+        "color": color,
+        "direction": direction,
         "image_paths": area_images,
         "cycle_widgets": cycle_widgets,
+        "modifier_sources": {
+            "speed": speed_source,
+            "text": text_source,
+            "theme": theme_source,
+            "color": color_source,
+            "direction": direction_source,
+            "image": image_source,
+            "cycle": cycle_source,
+        },
     }
 
 
@@ -836,6 +904,8 @@ def _build_area_definition(*, name: str, widget: str, panels: list[str], rect: d
         "direction": modifiers["direction"],
         "image_paths": modifiers["image_paths"],
         "cycle_widgets": modifiers["cycle_widgets"],
+        "modifier_sources": modifiers["modifier_sources"],
+        "allow_inert_modifiers": bool(region_cfg.get("__allow_inert_modifiers__")) if isinstance(region_cfg, dict) else False,
         "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
         "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
         "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,

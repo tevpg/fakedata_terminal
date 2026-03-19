@@ -200,12 +200,37 @@ def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, ima
     validated_image_paths = set()
     for area in runtime_screen.get("areas", []):
         widget = str(area.get("mode") or "")
+        if widget and widget not in widget_names(config_paths):
+            parser.error(f"resolved screen references unsupported widget '{widget}' in area '{area.get('name', '?')}'")
         if widget and not widget_enabled(widget, config_paths):
             parser.error(f"resolved screen references disabled widget '{widget}' in area '{area.get('name', '?')}'")
+
+        if not area.get("allow_inert_modifiers"):
+            supported = set(widget_supports(widget, config_paths))
+            sources = area.get("modifier_sources") or {}
+            active_modifiers = {
+                "speed": area.get("speed") is not None,
+                "text": bool(area.get("text")),
+                "theme": bool(area.get("theme")),
+                "color": bool(area.get("colour")),
+                "direction": bool(area.get("direction")),
+                "image": bool(area.get("image_paths")),
+                "cycle": bool(area.get("cycle_widgets")),
+            }
+            for modifier, is_active in active_modifiers.items():
+                if not is_active:
+                    continue
+                if sources.get(modifier) not in {"region", "cli"}:
+                    continue
+                if modifier not in supported:
+                    parser.error(
+                        f"resolved screen area '{area.get('name', '?')}' uses modifier '{modifier}' with widget '{widget}'"
+                    )
 
         if widget == "cycle":
             if not (area.get("cycle_widgets") or []):
                 parser.error(f"resolved screen area '{area.get('name', '?')}' uses widget 'cycle' without any cycle widgets")
+            seen_cycle_widgets = set()
             for cycle_widget in area.get("cycle_widgets") or []:
                 if cycle_widget not in widget_names(config_paths):
                     parser.error(
@@ -219,6 +244,11 @@ def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, ima
                     parser.error(
                         f"resolved screen area '{area.get('name', '?')}' cycle widget '{cycle_widget}' is not allowed"
                     )
+                if cycle_widget in seen_cycle_widgets:
+                    parser.error(
+                        f"resolved screen area '{area.get('name', '?')}' repeats cycle widget '{cycle_widget}'"
+                    )
+                seen_cycle_widgets.add(cycle_widget)
 
         image_paths = area.get("image_paths") or []
         if widget == "image" and not image_paths:
@@ -728,26 +758,44 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
                             speed: int, text: str, glitch: float, default_widget: str | None, default_colour: str | None,
                             direction: str,
                             config_paths: tuple[str, ...] | None = None) -> dict:
+    def _set_modifier_source(entry: dict, modifier: str, source: str) -> None:
+        entry.setdefault("__modifier_sources__", {})[modifier] = source
+
     regions_cfg = {}
     if base_scene:
         base_scene_direction = base_scene.get("direction")
         for area in base_scene["areas"]:
             region_key = "+".join(area["panels"])
             entry = {"widget": area["mode"]}
+            sources = area.get("modifier_sources") or {}
             if area.get("speed") is not None:
                 entry["speed"] = area["speed"]
+                if sources.get("speed") is not None:
+                    _set_modifier_source(entry, "speed", str(sources["speed"]))
             if area.get("text"):
                 entry["text"] = area["text"]
+                if sources.get("text") is not None:
+                    _set_modifier_source(entry, "text", str(sources["text"]))
             if area.get("theme"):
                 entry["theme"] = area["theme"]
+                if sources.get("theme") is not None:
+                    _set_modifier_source(entry, "theme", str(sources["theme"]))
             if area.get("direction") and area.get("direction") != base_scene_direction:
                 entry["direction"] = area["direction"]
+                if sources.get("direction") is not None:
+                    _set_modifier_source(entry, "direction", str(sources["direction"]))
             if area.get("colour"):
                 entry["colour"] = area["colour"]
+                if sources.get("color") is not None:
+                    _set_modifier_source(entry, "color", str(sources["color"]))
             if area.get("image_paths"):
                 entry["image"] = {"paths": area["image_paths"][:]}
+                if sources.get("image") is not None:
+                    _set_modifier_source(entry, "image", str(sources["image"]))
             if area.get("cycle_widgets"):
                 entry["cycle"] = {"widgets": area["cycle_widgets"][:]}
+                if sources.get("cycle") is not None:
+                    _set_modifier_source(entry, "cycle", str(sources["cycle"]))
             regions_cfg[region_key] = entry
 
     for item in region_widgets:
@@ -779,7 +827,10 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         for existing_key in to_delete:
             del regions_cfg[existing_key]
         current = regions_cfg.get(normalized_target, {})
+        previous_widget = current.get("widget")
         current["widget"] = widget
+        if previous_widget and previous_widget != widget:
+            current["__allow_inert_modifiers__"] = True
         regions_cfg[normalized_target] = current
 
     for item in region_speeds:
@@ -793,12 +844,14 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
             parser.error("--region-speed must be between 1 and 100")
         _require_region_widget_support(regions_cfg, normalized_target, target, "speed", parser, "--region-speed", config_paths)
         regions_cfg[normalized_target]["speed"] = panel_speed
+        _set_modifier_source(regions_cfg[normalized_target], "speed", "cli")
 
     for item in region_texts:
         target, panel_text = _parse_equals(item, parser, "--region-text")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-text", config_paths)
         _require_region_widget_support(regions_cfg, normalized_target, target, "text", parser, "--region-text", config_paths)
         regions_cfg[normalized_target]["text"] = panel_text
+        _set_modifier_source(regions_cfg[normalized_target], "text", "cli")
 
     for item in region_themes:
         target, theme_name = _parse_equals(item, parser, "--region-theme")
@@ -807,6 +860,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
             parser.error(f"--region-theme must be one of: {', '.join(THEME_CHOICES)}")
         _require_region_widget_support(regions_cfg, normalized_target, target, "theme", parser, "--region-theme", config_paths)
         regions_cfg[normalized_target]["theme"] = theme_name
+        _set_modifier_source(regions_cfg[normalized_target], "theme", "cli")
 
     for item in region_directions:
         target, direction_name = _parse_equals(item, parser, "--region-direction")
@@ -816,12 +870,14 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
             parser.error(f"--region-direction must be one of: {', '.join(CANONICAL_DIRECTION_CHOICES)}")
         _require_region_widget_support(regions_cfg, normalized_target, target, "direction", parser, "--region-direction", config_paths)
         regions_cfg[normalized_target]["direction"] = normalized_direction
+        _set_modifier_source(regions_cfg[normalized_target], "direction", "cli")
 
     for item in region_colours:
         target, colour_name = _parse_equals(item, parser, "--region-colour")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-colour", config_paths)
         _require_region_widget_support(regions_cfg, normalized_target, target, "color", parser, "--region-colour", config_paths)
         regions_cfg[normalized_target]["colour"] = _validate_colour_value(colour_name, parser, "--region-colour")
+        _set_modifier_source(regions_cfg[normalized_target], "color", "cli")
 
     for item in region_images:
         target, image_path = _parse_equals(item, parser, "--region-image")
@@ -832,6 +888,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         if glob.has_magic(os.path.expanduser(image_path)) and not expanded_paths:
             parser.error(f"--region-image glob for region '{target}' matched no files: {image_path}")
         image_cfg.setdefault("paths", []).extend(expanded_paths)
+        _set_modifier_source(regions_cfg[normalized_target], "image", "cli")
 
     return resolve_runtime_layout(
         layout_name,

@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from cli_config import prepare_runtime_config
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 
@@ -21,6 +23,36 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 class StartupValidationTests(unittest.TestCase):
+    def test_prepare_runtime_allows_inert_leftover_modifiers_after_widget_override(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(
+                "screens:\n"
+                "  localtest:\n"
+                "    layout: 2x2\n"
+                "    regions:\n"
+                "      P1:\n"
+                "        widget: gauge\n"
+                "        direction: backward\n"
+                "      P2:\n"
+                "        widget: text\n"
+                "      P3:\n"
+                "        widget: text\n"
+                "      P4:\n"
+                "        widget: text\n"
+            )
+            config_path = Path(handle.name)
+        try:
+            runtime = prepare_runtime_config(
+                ["--config", str(config_path), "--screen", "localtest", "--region-widget", "P1=life"],
+                image_module=None,
+                image_checker=lambda: False,
+                demo_scenes=[],
+            )
+        finally:
+            config_path.unlink(missing_ok=True)
+        p1 = next(area for area in runtime["config_screen"]["areas"] if area["name"] == "P1")
+        self.assertEqual(p1["mode"], "life")
+
     def test_no_args_shows_orientation_message(self) -> None:
         result = run_cli()
         self.assertEqual(result.returncode, 0)
@@ -117,6 +149,32 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("configuration validation failed:", result.stderr)
         self.assertIn("defaults.widget references disabled widget 'blank'", result.stderr)
+
+    def test_duplicate_cycle_widgets_fail_resolved_screen_validation(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(
+                "screens:\n"
+                "  localtest:\n"
+                "    layout: 2x2\n"
+                "    regions:\n"
+                "      P1:\n"
+                "        widget: cycle\n"
+                "        cycle:\n"
+                "          widgets: [gauge, gauge]\n"
+                "      P2:\n"
+                "        widget: text\n"
+                "      P3:\n"
+                "        widget: text\n"
+                "      P4:\n"
+                "        widget: text\n"
+            )
+            config_path = Path(handle.name)
+        try:
+            result = run_cli("--config", str(config_path), "--screen", "localtest")
+        finally:
+            config_path.unlink(missing_ok=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("repeats cycle widget 'gauge'", result.stderr)
 
 
 if __name__ == "__main__":
