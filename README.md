@@ -2,6 +2,12 @@
 
 FakeData Terminal renders animated, fake telemetry screens in the terminal. It combines configurable layouts, widget assignments, named themes, and optional image-to-ASCII rendering to produce cinematic dashboard displays.
 
+## Docs
+
+- [README.md](/home/tags/fakedata_terminal/README.md): user-facing usage and configuration overview
+- [configuration_model.md](/home/tags/fakedata_terminal/configuration_model.md): mental model, precedence, and validation rules
+- [implementation_todo.md](/home/tags/fakedata_terminal/implementation_todo.md): remaining implementation backlog
+
 ## What It Does
 
 - Renders multi-panel terminal screens using `curses`
