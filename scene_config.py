@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
 from functools import lru_cache
 import glob
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -629,8 +631,14 @@ def format_layout_diagrams(config_paths: tuple[str, ...] | None = None) -> str:
 def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
     panels = layout_cfg.get("panels", {})
     regions = layout_cfg.get("regions", {})
-    width = 31
-    height = 7
+    x_bounds = _axis_boundaries(panels, axis="x")
+    y_bounds = _axis_boundaries(panels, axis="y")
+    x_steps = _axis_step_sizes(x_bounds)
+    y_steps = _axis_step_sizes(y_bounds)
+    x_positions = _scaled_axis_positions(x_steps, scale=4)
+    y_positions = _scaled_axis_positions(y_steps, scale=2)
+    width = x_positions[-1] + 1 if x_positions else 1
+    height = y_positions[-1] + 1 if y_positions else 1
     masks = [[0 for _ in range(width)] for _ in range(height)]
 
     left = 1
@@ -639,21 +647,16 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
     down = 8
     eps = 0.0005
 
-    specs = {
-        name: {
-            "x0": float(spec["x"]),
-            "y0": float(spec["y"]),
-            "x1": float(spec["x"]) + float(spec["w"]),
-            "y1": float(spec["y"]) + float(spec["h"]),
-        }
-        for name, spec in panels.items()
-    }
+    specs = {}
+    for name, spec in panels.items():
+        x0 = _as_fraction(spec["x"])
+        y0 = _as_fraction(spec["y"])
+        x1 = x0 + _as_fraction(spec["w"])
+        y1 = y0 + _as_fraction(spec["h"])
+        specs[name] = {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
 
-    def xmap(value: float) -> int:
-        return int(round(value * (width - 1)))
-
-    def ymap(value: float) -> int:
-        return int(round(value * (height - 1)))
+    x_lookup = {bound: pos for bound, pos in zip(x_bounds, x_positions)}
+    y_lookup = {bound: pos for bound, pos in zip(y_bounds, y_positions)}
 
     def add_horizontal(y: int, x0: int, x1: int) -> None:
         for x in range(x0, x1 + 1):
@@ -669,26 +672,15 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
             if y < y1:
                 masks[y][x] |= down
 
-    add_horizontal(0, 0, width - 1)
-    add_horizontal(height - 1, 0, width - 1)
-    add_vertical(0, 0, height - 1)
-    add_vertical(width - 1, 0, height - 1)
-
-    panel_items = list(specs.items())
-    for idx, (_, a) in enumerate(panel_items):
-        for _, b in panel_items[idx + 1:]:
-            if abs(a["x1"] - b["x0"]) <= eps or abs(b["x1"] - a["x0"]) <= eps:
-                shared_x = a["x1"] if abs(a["x1"] - b["x0"]) <= eps else b["x1"]
-                overlap_y0 = max(a["y0"], b["y0"])
-                overlap_y1 = min(a["y1"], b["y1"])
-                if overlap_y1 - overlap_y0 > eps:
-                    add_vertical(xmap(shared_x), ymap(overlap_y0), ymap(overlap_y1))
-            if abs(a["y1"] - b["y0"]) <= eps or abs(b["y1"] - a["y0"]) <= eps:
-                shared_y = a["y1"] if abs(a["y1"] - b["y0"]) <= eps else b["y1"]
-                overlap_x0 = max(a["x0"], b["x0"])
-                overlap_x1 = min(a["x1"], b["x1"])
-                if overlap_x1 - overlap_x0 > eps:
-                    add_horizontal(ymap(shared_y), xmap(overlap_x0), xmap(overlap_x1))
+    for spec in specs.values():
+        x0 = x_lookup[spec["x0"]]
+        x1 = x_lookup[spec["x1"]]
+        y0 = y_lookup[spec["y0"]]
+        y1 = y_lookup[spec["y1"]]
+        add_horizontal(y0, x0, x1)
+        add_horizontal(y1, x0, x1)
+        add_vertical(x0, y0, y1)
+        add_vertical(x1, y0, y1)
 
     glyphs = {
         left | right: "─",
@@ -709,10 +701,10 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
             canvas[y][x] = glyphs.get(masks[y][x], " ")
 
     for panel_name, spec in specs.items():
-        x0 = xmap(spec["x0"])
-        x1 = xmap(spec["x1"])
-        y0 = ymap(spec["y0"])
-        y1 = ymap(spec["y1"])
+        x0 = x_lookup[spec["x0"]]
+        x1 = x_lookup[spec["x1"]]
+        y0 = y_lookup[spec["y0"]]
+        y1 = y_lookup[spec["y1"]]
         cx = (x0 + x1) // 2
         cy = (y0 + y1) // 2
         label = panel_name
@@ -743,6 +735,45 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
         else:
             lines.append(left)
     return "\n".join(lines)
+
+
+def _as_fraction(value: Any) -> Fraction:
+    try:
+        return Fraction(str(value)).limit_denominator(120)
+    except (ValueError, ZeroDivisionError):
+        return Fraction(float(value)).limit_denominator(120)
+
+
+def _axis_boundaries(panels: dict[str, Any], *, axis: str) -> list[Fraction]:
+    size_key = "w" if axis == "x" else "h"
+    boundaries = set()
+    for panel_cfg in panels.values():
+        if not isinstance(panel_cfg, dict):
+            continue
+        start = _as_fraction(panel_cfg[axis])
+        size = _as_fraction(panel_cfg[size_key])
+        boundaries.add(start)
+        boundaries.add(start + size)
+    return sorted(boundaries)
+
+
+def _axis_step_sizes(boundaries: list[Fraction]) -> list[int]:
+    if len(boundaries) < 2:
+        return [1]
+    intervals = [boundaries[idx + 1] - boundaries[idx] for idx in range(len(boundaries) - 1)]
+    lcm = 1
+    for interval in intervals:
+        lcm = math.lcm(lcm, interval.denominator)
+    return [max(1, int(interval * lcm)) for interval in intervals]
+
+
+def _scaled_axis_positions(steps: list[int], *, scale: int) -> list[int]:
+    positions = [0]
+    total = 0
+    for step in steps:
+        total += max(1, step * scale)
+        positions.append(total)
+    return positions
 
 
 def _supported_widget(widget: str) -> bool:

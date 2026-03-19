@@ -65,6 +65,14 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Screens (--screens to view all the preset screens)", result.stdout)
         self.assertIn("Config files:", result.stdout)
+        self.assertIn("1x3", result.stdout)
+        self.assertIn("2x4", result.stdout)
+
+    def test_layouts_succeeds(self) -> None:
+        result = run_cli("--layouts")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Layout: 1x3", result.stdout)
+        self.assertIn("Layout: 2x4", result.stdout)
 
     def test_region_text_rejected_for_life_widget(self) -> None:
         result = run_cli(
