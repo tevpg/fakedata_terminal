@@ -1,4 +1,4 @@
-"""Metrics, sparkline, and readout widget helpers for FakeData Terminal."""
+"""Shared telemetry-driven helpers for sparkline and readout widgets."""
 
 from __future__ import annotations
 

@@ -1290,8 +1290,9 @@ def random_rcol_line():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Per-style telemetry definitions shared by sparkline/readouts widgets
-# Each entry: (graph_title, signal_fn, reads_list, scroll_title)
+# Per-style telemetry definitions shared by sparkline/readouts widgets and
+# reused as a signal source for scope-style visuals.
+# Each entry: (graph_title, signal_fn, reads_list, aux_title)
 #   signal_fn  : () -> float 0..1   (normalised, drives the sparkline)
 #   reads_list : list of (label, value_fn, unit_str)
 # ══════════════════════════════════════════════════════════════════════════════

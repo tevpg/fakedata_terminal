@@ -13,7 +13,7 @@ FakeData Terminal renders animated, fake telemetry screens in the terminal. It c
 - Renders multi-panel terminal screens using `curses`
 - Drives text widgets from named theme pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and screen presets from [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml)
-- Supports widget types including `text`, `gauge`, `matrix`, `bars`, `life`, `scope`, `readouts`, `sweep`, `tunnel`, and `image`
+- Supports widget types including `text`, `gauge`, `matrix`, `bars`, `life`, `scope`, `sparkline`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset screen or build a screen explicitly with `--screen-layout`, `--region-widget`, and supported default/region overrides
 - Supports widget-level fallback defaults in YAML via the top-level `widgets:` section
 
@@ -58,6 +58,8 @@ Show layout diagrams:
 ```bash
 python3 fakedata_terminal.py --layouts
 ```
+
+`--layouts` renders geometry-driven ASCII previews. Panels with the same configured width or height consume the same number of preview columns or rows.
 
 Run a preset screen:
 
@@ -247,13 +249,16 @@ Within the merged config, area attributes resolve in this order:
 - [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py): YAML loading, overlay merging, and validation
 - [`vocab.py`](/home/tags/fakedata_terminal/vocab.py): theme data generators
 - [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml): packaged layout geometry and region aliases
-- [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml): defaults, widget fallbacks, and screen presets
+- [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml): packaged defaults and screen presets
+- [`data/widgets.yaml`](/home/tags/fakedata_terminal/data/widgets.yaml): widget metadata, defaults, and timing/behavior tunables
 - [`data/`](/home/tags/fakedata_terminal/data): image assets used by image panels
 
 ## Notes
 
 - Running `python3 fakedata_terminal.py` with no arguments prints the short orientation message and exits.
 - Image mode fails fast if `Pillow` or `jp2a` is unavailable.
+- Startup validation runs before rendering and catches unsupported widgets, invalid resolved modifier/widget combinations, duplicate `cycle.widgets` entries, unreadable images, and missing image dependencies.
 - `--config PATH` is repeatable and can add site, user, or project-specific overlays.
 - CLI defaults are `--default-colour` and `--default-widget`.
+- Packaged layouts currently include `full`, `1x3`, `2x2`, `2x4`, `3x2`, `3x3`, `4x3`, `L2x2_R3`, `L3_R2x2`, `L2_R3x3`, `L3_M3_R2`, and `L3x3_R2`.
 - Preset names currently include `clocks`, `cycle9`, `cycle4`, `science`, `science2`, `geometries`, `tunnel`, `test1` through `test7`, and `gauges`.
