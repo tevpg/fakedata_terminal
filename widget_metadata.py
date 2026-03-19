@@ -22,7 +22,7 @@ else:
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-WIDGET_METADATA_PATH = PACKAGE_DIR / "widgets.yaml"
+WIDGET_METADATA_PATH = PACKAGE_DIR / "data" / "widgets.yaml"
 KNOWN_MODIFIERS = {"speed", "theme", "text", "color", "direction", "image", "cycle"}
 PUBLIC_WIDGETS = {
     "text", "text_wide", "text_scant", "text_spew", "image", "life",
@@ -31,50 +31,99 @@ PUBLIC_WIDGETS = {
 }
 INTERNAL_WIDGETS = {"gauges"}
 ALL_WIDGETS = PUBLIC_WIDGETS | INTERNAL_WIDGETS
-LEGACY_SUPPORTS = {
-    "bars": ["speed", "theme", "text"],
-    "blank": ["text", "color"],
-    "blocks": ["speed", "color", "direction", "text"],
-    "cycle": ["speed", "theme", "color", "cycle"],
-    "gauge": ["speed", "color", "text", "direction"],
-    "gauges": ["speed", "theme", "text", "color"],
-    "image": ["speed", "image"],
-    "life": ["speed", "color"],
-    "matrix": ["speed"],
-    "readouts": ["theme", "text", "color"],
-    "scope": ["speed", "theme", "text", "direction"],
-    "sparkline": ["speed", "theme", "text", "direction"],
-    "sweep": ["speed"],
-    "text": ["speed", "theme", "text", "direction"],
-    "text_scant": ["speed", "theme", "text", "direction"],
-    "text_spew": ["speed", "theme", "text"],
-    "text_wide": ["speed", "theme", "text", "direction"],
-    "tunnel": ["speed", "color", "text", "direction"],
-}
+
+_ACTIVE_CONFIG_PATHS: tuple[str, ...] = ()
 
 
-@lru_cache(maxsize=1)
-def load_widget_metadata() -> dict[str, Any]:
+def set_widget_config_paths(config_paths: tuple[str, ...] | None) -> None:
+    global _ACTIVE_CONFIG_PATHS
+    _ACTIVE_CONFIG_PATHS = _normalize_config_paths(config_paths)
+    _load_widget_metadata_cached.cache_clear()
+
+
+def _normalize_config_paths(config_paths: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    if not config_paths:
+        return ()
+    normalized = []
+    for path in config_paths:
+        normalized.append(str(Path(path).expanduser().resolve()))
+    return tuple(normalized)
+
+
+def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _merge_dicts(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _load_widget_overlay(path: str) -> dict[str, Any]:
+    overlay_path = Path(path)
     try:
-        with WIDGET_METADATA_PATH.open("r", encoding="utf-8") as handle:
+        with overlay_path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle) or {}
     except OSError:
-        data = {}
-    return data if isinstance(data, dict) else {}
+        return {}
+    if not isinstance(data, dict):
+        return {}
+
+    overlay: dict[str, Any] = {}
+    defaults = data.get("defaults")
+    if isinstance(defaults, dict):
+        overlay["defaults"] = defaults
+    widgets = data.get("widgets")
+    if isinstance(widgets, dict):
+        overlay["widgets"] = widgets
+    return overlay
 
 
-def widget_catalog() -> dict[str, dict[str, Any]]:
-    widgets = load_widget_metadata().get("widgets")
+def _effective_config_paths(config_paths: tuple[str, ...] | list[str] | None = None) -> tuple[str, ...]:
+    normalized = _normalize_config_paths(config_paths)
+    if not normalized:
+        normalized = _ACTIVE_CONFIG_PATHS
+
+    packaged = str(WIDGET_METADATA_PATH.resolve())
+    ordered = [packaged]
+    for path in normalized:
+        if path == packaged:
+            continue
+        ordered.append(path)
+    return tuple(ordered)
+
+
+@lru_cache(maxsize=None)
+def _load_widget_metadata_cached(effective_paths: tuple[str, ...]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for path in effective_paths:
+        merged = _merge_dicts(merged, _load_widget_overlay(path))
+    return merged
+
+
+def load_widget_metadata(config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    return _load_widget_metadata_cached(_effective_config_paths(config_paths))
+
+
+def widget_catalog(config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, dict[str, Any]]:
+    widgets = load_widget_metadata(config_paths).get("widgets")
     return widgets if isinstance(widgets, dict) else {}
 
 
-def widget_metadata(widget: str) -> dict[str, Any]:
-    entry = widget_catalog().get(widget)
+def widget_root_defaults(config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    defaults = load_widget_metadata(config_paths).get("defaults")
+    return defaults if isinstance(defaults, dict) else {}
+
+
+def widget_metadata(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    entry = widget_catalog(config_paths).get(widget)
     return entry if isinstance(entry, dict) else {}
 
 
-def widget_enabled(widget: str) -> bool:
-    entry = widget_metadata(widget)
+def widget_enabled(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> bool:
+    entry = widget_metadata(widget, config_paths)
     enabled = entry.get("enabled")
     return enabled if isinstance(enabled, bool) else True
 
@@ -83,8 +132,12 @@ def public_widget_names() -> list[str]:
     return sorted(PUBLIC_WIDGETS)
 
 
-def widget_supports(widget: str) -> list[str]:
-    entry = widget_metadata(widget)
+def all_widget_names() -> list[str]:
+    return sorted(ALL_WIDGETS)
+
+
+def widget_supports(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> list[str]:
+    entry = widget_metadata(widget, config_paths)
     supports = entry.get("supports")
     if isinstance(supports, list):
         normalized: list[str] = []
@@ -97,18 +150,33 @@ def widget_supports(widget: str) -> list[str]:
             normalized.append(name)
         if normalized:
             return normalized
-    return LEGACY_SUPPORTS.get(widget, ["speed"])
+    return []
 
 
-def widget_defaults(widget: str) -> dict[str, Any]:
-    entry = widget_metadata(widget)
+def widget_defaults(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    entry = widget_metadata(widget, config_paths)
     defaults = entry.get("defaults")
     return defaults if isinstance(defaults, dict) else {}
 
 
-def validate_widget_metadata() -> list[str]:
+def widget_timing_defaults(config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    timing = widget_root_defaults(config_paths).get("timing")
+    return timing if isinstance(timing, dict) else {}
+
+
+def widget_timing(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    timing = widget_metadata(widget, config_paths).get("timing")
+    return timing if isinstance(timing, dict) else {}
+
+
+def widget_behavior(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    behavior = widget_metadata(widget, config_paths).get("behavior")
+    return behavior if isinstance(behavior, dict) else {}
+
+
+def validate_widget_metadata(config_paths: tuple[str, ...] | list[str] | None = None) -> list[str]:
     issues: list[str] = []
-    catalog = load_widget_metadata()
+    catalog = load_widget_metadata(config_paths)
     if not isinstance(catalog, dict):
         return [f"{WIDGET_METADATA_PATH.name}: root must be a mapping"]
 
@@ -116,7 +184,15 @@ def validate_widget_metadata() -> list[str]:
     if not isinstance(widgets, dict):
         return [f"{WIDGET_METADATA_PATH.name}: widgets must be a mapping"]
 
-    for widget in sorted(PUBLIC_WIDGETS):
+    defaults = catalog.get("defaults")
+    if defaults is not None and not isinstance(defaults, dict):
+        issues.append(f"{WIDGET_METADATA_PATH.name}: defaults must be a mapping")
+    elif isinstance(defaults, dict):
+        timing = defaults.get("timing")
+        if timing is not None and not isinstance(timing, dict):
+            issues.append(f"{WIDGET_METADATA_PATH.name}: defaults.timing must be a mapping")
+
+    for widget in sorted(ALL_WIDGETS):
         entry = widgets.get(widget)
         if not isinstance(entry, dict):
             issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget} must be a mapping")
@@ -133,10 +209,17 @@ def validate_widget_metadata() -> list[str]:
         defaults = entry.get("defaults")
         if defaults is not None and not isinstance(defaults, dict):
             issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget}.defaults must be a mapping")
+        timing = entry.get("timing")
+        if timing is not None and not isinstance(timing, dict):
+            issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget}.timing must be a mapping")
+        behavior = entry.get("behavior")
+        if behavior is not None and not isinstance(behavior, dict):
+            issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget}.behavior must be a mapping")
 
     for widget, entry in widgets.items():
         widget_name = str(widget)
         if widget_name not in ALL_WIDGETS:
+            issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget_name} is not a supported widget name")
             continue
         if not isinstance(entry, dict):
             issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget_name} must be a mapping")

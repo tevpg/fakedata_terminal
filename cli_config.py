@@ -25,7 +25,7 @@ try:
         validate_scene_catalog,
         widget_names,
     )
-    from .widget_metadata import validate_widget_metadata, widget_supports
+    from .widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_enabled, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label, normalize_colour_spec
     from scene_config import (
@@ -44,11 +44,10 @@ except ImportError:
         validate_scene_catalog,
         widget_names,
     )
-    from widget_metadata import validate_widget_metadata, widget_supports
+    from widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_enabled, widget_supports
 
 
 DEFAULT_THEME = "science"
-IMAGE_DEPENDENCY_MESSAGE = "image dependencies not met"
 THEME_CHOICES = [
     "hacker", "science", "medicine", "pharmacy", "finance",
     "space", "military", "navigation", "spaceteam",
@@ -193,30 +192,42 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
     return None
 
 
-def _degrade_image_area(area: dict, message: str) -> None:
-    area["mode"] = "blank"
-    area["image_paths"] = []
-    area["unavailable_message"] = message
-    area["static_lines"] = [message]
-    area["static_align"] = "center"
+def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, image_checker,
+                              config_paths: tuple[str, ...] | None = None) -> None:
+    image_mode_active = False
+    for area in runtime_screen.get("areas", []):
+        widget = str(area.get("mode") or "")
+        if widget and not widget_enabled(widget, config_paths):
+            parser.error(f"resolved screen references disabled widget '{widget}' in area '{area.get('name', '?')}'")
 
+        if widget == "cycle":
+            if not (area.get("cycle_widgets") or []):
+                parser.error(f"resolved screen area '{area.get('name', '?')}' uses widget 'cycle' without any cycle widgets")
+            for cycle_widget in area.get("cycle_widgets") or []:
+                if cycle_widget not in widget_names(config_paths):
+                    parser.error(
+                        f"resolved screen area '{area.get('name', '?')}' cycle widget '{cycle_widget}' is unsupported"
+                    )
+                if not widget_enabled(cycle_widget, config_paths):
+                    parser.error(
+                        f"resolved screen area '{area.get('name', '?')}' cycle widget '{cycle_widget}' is disabled"
+                    )
+                if cycle_widget in {"cycle", "blank"}:
+                    parser.error(
+                        f"resolved screen area '{area.get('name', '?')}' cycle widget '{cycle_widget}' is not allowed"
+                    )
 
-def _degrade_runtime_image_dependencies(runtime_scene: dict, message: str) -> None:
-    for area in runtime_scene.get("areas", []):
-        if area.get("mode") == "image":
-            _degrade_image_area(area, message)
-            continue
-        if area.get("mode") == "cycle" and area.get("cycle_widgets"):
-            degraded_widgets = [
-                "blank" if widget == "image" else widget
-                for widget in area["cycle_widgets"]
-            ]
-            if degraded_widgets != area["cycle_widgets"]:
-                area["cycle_widgets"] = degraded_widgets
-                area["unavailable_message"] = message
-                area["static_lines"] = [message]
-                area["static_align"] = "center"
-    runtime_scene["image_paths"] = []
+        image_paths = area.get("image_paths") or []
+        if widget == "image" and not image_paths:
+            parser.error(f"resolved screen area '{area.get('name', '?')}' uses widget 'image' without any image sources")
+        if image_paths:
+            image_mode_active = True
+        for image_path in image_paths:
+            if not os.path.isfile(image_path):
+                parser.error(f"resolved screen area '{area.get('name', '?')}' image file not found: {image_path}")
+
+    if image_mode_active and (image_module is None or not image_checker()):
+        parser.error("image widgets require Pillow and jp2a to be available before rendering starts")
 
 
 def _widget_attribute_names(widget: str) -> list[str]:
@@ -547,14 +558,14 @@ def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:
     }
 
 
-def _build_widget_scenes(theme: str, speed: int, text: str, image_paths: list[str], parser,
-                         image_module, image_checker,
-                         config_paths: tuple[str, ...]) -> list[dict]:
+def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[str], parser,
+                          image_module, image_checker,
+                          config_paths: tuple[str, ...]) -> list[dict]:
     widgets = _showcase_widget_names(config_paths)
     if not widgets:
         parser.error("--widgets found no widgets to show")
 
-    scenes = []
+    screens = []
     for widget in widgets:
         attrs = _widget_attribute_names(widget)
         unavailable = _widget_unavailable_reason(widget, image_paths, image_module, image_checker)
@@ -589,28 +600,28 @@ def _build_widget_scenes(theme: str, speed: int, text: str, image_paths: list[st
             config_paths=config_paths,
         )
         runtime["showcase_header_lines"] = header_lines
-        scenes.append(runtime)
-    return scenes
+        screens.append(runtime)
+    return screens
 
 
-def _build_screen_scenes(parser, config_paths: tuple[str, ...]) -> list[dict]:
-    scenes = []
+def _build_screen_screens(parser, config_paths: tuple[str, ...]) -> list[dict]:
+    screens = []
     for scene_name in config_scene_names(config_paths):
         runtime = resolve_config_scene(scene_name, parser, config_paths)
         runtime["showcase_header_lines"] = [f"screen: {scene_name}"]
-        scenes.append(runtime)
-    return scenes
+        screens.append(runtime)
+    return screens
 
 
 def _build_widget_showcase(theme: str, speed: int, text: str, image_paths: list[str], parser,
                            image_module, image_checker,
                            config_paths: tuple[str, ...] | None = None) -> dict:
     resolved_paths = config_paths or ()
-    scenes = _build_widget_scenes(theme, speed, text, image_paths, parser, image_module, image_checker, resolved_paths)
-    initial = scenes[0]
+    screens = _build_widget_screens(theme, speed, text, image_paths, parser, image_module, image_checker, resolved_paths)
+    initial = screens[0]
     return {
         "active": True,
-        "scenes": scenes,
+        "screens": screens,
         "idx": 0,
         "next": float("inf"),
         "pair_duration": 10.0,
@@ -621,17 +632,17 @@ def _build_widget_showcase(theme: str, speed: int, text: str, image_paths: list[
 
 def _build_screen_showcase(parser, config_paths: tuple[str, ...] | None = None) -> dict:
     resolved_paths = config_paths or ()
-    scenes = _build_screen_scenes(parser, resolved_paths)
-    if not scenes:
+    screens = _build_screen_screens(parser, resolved_paths)
+    if not screens:
         parser.error("--screens found no configured screens to show")
     return {
         "active": True,
-        "scenes": scenes,
+        "screens": screens,
         "idx": 0,
         "next": float("inf"),
         "pair_duration": 10.0,
         "done": False,
-        "initial": scenes[0],
+        "initial": screens[0],
     }
 
 
@@ -663,6 +674,18 @@ def _normalize_region_key(layout_name: str, region_expr: str, parser, flag_name:
     if normalized is None:
         parser.error(f"{flag_name} references unknown region or panel spec '{region_expr}'")
     return normalized
+
+
+def _require_region_widget_support(regions_cfg: dict[str, dict], region_key: str, display_target: str,
+                                   modifier: str, parser, flag_name: str,
+                                   config_paths: tuple[str, ...] | None = None) -> None:
+    if region_key not in regions_cfg:
+        parser.error(f"{flag_name} target '{display_target}' has no matching assignment")
+    widget = str(regions_cfg[region_key].get("widget") or "")
+    if not widget:
+        parser.error(f"{flag_name} target '{display_target}' has no widget assignment")
+    if modifier not in widget_supports(widget, config_paths):
+        parser.error(f"{flag_name} is not valid for widget '{widget}' in region '{display_target}'")
 
 
 def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[str], region_speeds: list[str],
@@ -734,15 +757,13 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
             parser.error(f"--region-speed expects an integer speed, got '{speed_text}'")
         if not 1 <= panel_speed <= 100:
             parser.error("--region-speed must be between 1 and 100")
-        if normalized_target not in regions_cfg:
-            parser.error(f"--region-speed target '{target}' has no matching assignment")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "speed", parser, "--region-speed", config_paths)
         regions_cfg[normalized_target]["speed"] = panel_speed
 
     for item in region_texts:
         target, panel_text = _parse_equals(item, parser, "--region-text")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-text", config_paths)
-        if normalized_target not in regions_cfg:
-            parser.error(f"--region-text target '{target}' has no matching assignment")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "text", parser, "--region-text", config_paths)
         regions_cfg[normalized_target]["text"] = panel_text
 
     for item in region_themes:
@@ -750,8 +771,7 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-theme", config_paths)
         if theme_name not in THEME_CHOICES:
             parser.error(f"--region-theme must be one of: {', '.join(THEME_CHOICES)}")
-        if normalized_target not in regions_cfg:
-            parser.error(f"--region-theme target '{target}' has no matching assignment")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "theme", parser, "--region-theme", config_paths)
         regions_cfg[normalized_target]["theme"] = theme_name
 
     for item in region_directions:
@@ -760,24 +780,19 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         normalized_direction = _direction_value(direction_name)
         if normalized_direction is None:
             parser.error(f"--region-direction must be one of: {', '.join(CANONICAL_DIRECTION_CHOICES)}")
-        if normalized_target not in regions_cfg:
-            parser.error(f"--region-direction target '{target}' has no matching assignment")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "direction", parser, "--region-direction", config_paths)
         regions_cfg[normalized_target]["direction"] = normalized_direction
 
     for item in region_colours:
         target, colour_name = _parse_equals(item, parser, "--region-colour")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-colour", config_paths)
-        if normalized_target not in regions_cfg:
-            parser.error(f"--region-colour target '{target}' has no matching assignment")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "color", parser, "--region-colour", config_paths)
         regions_cfg[normalized_target]["colour"] = _validate_colour_value(colour_name, parser, "--region-colour")
 
     for item in region_images:
         target, image_path = _parse_equals(item, parser, "--region-image")
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-image", config_paths)
-        if normalized_target not in regions_cfg:
-            parser.error(f"--region-image target '{target}' has no matching assignment")
-        if regions_cfg[normalized_target].get("widget") != "image":
-            parser.error(f"--region-image target '{target}' is not assigned to widget 'image'")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "image", parser, "--region-image", config_paths)
         image_cfg = regions_cfg[normalized_target].setdefault("image", {})
         image_cfg.setdefault("paths", []).append(image_path)
 
@@ -817,12 +832,13 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     del demo_scenes
     raw_argv = sys.argv[1:] if argv is None else list(argv)
     config_paths = _resolve_config_paths(raw_argv)
+    set_widget_config_paths(config_paths)
     parser = _build_parser(config_paths)
 
     args = parser.parse_args(raw_argv)
 
     issues = validate_scene_catalog(config_paths)
-    issues.extend(validate_widget_metadata())
+    issues.extend(validate_widget_metadata(config_paths))
     if issues:
         parser.error("configuration validation failed:\n  " + "\n  ".join(issues))
 
@@ -875,7 +891,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     runtime_default_colour = args.default_colour if colour_explicit and args.default_colour is not None else configured_defaults.get("color")
     runtime_default_widget = args.default_widget if widget_explicit and args.default_widget is not None else configured_defaults.get("widget")
     runtime_direction = configured_defaults.get("direction", "forward")
-    widget_showcase = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
+    widget_showcase = {"active": False, "screens": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
     if args.widgets:
         widget_showcase = _build_widget_showcase(
@@ -951,27 +967,40 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_default_colour = _validate_colour_value(runtime_default_colour, parser, "--default-colour")
     if runtime_default_widget is not None and runtime_default_widget not in widget_names(config_paths):
         parser.error(f"--default-widget must be one of: {', '.join(widget_names(config_paths))}")
+    if runtime_default_widget is not None and not widget_enabled(runtime_default_widget, config_paths):
+        parser.error(f"--default-widget references disabled widget '{runtime_default_widget}'")
     if args.life_max < 1:
         parser.error("--life-max must be at least 1")
     if args.exit is not None and args.exit < 0:
         parser.error("--exit must be >= 0")
 
+    _validate_resolved_screen(
+        config_scene_runtime,
+        parser,
+        image_module=image_module,
+        image_checker=image_checker,
+        config_paths=config_paths,
+    )
+    if args.widgets or args.screens:
+        for runtime_screen in widget_showcase["screens"]:
+            _validate_resolved_screen(
+                runtime_screen,
+                parser,
+                image_module=image_module,
+                image_checker=image_checker,
+                config_paths=config_paths,
+            )
+
     image_sources = config_scene_runtime["image_paths"] or image_paths
-    image_dependencies_met = image_module is not None and image_checker()
     image_mode_active = any(area["mode"] == "image" for area in config_scene_runtime["areas"])
     if args.widgets or args.screens:
         image_mode_active = any(
             area["mode"] == "image"
-            for scene in widget_showcase["scenes"]
-            for area in scene["areas"]
+            for screen in widget_showcase["screens"]
+            for area in screen["areas"]
         )
     if image_mode_active and not image_paths and not any(area.get("image_paths") for area in config_scene_runtime["areas"]):
         parser.error("image mode requires configured default image sources or --region-image REGION=PATH")
-    if image_mode_active and not image_dependencies_met:
-        _degrade_runtime_image_dependencies(config_scene_runtime, IMAGE_DEPENDENCY_MESSAGE)
-        if args.widgets or args.screens:
-            for scene in widget_showcase["scenes"]:
-                _degrade_runtime_image_dependencies(scene, IMAGE_DEPENDENCY_MESSAGE)
 
     return {
         "speed": runtime_speed,
@@ -983,13 +1012,13 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "sidebar_mode": None,
         "theme": config_scene_runtime["theme"],
         "direction": config_scene_runtime.get("direction", runtime_direction),
-        "scene_name": "<widgets>" if args.widgets else ("<screens>" if args.screens else (args.screen or f"<cli:{runtime_layout_name}>")),
+        "screen_name": "<widgets>" if args.widgets else ("<screens>" if args.screens else (args.screen or f"<cli:{runtime_layout_name}>")),
         "themes": THEME_CHOICES[:],
-        "config_scene": config_scene_runtime,
+        "config_screen": config_scene_runtime,
         "layout_name": config_scene_runtime["layout"],
         "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_scene_runtime["areas"]),
         "demo_state": {"active": False, "scenes": [], "idx": 0, "scene": None, "next": float("inf"), "done": False},
-        "widget_showcase": widget_showcase,
+        "screen_showcase": widget_showcase,
         "glitch_interval": runtime_glitch if not (args.widgets or args.screens) else max(0.0, args.screen_glitch if glitch_explicit and args.screen_glitch is not None else 0.0),
         "exit_after": args.exit,
         "image_paths": image_sources,
@@ -1018,7 +1047,7 @@ def show_startup_banner(script_name: str, config: dict) -> None:
     print(f"  {dim}{'─' * 54}{reset}")
     print(f"  {bold}speed{reset}  : default {config['speed']}/100", end="")
     print(f"  ({_show_delay(config['speed'])})")
-    print(f"  {bold}screen{reset} : {config['scene_name']}")
+    print(f"  {bold}screen{reset} : {config['screen_name']}")
     print(f"  {bold}theme{reset}  : {config['theme']}")
     if config.get("default_colour") is not None:
         print(f"  {bold}colour{reset} : default {config['default_colour']}")

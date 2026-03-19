@@ -41,8 +41,8 @@ except ImportError:
     Image = None
 
 SCRIPT_NAME = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else os.path.basename(__file__)
-CONFIG_SCENE = None
-_showcase_state = {"active": False, "scenes": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
+CONFIG_SCREEN = None
+_screen_showcase_state = {"active": False, "screens": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
 try:
     from .cli_config import prepare_runtime_config
@@ -169,9 +169,9 @@ SIDEBAR_CYCLE_MODES = [
 COLOUR_PAIRS = build_colour_pairs(curses)
 
 
-def _scene_name_for_export(now: datetime | None = None) -> str:
+def _screen_name_for_export(now: datetime | None = None) -> str:
     current = datetime.now() if now is None else now
-    return f"scene_{current.strftime('%Y%m%d-%H%M%S')}"
+    return f"screen_{current.strftime('%Y%m%d-%H%M%S')}"
 
 
 def _shorten_export_image_path(path: str) -> str:
@@ -266,45 +266,45 @@ def _pick_factored_scene_value(scene_key: str, region_key: str, region_values: l
     return best_value
 
 
-def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], current_base_speed: int,
-                             current_speed_for_area) -> str | None:
-    if not config_scene:
+def _export_screen_definition(config_screen: dict, area_states: dict[str, dict], current_base_speed: int,
+                              current_speed_for_area) -> str | None:
+    if not config_screen:
         return None
 
-    scene_name = _scene_name_for_export()
+    screen_name = _screen_name_for_export()
     shortened_data_images = False
-    scene_colour = None
-    scene_text = config_scene.get("text", "")
+    screen_colour = None
+    screen_text = config_screen.get("text", "")
     direction_values = {
         area.get("direction")
-        for area in config_scene.get("areas", [])
+        for area in config_screen.get("areas", [])
         if area.get("direction") is not None
     }
-    scene_direction = config_scene.get("direction")
-    if scene_direction is None and len(direction_values) == 1 and len(config_scene.get("areas", [])) == len([
-        area for area in config_scene.get("areas", []) if area.get("direction") is not None
+    screen_direction = config_screen.get("direction")
+    if screen_direction is None and len(direction_values) == 1 and len(config_screen.get("areas", [])) == len([
+        area for area in config_screen.get("areas", []) if area.get("direction") is not None
     ]):
-        scene_direction = next(iter(direction_values))
-    if scene_direction is None:
-        scene_direction = "forward"
+        screen_direction = next(iter(direction_values))
+    if screen_direction is None:
+        screen_direction = "forward"
     colour_values = {
         area.get("colour")
-        for area in config_scene.get("areas", [])
+        for area in config_screen.get("areas", [])
         if area.get("colour") is not None
     }
-    if colour_values and len(colour_values) == 1 and len(config_scene.get("areas", [])) == len([
-        area for area in config_scene.get("areas", []) if area.get("colour") is not None
+    if colour_values and len(colour_values) == 1 and len(config_screen.get("areas", [])) == len([
+        area for area in config_screen.get("areas", []) if area.get("colour") is not None
     ]):
-        scene_colour = next(iter(colour_values))
+        screen_colour = next(iter(colour_values))
     effective_regions = []
-    for area in sorted(config_scene.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
+    for area in sorted(config_screen.get("areas", []), key=lambda item: (item["x"], item["y"], item["name"])):
         state = area_states.get(area["name"], {})
         role = state.get("role") or ("main" if area["x"] < 0.5 else "sidebar")
         area_speed = current_speed_for_area(state, role)
-        area_theme = area.get("theme") if area.get("theme") is not None else config_scene.get("theme")
-        area_text = area.get("text") if area.get("text") is not None else scene_text
-        area_colour = area.get("colour") if area.get("colour") is not None else scene_colour
-        area_direction = area.get("direction") if area.get("direction") is not None else scene_direction
+        area_theme = area.get("theme") if area.get("theme") is not None else config_screen.get("theme")
+        area_text = area.get("text") if area.get("text") is not None else screen_text
+        area_colour = area.get("colour") if area.get("colour") is not None else screen_colour
+        area_direction = area.get("direction") if area.get("direction") is not None else screen_direction
         effective_regions.append({
             "area": area,
             "speed": area_speed,
@@ -315,70 +315,70 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
             "role": role,
         })
 
-    factored_scene_theme = _pick_factored_scene_value(
+    factored_screen_theme = _pick_factored_scene_value(
         "theme",
         "theme",
         [entry["theme"] for entry in effective_regions],
-        config_scene.get("theme"),
+        config_screen.get("theme"),
     )
-    factored_scene_speed = _pick_factored_scene_value(
+    factored_screen_speed = _pick_factored_scene_value(
         "speed",
         "speed",
         [entry["speed"] for entry in effective_regions],
         current_base_speed,
     )
-    factored_scene_text = _pick_factored_scene_value(
+    factored_screen_text = _pick_factored_scene_value(
         "text",
         "text",
         [entry["text"] for entry in effective_regions],
-        scene_text,
+        screen_text,
     )
-    factored_scene_direction = _pick_factored_scene_value(
+    factored_screen_direction = _pick_factored_scene_value(
         "direction",
         "direction",
         [entry["direction"] for entry in effective_regions],
-        scene_direction,
+        screen_direction,
     )
-    factored_scene_colour = _pick_factored_scene_value(
+    factored_screen_colour = _pick_factored_scene_value(
         "colour",
         "colour",
         [entry["colour"] for entry in effective_regions],
-        scene_colour,
+        screen_colour,
     )
-    scene_body = {
-        "layout": config_scene["layout"],
-        "glitch": max(0.0, float(config_scene.get("glitch", 0.0))),
+    screen_body = {
+        "layout": config_screen["layout"],
+        "glitch": max(0.0, float(config_screen.get("glitch", 0.0))),
     }
-    if factored_scene_theme is not _UNFACTORED:
-        scene_body["theme"] = factored_scene_theme
-    if factored_scene_speed is not _UNFACTORED:
-        scene_body["speed"] = factored_scene_speed
-    if factored_scene_text is not _UNFACTORED:
-        scene_body["text"] = _escape_export_text_modifier(factored_scene_text)
-    if factored_scene_direction is not _UNFACTORED:
-        scene_body["direction"] = factored_scene_direction
-    if factored_scene_colour is not _UNFACTORED:
-        scene_body["colour"] = factored_scene_colour
-    scene_body["regions"] = {}
+    if factored_screen_theme is not _UNFACTORED:
+        screen_body["theme"] = factored_screen_theme
+    if factored_screen_speed is not _UNFACTORED:
+        screen_body["speed"] = factored_screen_speed
+    if factored_screen_text is not _UNFACTORED:
+        screen_body["text"] = _escape_export_text_modifier(factored_screen_text)
+    if factored_screen_direction is not _UNFACTORED:
+        screen_body["direction"] = factored_screen_direction
+    if factored_screen_colour is not _UNFACTORED:
+        screen_body["colour"] = factored_screen_colour
+    screen_body["regions"] = {}
 
     for entry in effective_regions:
         area = entry["area"]
         region_body = {
             "widget": area["mode"],
         }
-        if factored_scene_speed is _UNFACTORED or entry["speed"] != factored_scene_speed:
+        if factored_screen_speed is _UNFACTORED or entry["speed"] != factored_screen_speed:
             region_body["speed"] = entry["speed"]
 
-        if factored_scene_theme is _UNFACTORED or entry["theme"] != factored_scene_theme:
+        if factored_screen_theme is _UNFACTORED or entry["theme"] != factored_screen_theme:
             region_body["theme"] = entry["theme"]
 
-        if factored_scene_text is _UNFACTORED or entry["text"] != factored_scene_text:
+        if factored_screen_text is _UNFACTORED or entry["text"] != factored_screen_text:
             region_body["text"] = _escape_export_text_modifier(entry["text"])
 
-        if factored_scene_colour is _UNFACTORED or entry["colour"] != factored_scene_colour:
+        if factored_screen_colour is _UNFACTORED or entry["colour"] != factored_screen_colour:
             region_body["colour"] = entry["colour"]
 
-        if factored_scene_direction is _UNFACTORED or entry["direction"] != factored_scene_direction:
+        if factored_screen_direction is _UNFACTORED or entry["direction"] != factored_screen_direction:
             region_body["direction"] = entry["direction"]
 
         image_paths = area.get("image_paths") or []
@@ -400,16 +400,16 @@ def _export_scene_definition(config_scene: dict, area_states: dict[str, dict], c
         if area.get("static_align") is not None:
             region_body["static_align"] = area["static_align"]
 
-        scene_body["regions"][area["name"]] = region_body
+        screen_body["regions"][area["name"]] = region_body
 
-    export_doc = {"screens": {scene_name: scene_body}}
+    export_doc = {"screens": {screen_name: screen_body}}
     dumped = yaml.safe_dump(export_doc, sort_keys=False, allow_unicode=False)
     return _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(stdscr):
-    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCENE, _showcase_state, EXIT_AFTER
+    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCREEN, _screen_showcase_state, EXIT_AFTER
     try:
         curses.curs_set(0)
     except curses.error:
@@ -838,9 +838,9 @@ def main(stdscr):
             pass
 
     def _draw_showcase_header():
-        if not _showcase_state["active"] or not CONFIG_SCENE:
+        if not _screen_showcase_state["active"] or not CONFIG_SCREEN:
             return
-        header_lines = CONFIG_SCENE.get("showcase_header_lines") or []
+        header_lines = CONFIG_SCREEN.get("showcase_header_lines") or []
         if not header_lines:
             return
         width = max(len(line) for line in header_lines) + 1
@@ -856,7 +856,7 @@ def main(stdscr):
             pass
 
     def _draw_showcase_footer():
-        if not _showcase_state["active"] or rows < 1:
+        if not _screen_showcase_state["active"] or rows < 1:
             return
         label = f"[Left/h] back  [Right/l] forward  [+/-] faster/slower  [Q] exit   Speed: {current_base_speed}"
         try:
@@ -930,7 +930,7 @@ def main(stdscr):
                 current_base_speed = round((refreshed[mid - 1] + refreshed[mid]) / 2.0)
 
     def _draw_area_speed_overlay(area: dict, area_rows: int, y: int, x: int, width: int, role: str, now: float):
-        if _showcase_state["active"] or rows < 1:
+        if _screen_showcase_state["active"] or rows < 1:
             return
         if now >= _speed_overlay_until:
             return
@@ -952,17 +952,17 @@ def main(stdscr):
             pass
 
     def _set_showcase_scene(next_idx: int) -> None:
-        global CONFIG_SCENE, THEME_ARG
+        global CONFIG_SCREEN, THEME_ARG
         nonlocal area_specs, area_states
         now = time.monotonic()
-        scenes = _showcase_state.get("scenes", [])
-        if not scenes:
+        screens = _screen_showcase_state.get("screens", [])
+        if not screens:
             return
-        next_idx %= len(scenes)
-        _showcase_state["idx"] = next_idx
-        _showcase_state["done"] = False
-        CONFIG_SCENE = scenes[next_idx]
-        THEME_ARG = CONFIG_SCENE.get("theme", THEME_ARG)
+        next_idx %= len(screens)
+        _screen_showcase_state["idx"] = next_idx
+        _screen_showcase_state["done"] = False
+        CONFIG_SCREEN = screens[next_idx]
+        THEME_ARG = CONFIG_SCREEN.get("theme", THEME_ARG)
         GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
         area_specs = _current_area_specs(rows, cols)
         area_states = _sync_areas(area_specs, now)
@@ -981,10 +981,10 @@ def main(stdscr):
         )
 
     def _config_area_specs(rows: int, cols: int):
-        return build_config_area_specs(CONFIG_SCENE, rows, cols)
+        return build_config_area_specs(CONFIG_SCREEN, rows, cols)
 
     def _current_area_specs(rows: int, cols: int):
-        if CONFIG_SCENE and not _demo_state["active"]:
+        if CONFIG_SCREEN and not _demo_state["active"]:
             return _config_area_specs(rows, cols)
         return _legacy_area_specs(cols)
 
@@ -1009,8 +1009,8 @@ def main(stdscr):
     _exit_at = start_now + EXIT_AFTER if EXIT_AFTER is not None else float("inf")
     _last_loop_now = start_now
 
-    if _showcase_state["active"] and _showcase_state["next"] == float("inf"):
-        _showcase_state["next"] = start_now + _showcase_state["pair_duration"]
+    if _screen_showcase_state["active"] and _screen_showcase_state["next"] == float("inf"):
+        _screen_showcase_state["next"] = start_now + _screen_showcase_state["pair_duration"]
 
     def _shift_pause_timers(delta: float, resumed_at: float) -> None:
         nonlocal _glitch_next, _glitch_restore_at, _last_loop_now
@@ -1027,8 +1027,8 @@ def main(stdscr):
             area["textwall_pause_until"] = shift_deadline(area.get("textwall_pause_until", 0.0), delta)
             area["direction_next_change"] = shift_deadline(area.get("direction_next_change", 0.0), delta)
             area["last_update_at"] = resumed_at
-        if _showcase_state["active"] and _showcase_state["next"] != float("inf"):
-            _showcase_state["next"] += delta
+        if _screen_showcase_state["active"] and _screen_showcase_state["next"] != float("inf"):
+            _screen_showcase_state["next"] += delta
         if _demo_state["active"] and _demo_state["next"] != float("inf"):
             _demo_state["next"] += delta
         if _glitch_active and _glitch_restore_at:
@@ -1116,7 +1116,7 @@ def main(stdscr):
             _paint_area(area, spec["height"], spec["y"], spec["x"], spec["width"], spec["role"])
             _draw_area_speed_overlay(area, spec["height"], spec["y"], spec["x"], spec["width"], spec["role"], now)
             _draw_area_label(spec["y"], spec["x"], spec["width"], area.get("label"))
-        if CONFIG_SCENE and not _demo_state["active"]:
+        if CONFIG_SCREEN and not _demo_state["active"]:
             _draw_config_separators(area_specs)
 
         primary_main = next((spec for spec in area_specs if spec["role"] == "main"), area_specs[0])
@@ -1148,19 +1148,19 @@ def main(stdscr):
 
         key = stdscr.getch()
         if key in (ord('q'), ord('Q'), 27):
-            if CONFIG_SCENE and not _demo_state["active"] and not _showcase_state["active"]:
-                return _export_scene_definition(
-                    CONFIG_SCENE,
+            if CONFIG_SCREEN and not _demo_state["active"] and not _screen_showcase_state["active"]:
+                return _export_screen_definition(
+                    CONFIG_SCREEN,
                     area_states,
                     current_base_speed,
                     _current_speed_for_area,
                 )
             break
-        if _showcase_state["active"] and key in (curses.KEY_LEFT, ord('h'), ord('H')):
-            _set_showcase_scene(_showcase_state["idx"] - 1)
+        if _screen_showcase_state["active"] and key in (curses.KEY_LEFT, ord('h'), ord('H')):
+            _set_showcase_scene(_screen_showcase_state["idx"] - 1)
             continue
-        if _showcase_state["active"] and key in (curses.KEY_RIGHT, ord('l'), ord('L')):
-            _set_showcase_scene(_showcase_state["idx"] + 1)
+        if _screen_showcase_state["active"] and key in (curses.KEY_RIGHT, ord('l'), ord('L')):
+            _set_showcase_scene(_screen_showcase_state["idx"] + 1)
             continue
         if key == ord(' '):
             if _paused:
@@ -1209,7 +1209,7 @@ def main(stdscr):
 def run(argv=None) -> int:
     global IMAGE_PATHS, SPEED_ARG, MAIN_SPEED_ARG, SIDEBAR_SPEED_ARG
     global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_THEMES
-    global THEME_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCENE, _showcase_state, EXIT_AFTER
+    global THEME_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCREEN, _screen_showcase_state, EXIT_AFTER
 
     config = prepare_runtime_config(
         argv=argv,
@@ -1227,10 +1227,10 @@ def run(argv=None) -> int:
     MAIN_MODE = config["main_mode"]
     _ALL_THEMES = config["themes"]
     THEME_ARG = config["theme"]
-    CONFIG_SCENE = config["config_scene"]
+    CONFIG_SCREEN = config["config_screen"]
     SIDEBAR_MODE = config["sidebar_mode"]
     _demo_state = config["demo_state"]
-    _showcase_state = config["widget_showcase"]
+    _screen_showcase_state = config["screen_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
     EXIT_AFTER = config["exit_after"]
 

@@ -24,17 +24,19 @@ else:
 
 try:
     from .runtime_support import COLOUR_CHOICES, normalize_colour_spec
-    from .widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_supports
+    from .widget_metadata import all_widget_names, public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CHOICES, normalize_colour_spec
-    from widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_supports
+    from widget_metadata import all_widget_names, public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 LAYOUT_CONFIG_PATH = PACKAGE_DIR / "data" / "layouts.yaml"
 SCREEN_CONFIG_PATH = PACKAGE_DIR / "data" / "screens.yaml"
+WIDGET_CONFIG_PATH = PACKAGE_DIR / "data" / "widgets.yaml"
 PACKAGE_CONFIG_PATHS = (
     LAYOUT_CONFIG_PATH,
+    WIDGET_CONFIG_PATH,
     SCREEN_CONFIG_PATH,
 )
 USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "screens.yaml"
@@ -44,7 +46,7 @@ PROJECT_CONFIG_NAMES = (
 )
 
 TOP_LEVEL_KEYS = {"defaults", "layouts", "screens", "widgets"}
-DEFAULT_KEYS = {"layout", "theme", "speed", "image", "widget", "colour", "color", "glitch", "direction"}
+DEFAULT_KEYS = {"theme", "speed", "image", "widget", "colour", "color", "glitch", "direction", "timing"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}
@@ -318,23 +320,11 @@ def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
 
 
 def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
-    catalog = load_scene_catalog(config_paths)
-    widgets = catalog.get("widgets", {})
-    defaults: dict[str, dict[str, Any]] = {
-        widget_name: dict(widget_metadata_defaults(widget_name))
+    return {
+        widget_name: dict(widget_metadata_defaults(widget_name, config_paths))
         for widget_name in public_widget_names()
-        if widget_metadata_defaults(widget_name)
+        if widget_metadata_defaults(widget_name, config_paths)
     }
-    if not isinstance(widgets, dict):
-        return defaults
-    for key, value in widgets.items():
-        widget_name = str(key)
-        if not isinstance(value, dict) or not _supported_widget(widget_name):
-            continue
-        merged = dict(defaults.get(widget_name, {}))
-        merged.update(value)
-        defaults[widget_name] = merged
-    return defaults
 
 
 def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -353,9 +343,7 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
     color = defaults.get("color")
     if color is None:
         color = defaults.get("colour")
-    layout_name = defaults.get("layout")
     return {
-        "layout": canonical_layout_name(layout_name, config_paths) if layout_name is not None else None,
         "theme": defaults.get("theme", "science"),
         "speed": defaults.get("speed", 50),
         "widget": defaults.get("widget"),
@@ -413,8 +401,9 @@ def _config_key_to_modifier(key: str) -> str | None:
     return mapping.get(key)
 
 
-def _validate_supported_modifiers(widget_name: str, mapping: dict[str, Any], context: str, issues: list[str]) -> None:
-    supported = set(widget_supports(widget_name))
+def _validate_supported_modifiers(widget_name: str, mapping: dict[str, Any], context: str, issues: list[str],
+                                  config_paths: tuple[str, ...] | None = None) -> None:
+    supported = set(widget_supports(widget_name, config_paths))
     for key, value in mapping.items():
         if key == "widget" or not _modifier_is_set(value):
             continue
@@ -439,12 +428,11 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
             issues.append(f"{config_label}: defaults must be a mapping")
         else:
             _unknown_keys(defaults, DEFAULT_KEYS, "defaults", issues)
-            layout_name = defaults.get("layout")
-            if layout_name is not None and canonical_layout_name(layout_name, config_paths) is None:
-                issues.append(f"{config_label}: defaults.layout references unknown layout '{layout_name}'")
             widget = defaults.get("widget")
             if widget is not None and not _supported_widget(str(widget)):
                 issues.append(f"{config_label}: defaults.widget uses unsupported widget '{widget}'")
+            elif widget is not None and not widget_enabled(str(widget), config_paths):
+                issues.append(f"{config_label}: defaults.widget references disabled widget '{widget}'")
             image_spec = defaults.get("image")
             if image_spec is not None and not isinstance(image_spec, dict):
                 issues.append(f"{config_label}: defaults.image must be a mapping")
@@ -466,6 +454,9 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
             direction = defaults.get("direction")
             if direction is not None and _direction_value(direction) is None:
                 issues.append(f"{config_label}: defaults.direction must be one of: forward, backward, random, none")
+            timing = defaults.get("timing")
+            if timing is not None and not isinstance(timing, dict):
+                issues.append(f"{config_label}: defaults.timing must be a mapping")
 
     layouts = catalog.get("layouts", {})
     if layouts is not None:
@@ -558,12 +549,17 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         issues.append(
                             f"{config_label}: screen '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
                         )
+                    elif not widget_enabled(str(widget), config_paths):
+                        issues.append(
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' references disabled widget '{widget}'"
+                        )
                     else:
                         _validate_supported_modifiers(
                             str(widget),
                             region_cfg,
                             f"{config_label}: screen '{scene_name}' region '{region_name}'",
                             issues,
+                            config_paths,
                         )
                     cycle_spec = region_cfg.get("cycle")
                     if cycle_spec is not None and not isinstance(cycle_spec, dict):
@@ -588,6 +584,10 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                                     issues.append(
                                         f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
                                     )
+                                elif not widget_enabled(cycle_widget_name, config_paths):
+                                    issues.append(
+                                        f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] references disabled widget '{cycle_widget_name}'"
+                                    )
                                 elif cycle_widget_name in {"cycle", "blank"}:
                                     issues.append(
                                         f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
@@ -604,59 +604,6 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
     if widgets is not None:
         if not isinstance(widgets, dict):
             issues.append(f"{config_label}: widgets must be a mapping")
-        else:
-            for widget_name, widget_cfg in widgets.items():
-                widget_name = str(widget_name)
-                if isinstance(widget_cfg, list):
-                    continue
-                if not isinstance(widget_cfg, dict):
-                    issues.append(f"{config_label}: widgets.{widget_name} must be a mapping or list")
-                    continue
-                if not _supported_widget(widget_name):
-                    issues.append(f"{config_label}: widgets.{widget_name} is not a supported widget name")
-                    continue
-                _validate_supported_modifiers(
-                    widget_name,
-                    widget_cfg,
-                    f"{config_label}: widgets.{widget_name}",
-                    issues,
-                )
-                _unknown_keys(widget_cfg, WIDGET_DEFAULT_KEYS, f"widgets.{widget_name}", issues)
-                _speed_issues(widget_cfg.get("speed"), f"{config_label}: widgets.{widget_name}.speed", issues)
-                widget_color = widget_cfg.get("color", widget_cfg.get("colour"))
-                if widget_color is not None and _color_value(widget_color) is None:
-                    issues.append(f"{config_label}: widgets.{widget_name}.colour must be a recognized colour name")
-                direction = widget_cfg.get("direction")
-                if direction is not None and _direction_value(direction) is None:
-                    issues.append(f"{config_label}: widgets.{widget_name}.direction must be one of: forward, backward, random, none")
-                cycle_spec = widget_cfg.get("cycle")
-                if cycle_spec is not None and not isinstance(cycle_spec, dict):
-                    issues.append(f"{config_label}: widgets.{widget_name}.cycle must be a mapping")
-                elif isinstance(cycle_spec, dict):
-                    _unknown_keys(cycle_spec, CYCLE_KEYS, f"widgets.{widget_name}.cycle", issues)
-                    cycle_widgets = cycle_spec.get("widgets")
-                    if cycle_widgets is not None and not isinstance(cycle_widgets, list):
-                        issues.append(f"{config_label}: widgets.{widget_name}.cycle.widgets must be a list")
-                    elif isinstance(cycle_widgets, list):
-                        if widget_name != "cycle":
-                            issues.append(
-                                f"{config_label}: widgets.{widget_name}.cycle is only valid for widget 'cycle'"
-                            )
-                        for idx, cycle_widget in enumerate(cycle_widgets):
-                            cycle_widget_name = str(cycle_widget)
-                            if not _supported_widget(cycle_widget_name):
-                                issues.append(
-                                    f"{config_label}: widgets.{widget_name}.cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
-                                )
-                            elif cycle_widget_name in {"cycle", "blank"}:
-                                issues.append(
-                                    f"{config_label}: widgets.{widget_name}.cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
-                                )
-                image_spec = widget_cfg.get("image")
-                if image_spec is not None and not isinstance(image_spec, dict):
-                    issues.append(f"{config_label}: widgets.{widget_name}.image must be a mapping")
-                elif isinstance(image_spec, dict):
-                    _unknown_keys(image_spec, IMAGE_KEYS, f"widgets.{widget_name}.image", issues)
 
     return issues
 
@@ -795,11 +742,7 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
 
 
 def _supported_widget(widget: str) -> bool:
-    return widget in {
-        "text", "text_wide", "text_scant", "text_spew", "image", "life",
-        "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
-        "sparkline", "readouts", "blank", "cycle",
-    }
+    return widget in all_widget_names()
 
 
 def _expand_image_spec(image_spec: dict[str, Any] | None) -> list[str]:
@@ -976,9 +919,11 @@ def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict
         for widget_cfg in widgets.values():
             if not isinstance(widget_cfg, dict):
                 continue
-            if any(key in widget_cfg for key in ("paths", "path", "glob")):
-                _normalize_image_mapping(widget_cfg, base_dir)
-            _normalize_image_mapping(widget_cfg.get("image"), base_dir)
+            defaults_cfg = widget_cfg.get("defaults")
+            if isinstance(defaults_cfg, dict):
+                if any(key in defaults_cfg for key in ("paths", "path", "glob")):
+                    _normalize_image_mapping(defaults_cfg, base_dir)
+                _normalize_image_mapping(defaults_cfg.get("image"), base_dir)
     screens = catalog.get("screens")
     if isinstance(screens, dict):
         for scene_cfg in screens.values():
