@@ -1,8 +1,0 @@
-# Timing TODO
-
-Execution backlog has been consolidated into [implementation_todo.md](/home/tags/fakedata_terminal/implementation_todo.md).
-
-Persistent design/reference material lives in:
-
-- [README.md](/home/tags/fakedata_terminal/README.md)
-- [configuration_model.md](/home/tags/fakedata_terminal/configuration_model.md)
