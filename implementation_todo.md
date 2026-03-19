@@ -9,48 +9,45 @@ Persistent reference material lives elsewhere:
 
 ## Current Priorities
 
-### 1. Finish startup validation
-
-- broaden resolved-screen semantic validation where it is safe
-- preserve the inert-leftover-modifier exception
-- keep all avoidable failures pre-render
-- decide whether any remaining `cycle` validation rules are still missing
-
-### 2. Finish precedence and internal cleanup
+### 1. Finish precedence and internal cleanup
 
 - close any remaining precedence mismatches with `configuration_model.md`
 - trim leftover internal `scene_*` wrappers and naming where practical
 - eliminate internal-only widget ids from the model entirely
-- rename leftover `MetricsWidgets` `gauge*` / `ensure_gauges` naming that now refers to `sparkline` + `readouts`
-- assess the role and boundary of `MetricsWidgets` itself:
-  - is it still the right abstraction for `sparkline` + `readouts`
-  - which remaining `gauge_*` state is still semantically correct vs stale
-  - whether any state should move, split, or be removed entirely
 - remove stale comments/docs that still describe the old model
 
-### 3. Finish hardening
+### 2. Finish hardening
 
 - add focused regression tests for:
-  - precedence resolution
-  - screen/layout incompatibility validation
-  - direct CLI modifier/widget validation
-  - disabled-widget and cycle validation
-  - image validation and dependency failures
-  - `colour` / `color` handling
+  - any remaining screen/layout incompatibility validation gaps
+  - any remaining direct CLI modifier/widget validation gaps
+  - any remaining disabled-widget and cycle validation gaps
+  - any remaining image validation and dependency-failure gaps
 - clean tests/examples/docs around the implemented model
 
-### 4. Finish timing work
+### 3. Finish timing work
 
 - audit for any remaining ad hoc timing paths
 - tune widget timing/behavior values in `data/widgets.yaml`
 - add timing-focused regression coverage
 
-### 5. New feature ideas
+### 4. New feature ideas
 
 - 'swirl' widget
 - gauge multi-all coloured, the sweep arm changes colour to match the colour of current portion of rim
 - flash on/off chaotic disruptive, as though screen is basically going haywire and breaking down
 - new object class `sequence`: a series of scenes (or scene definitions?) advanced by keypress or possibly by timer.  Keypress seems more useful, if it goes to something like a dramatic change when actor initiates something....  a timer might loop through a series of scenes, like 'cycle' is for widgets.
+
+## Future Refactors
+
+### Telemetry provider / widget split
+
+- stop treating `sparkline` + `readouts` as a special shared widget family
+- split `sparkline` and `readouts` into independent widget implementations
+- extract the current shared fake telemetry generation into a separate helper/provider layer
+- make telemetry consumption optional per widget rather than implied by widget family
+- keep synchronized/shared telemetry streams possible, but not architecturally required
+- assess whether `scope`, `gauge`, or later widgets should be able to consume telemetry providers
 
 ## Open Questions
 
@@ -60,6 +57,19 @@ Persistent reference material lives elsewhere:
 - if yes, should `all` mean:
   - all enabled widgets in principle
   - or only widgets usable on the current platform/dependency set?
+
+## Recently Completed
+
+- removed the internal widget id `gauges` and the separate `INTERNAL_WIDGETS` concept
+- kept the public `gauge` widget intact while rejecting the removed `gauges` id at startup
+- broadened resolved-screen startup validation without breaking the inert-leftover-modifier exception
+- added startup validation coverage for duplicate `cycle.widgets` members and stale-widget rejection
+- added portrait-oriented layouts `1x3` and `2x4`
+- changed `--layouts` preview rendering to derive row/column spans from layout geometry so equal-sized panels consume equal preview space
+- assessed the role and boundary of `MetricsWidgets`; current direction is toward independent widgets plus an optional telemetry-provider layer rather than expanding the shared widget-family abstraction
+- renamed the remaining metrics-specific `gauge*` / `ensure_gauges` internals to metrics-oriented names and removed stale metrics-only state from the shared area model
+- added focused precedence tests for widget-default, region, CLI, and default-colour resolution, and fixed `--default-colour` so it overrides colours inherited only from config defaults
+- added hardening coverage for direct CLI target/overlap failures, unknown region references, image dependency failures, and unassigned-panel rejection when no default widget is configured
 
 ## Working Rules
 

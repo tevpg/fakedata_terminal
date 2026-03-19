@@ -564,7 +564,6 @@ def main(stdscr):
         stdscr=stdscr,
         safe_row_width=_safe_row_width,
         area_theme=_area_theme,
-        new_area_text_entry=text_widgets.new_area_text_entry,
         inject_text_getter=lambda: INJECT_TEXT,
         get_gauge_config=get_gauge_config,
         normalize_colour_spec=_normalize_colour_spec,
@@ -1021,7 +1020,7 @@ def main(stdscr):
         for area in area_states.values():
             area["next_update"] = shift_deadline(area.get("next_update", 0.0), delta)
             area["cycle_next_change"] = shift_deadline(area.get("cycle_next_change", 0.0), delta)
-            area["gauge_next_reads_at"] = shift_deadline(area.get("gauge_next_reads_at", 0.0), delta)
+            area["metrics_next_reads_at"] = shift_deadline(area.get("metrics_next_reads_at", 0.0), delta)
             area["textwall_next_reverse_at"] = shift_deadline(area.get("textwall_next_reverse_at", 0.0), delta)
             area["textwall_pause_until"] = shift_deadline(area.get("textwall_pause_until", 0.0), delta)
             area["direction_next_change"] = shift_deadline(area.get("direction_next_change", 0.0), delta)
@@ -1108,7 +1107,7 @@ def main(stdscr):
             area = area_states[spec["name"]]
             if not _paused:
                 if text_widgets.effective_mode(area) == "readouts":
-                    area["gauge_count"] += 1
+                    area["metrics_count"] += 1
                 _step_area(area, spec["height"], spec["width"], spec["role"], now, dt)
             if spec.get("separator_after"):
                 _draw_separator(rows, spec["width"])

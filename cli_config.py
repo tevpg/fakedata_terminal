@@ -1051,8 +1051,11 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
 
     if runtime_default_colour is not None:
         for area in config_scene_runtime["areas"]:
-            if not area.get("colour"):
+            sources = area.get("modifier_sources") or {}
+            if not area.get("colour") or sources.get("color") == "default":
                 area["colour"] = runtime_default_colour
+                sources["color"] = "cli_default"
+                area["modifier_sources"] = sources
 
     if runtime_speed is None:
         runtime_speed = config_scene_runtime["speed"]
