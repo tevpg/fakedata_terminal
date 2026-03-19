@@ -464,6 +464,8 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "crash_phase": 0,
         "crash_flash_frames": 0,
         "crash_blank_frames": 0,
+        "crash_invert_frames": 0,
+        "crash_static_frames": 0,
         "scope_vals": [],
         "scope_drift": 0.0,
         "scope_phase": random.uniform(0.0, math.tau),

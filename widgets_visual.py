@@ -241,8 +241,8 @@ class VisualWidgets:
     def ensure_crash(self, area: dict, rows: int, width: int):
         self.crash_widget.ensure(area, rows, width)
 
-    def update_crash(self, area: dict, rows: int, width: int):
-        self.crash_widget.update(area, rows, width)
+    def update_crash(self, area: dict, rows: int, width: int, speed: int):
+        self.crash_widget.update(area, rows, width, speed)
 
     def repaint_crash(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.crash_widget.render(area, nrows, y, x, width)
@@ -389,7 +389,7 @@ class VisualWidgets:
         if mode == "bars":
             self.update_bars(area)
         elif mode == "crash":
-            self.update_crash(area, rows, width)
+            self.update_crash(area, rows, width, speed)
         elif mode == "gauge":
             self.update_gauge(area, now, dt, speed)
         elif mode == "matrix":
