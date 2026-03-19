@@ -81,6 +81,44 @@ widgets:
       # Fast shared scheduler cadence for hard flicker / overwrite motion.
       cadence_factor: 1.00
 
+  rotate:
+    enabled: true
+    supports: [speed, color, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for rigid-body orbital motion.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  orbit:
+    enabled: true
+    supports: [speed, color, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for per-glyph orbital motion.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
   gauge:
     enabled: true
     supports: [speed, color, text, direction]
@@ -268,6 +306,8 @@ widgets:
           - bars
           - crash
           - gauge
+          - orbit
+          - rotate
           - scope
           - sparkline
           - tunnel

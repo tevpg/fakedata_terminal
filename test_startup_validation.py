@@ -145,6 +145,8 @@ class StartupValidationTests(unittest.TestCase):
         self.assertIn("1x3", result.stdout)
         self.assertIn("2x4", result.stdout)
         self.assertIn("crash", result.stdout)
+        self.assertIn("orbit", result.stdout)
+        self.assertIn("rotate", result.stdout)
 
     def test_crash_widget_resolves_with_metadata_default_colour(self) -> None:
         runtime = prepare_runtime_config(
@@ -164,6 +166,46 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(areas["P1"]["mode"], "crash")
         self.assertEqual(areas["P1"]["theme"], "finance")
         self.assertEqual(areas["P1"]["colour"], "multi-all")
+
+    def test_rotate_widget_resolves_with_direction_and_colour(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=rotate",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-direction", "P1=backward",
+                "--region-colour", "P1=bright-cyan",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["mode"], "rotate")
+        self.assertEqual(areas["P1"]["direction"], "backward")
+        self.assertEqual(areas["P1"]["colour"], "bright-cyan")
+
+    def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=orbit",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-direction", "P1=forward",
+                "--region-colour", "P1=bright-magenta",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["mode"], "orbit")
+        self.assertEqual(areas["P1"]["direction"], "forward")
+        self.assertEqual(areas["P1"]["colour"], "bright-magenta")
 
     def test_layouts_succeeds(self) -> None:
         result = run_cli("--layouts")
