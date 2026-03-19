@@ -359,6 +359,13 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "",
             *modifier_lines,
         ],
+        "crash": [
+            "Violent flicker-and-corruption failure display.",
+            "",
+            *modifier_lines,
+            "theme seeds the text fragments.",
+            "colour defaults to multi-all in the renderer.",
+        ],
         "gauge": [
             "Large digital gauge display.",
             "",

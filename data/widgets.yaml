@@ -72,6 +72,15 @@ widgets:
       # Shared scheduler cadence for bar-value drift updates.
       cadence_factor: 0.55
 
+  crash:
+    enabled: true
+    supports: [speed, theme, color]
+    defaults:
+      color: multi-all
+    timing:
+      # Fast shared scheduler cadence for hard flicker / overwrite motion.
+      cadence_factor: 1.00
+
   gauge:
     enabled: true
     supports: [speed, color, text, direction]
@@ -257,6 +266,7 @@ widgets:
           - text_scant
           - text_spew
           - bars
+          - crash
           - gauge
           - scope
           - sparkline

@@ -144,6 +144,26 @@ class StartupValidationTests(unittest.TestCase):
         self.assertIn("Config files:", result.stdout)
         self.assertIn("1x3", result.stdout)
         self.assertIn("2x4", result.stdout)
+        self.assertIn("crash", result.stdout)
+
+    def test_crash_widget_resolves_with_metadata_default_colour(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=crash",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-theme", "P1=finance",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["mode"], "crash")
+        self.assertEqual(areas["P1"]["theme"], "finance")
+        self.assertEqual(areas["P1"]["colour"], "multi-all")
 
     def test_layouts_succeeds(self) -> None:
         result = run_cli("--layouts")

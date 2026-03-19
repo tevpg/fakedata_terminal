@@ -9,24 +9,28 @@ try:
     from .runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from .timing_support import resolve_direction_motion as resolve_shared_direction_motion
     from .widgets_visual_blocks import BlocksWidget
+    from .widgets_visual_crash import CrashWidget
     from .widgets_visual_gauge import GaugeWidget
     from .widgets_visual_matrix import MatrixWidget
     from .widgets_visual_scope import ScopeWidget
     from .widgets_visual_sweep import SweepWidget
     from .widgets_visual_tunnel import TunnelWidget
+    from .vocab import _build_pools
 except ImportError:
     from runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from timing_support import resolve_direction_motion as resolve_shared_direction_motion
     from widgets_visual_blocks import BlocksWidget
+    from widgets_visual_crash import CrashWidget
     from widgets_visual_gauge import GaugeWidget
     from widgets_visual_matrix import MatrixWidget
     from widgets_visual_scope import ScopeWidget
     from widgets_visual_sweep import SweepWidget
     from widgets_visual_tunnel import TunnelWidget
+    from vocab import _build_pools
 
 
 class VisualWidgets:
-    VISUAL_MODES = {"bars", "gauge", "matrix", "blocks", "sweep", "tunnel", "scope"}
+    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "sweep", "tunnel", "scope"}
 
     def __init__(
         self,
@@ -60,6 +64,15 @@ class VisualWidgets:
             normalize_colour_spec=normalize_colour_spec,
             blocks_palette_specs=blocks_palette_specs,
             colour_pair_indices=COLOUR_PAIR_INDICES,
+        )
+        self.crash_widget = CrashWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            safe_row_width=safe_row_width,
+            area_theme=area_theme,
+            build_pools=_build_pools,
+            normalize_colour_spec=normalize_colour_spec,
+            colour_attr_from_spec=colour_attr_from_spec,
         )
         self.gauge_widget = GaugeWidget(
             curses_module=curses_module,
@@ -225,6 +238,15 @@ class VisualWidgets:
     def repaint_gauge(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.gauge_widget.render(area, nrows, y, x, width)
 
+    def ensure_crash(self, area: dict, rows: int, width: int):
+        self.crash_widget.ensure(area, rows, width)
+
+    def update_crash(self, area: dict, rows: int, width: int):
+        self.crash_widget.update(area, rows, width)
+
+    def repaint_crash(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.crash_widget.render(area, nrows, y, x, width)
+
     def ensure_blocks(self, area: dict, rows: int, width: int):
         self.blocks_widget.ensure(area, rows, width)
 
@@ -344,6 +366,8 @@ class VisualWidgets:
                 for _ in range(max(12, min(36, rows * 3))):
                     self.update_blocks(area, rows, width)
                 area["blocks_warmed"] = True
+        elif mode == "crash":
+            self.ensure_crash(area, rows, width)
         elif mode == "sweep":
             self.ensure_sweep(area, rows, width)
         elif mode == "tunnel":
@@ -364,6 +388,8 @@ class VisualWidgets:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.update_bars(area)
+        elif mode == "crash":
+            self.update_crash(area, rows, width)
         elif mode == "gauge":
             self.update_gauge(area, now, dt, speed)
         elif mode == "matrix":
@@ -381,6 +407,8 @@ class VisualWidgets:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.repaint_bars(area, rows, y, x, width)
+        elif mode == "crash":
+            self.repaint_crash(area, rows, y, x, width)
         elif mode == "gauge":
             self.repaint_gauge(area, rows, y, x, width)
         elif mode == "matrix":

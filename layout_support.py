@@ -21,7 +21,7 @@ def sidebar_cycle_modes_for_main(main_mode: str, sidebar_cycle_modes: list[str])
 
 def cycle_widget_names(include_image: bool) -> list[str]:
     names = [
-        "bars", "blocks", "gauge", "image", "life", "matrix",
+        "bars", "blocks", "crash", "gauge", "image", "life", "matrix",
         "scope", "readouts", "sparkline", "sweep", "tunnel",
         "text", "text_scant", "text_spew", "text_wide",
     ]
