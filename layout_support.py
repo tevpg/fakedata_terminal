@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import random
 
+try:
+    from .timing_support import cycle_start_deadline
+except ImportError:
+    from timing_support import cycle_start_deadline
+
 
 def sidebar_cycle_modes_for_main(main_mode: str, sidebar_cycle_modes: list[str]) -> list[str]:
     if main_mode in ("text", "text_wide"):
@@ -142,6 +147,6 @@ def sync_cycle_start_modes(area_specs: list[dict], area_states: dict[str, dict],
         area["label"] = current
         if current in area["cycle_order"]:
             area["cycle_idx"] = area["cycle_order"].index(current)
-        area["cycle_next_change"] = now + random.uniform(0.0, 10.0)
+        area["cycle_next_change"] = cycle_start_deadline(now)
         area["next_update"] = 0.0
         used.add(current)

@@ -13,7 +13,6 @@ Persistent reference material lives elsewhere:
 
 - close any remaining precedence mismatches with `configuration_model.md`
 - trim leftover internal `scene_*` wrappers and naming where practical
-- eliminate internal-only widget ids from the model entirely
 - remove stale comments/docs that still describe the old model
 
 ### 2. Finish hardening
@@ -27,9 +26,9 @@ Persistent reference material lives elsewhere:
 
 ### 3. Finish timing work
 
-- audit for any remaining ad hoc timing paths
 - tune widget timing/behavior values in `data/widgets.yaml`
-- add timing-focused regression coverage
+- decide whether any remaining widget-local tick/motion details should stay as implementation details or be promoted into the timing model
+- expand timing-focused regression coverage if more timing behavior becomes declarative
 
 ### 4. New feature ideas
 
@@ -70,6 +69,8 @@ Persistent reference material lives elsewhere:
 - renamed the remaining metrics-specific `gauge*` / `ensure_gauges` internals to metrics-oriented names and removed stale metrics-only state from the shared area model
 - added focused precedence tests for widget-default, region, CLI, and default-colour resolution, and fixed `--default-colour` so it overrides colours inherited only from config defaults
 - added hardening coverage for direct CLI target/overlap failures, unknown region references, image dependency failures, and unassigned-panel rejection when no default widget is configured
+- audited timing paths, fixed cycle-start jitter to use the shared timing helper, and added targeted timing tests for scheduler/deadline behavior
+- updated timing comments in `data/widgets.yaml` to describe the current shared scheduler model rather than the older burst/steady bucket terminology
 
 ## Working Rules
 

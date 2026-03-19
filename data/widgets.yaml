@@ -1,17 +1,17 @@
-# First-pass widget metadata and timing/behavior tunables for the timing rewrite.
+# Widget metadata plus timing/behavior tunables.
 #
-# This file is intentionally a draft. The values here are based on current
-# runtime behavior where possible, and on approximations where the current
-# behavior does not map cleanly to the new model.
+# The scheduler now uses `widget_interval(...)` from `timing_support.py` as the
+# common update gate for all widgets. `cadence_factor` therefore means "fraction
+# of the shared base update rate" rather than an old burst/steady bucket name.
 #
-# Cadence-factor derivation rule for this draft:
-# - `1.00` is reserved for the fastest ordinary cadence bucket in the current
-#   runtime: steady modes that use `_steady_mode_delay(...)/1.5`
-# - `0.67` approximates the ordinary steady bucket using `_steady_mode_delay(...)`
-# - `0.55` approximates the mean burst-driven bucket based on the current
-#   `make_burst_fn()` weighted average delay (~1.2075 * centre_delay)
-# - values below that are used only when the current implementation already
-#   advances a widget less often than its enclosing burst cadence
+# Some widgets still have local animation details that are not fully declarative
+# here yet, for example:
+# - extra motion/trace state inside the visual widget implementations
+# - read-refresh deadlines for telemetry-style widgets
+# - direction-driven freezing for certain widgets when `direction: none`
+#
+# The values below should therefore be treated as the current tuned scheduler
+# inputs, not as a complete declarative timing model.
 
 defaults:
   timing:
@@ -27,7 +27,7 @@ widgets:
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
-      # Burst-driven; every update scrolls.
+      # Shared scheduler cadence; each update scrolls the text buffer.
       cadence_factor: 0.55
     behavior:
       direction_random:
@@ -44,8 +44,7 @@ widgets:
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
-      # Burst-driven, but only scrolls every 2 ticks in main and every 5 ticks
-      # in sidebar. This value is an intentional compromise estimate.
+      # Slower shared scheduler cadence for sparser text motion.
       cadence_factor: 0.25
     behavior:
       direction_random:
@@ -62,10 +61,7 @@ widgets:
     supports: [speed, theme, text]
     defaults: {}
     timing:
-      # The old code special-cases this to `next_update = now`, effectively
-      # making it loop-bound rather than cadence-bound. In the shared model it
-      # must be normalized back into the common <= 1.0 range, so it maps to
-      # the maximum shared cadence.
+      # Maximum shared scheduler cadence for the most aggressive text mode.
       cadence_factor: 1.00
 
   bars:
@@ -73,7 +69,7 @@ widgets:
     supports: [speed, theme, text]
     defaults: {}
     timing:
-      # Burst-driven; values update on each burst step.
+      # Shared scheduler cadence for bar-value drift updates.
       cadence_factor: 0.55
 
   gauge:
@@ -81,7 +77,7 @@ widgets:
     supports: [speed, color, text, direction]
     defaults: {}
     timing:
-      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      # Fast shared scheduler cadence for continuous dial motion.
       cadence_factor: 1.00
       motion:
         units: rpm
@@ -101,7 +97,7 @@ widgets:
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
-      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      # Shared scheduler cadence for waveform/trace updates.
       cadence_factor: 1.0
     behavior:
       direction_random:
@@ -118,7 +114,8 @@ widgets:
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
-      # Burst-driven panel updates; separate read-refresh deadlines remain explicit.
+      # Shared scheduler cadence for sample history updates.
+      # Read-refresh deadlines remain explicit and separate.
       cadence_factor: 0.55
     behavior:
       direction_random:
@@ -135,7 +132,7 @@ widgets:
     supports: [speed, color, text, direction]
     defaults: {}
     timing:
-      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      # Fast shared scheduler cadence for tunnel motion.
       cadence_factor: 1.00
     behavior:
       direction_random:
@@ -152,7 +149,7 @@ widgets:
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
-      # Burst-driven forward motion with special reverse/pause deadlines.
+      # Shared scheduler cadence plus special direction-reroll behavior.
       cadence_factor: 0.55
     behavior:
       direction_random:
@@ -184,7 +181,7 @@ widgets:
     supports: [speed]
     defaults: {}
     timing:
-      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      # Shared scheduler cadence for glyph-column updates.
       cadence_factor: 0.67
 
   blocks:
@@ -192,7 +189,7 @@ widgets:
     supports: [speed, color, direction, text]
     defaults: {}
     timing:
-      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      # Fast shared scheduler cadence for block-field updates.
       cadence_factor: 1.00
 
   sweep:
@@ -200,7 +197,7 @@ widgets:
     supports: [speed]
     defaults: {}
     timing:
-      # Fast steady bucket: `_steady_mode_delay(...)/1.5`
+      # Fast shared scheduler cadence for sweep motion.
       cadence_factor: 1.00
 
   readouts:
@@ -208,7 +205,8 @@ widgets:
     supports: [theme, text, color]
     defaults: {}
     timing:
-      # Burst-driven panel updates; read refresh is a separate explicit deadline.
+      # Shared scheduler cadence for telemetry panel repaint/update work.
+      # Read-refresh is a separate explicit deadline.
       cadence_factor: 0.55
     behavior:
       read_refresh:
@@ -221,7 +219,7 @@ widgets:
     supports: [speed, image]
     defaults: {}
     timing:
-      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      # Shared scheduler cadence for image wipe/frame transitions.
       cadence_factor: 0.67
     behavior:
       transition:
@@ -233,7 +231,7 @@ widgets:
     supports: [speed, color]
     defaults: {}
     timing:
-      # Ordinary steady bucket: `_steady_mode_delay(...)`
+      # Shared scheduler cadence for automaton generations.
       cadence_factor: 0.67
     behavior:
       restart:
