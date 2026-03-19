@@ -212,12 +212,16 @@ def load_scene_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str,
     return catalog
 
 
-def config_scene_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+def config_screen_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     catalog = load_scene_catalog(config_paths)
     screens = catalog.get("screens", {})
     if not isinstance(screens, dict):
         return []
     return list(screens.keys())
+
+
+def config_scene_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    return config_screen_names(config_paths)
 
 
 def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -785,7 +789,7 @@ def _first_non_none(*values: Any) -> Any:
 
 
 def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, Any], *,
-                            default_color: str | None, scene_direction: str, default_images: list[str]) -> dict[str, Any]:
+                            default_color: str | None, screen_direction: str, default_images: list[str]) -> dict[str, Any]:
     area_images: list[str] = []
     if widget == "image":
         area_images = _region_image_paths(region_cfg)
@@ -809,7 +813,7 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
         ),
         "theme": _first_non_none(_region_theme(region_cfg), _region_theme(widget_cfg)),
         "color": _first_non_none(_region_color(region_cfg), _region_color(widget_cfg), default_color),
-        "direction": _first_non_none(_region_direction(region_cfg), _region_direction(widget_cfg), scene_direction),
+        "direction": _first_non_none(_region_direction(region_cfg), _region_direction(widget_cfg), screen_direction),
         "image_paths": area_images,
         "cycle_widgets": cycle_widgets,
     }
@@ -839,16 +843,20 @@ def _build_area_definition(*, name: str, widget: str, panels: list[str], rect: d
     }
 
 
-def _resolve_scene_runtime_defaults(scene_cfg: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+def _resolve_screen_runtime_defaults(screen_cfg: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
     return {
-        "theme": scene_cfg.get("theme", defaults.get("theme", "science")),
-        "speed": scene_cfg.get("speed", defaults.get("speed", 50)),
-        "text": scene_cfg.get("text", ""),
-        "glitch": scene_cfg.get("glitch", defaults.get("glitch", 0.0)),
+        "theme": screen_cfg.get("theme", defaults.get("theme", "science")),
+        "speed": screen_cfg.get("speed", defaults.get("speed", 50)),
+        "text": screen_cfg.get("text", ""),
+        "glitch": screen_cfg.get("glitch", defaults.get("glitch", 0.0)),
         "default_widget": defaults.get("widget"),
-        "default_color": _region_color(scene_cfg) or defaults.get("color"),
-        "direction": _region_direction(scene_cfg) or defaults.get("direction", "forward"),
+        "default_color": _region_color(screen_cfg) or defaults.get("color"),
+        "direction": _region_direction(screen_cfg) or defaults.get("direction", "forward"),
     }
+
+
+def _resolve_scene_runtime_defaults(scene_cfg: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    return _resolve_screen_runtime_defaults(scene_cfg, defaults)
 
 
 def _config_label(config_paths: tuple[str, ...] | None) -> str:
@@ -1081,15 +1089,15 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
     return {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
 
 
-def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[str, Any],
-                           regions_cfg: dict[str, Any], parser, *,
-                           theme: str, speed: int | float, text: str,
-                           glitch: int | float = 0.0,
-                           default_widget: str | None = None, default_color: str | None = None,
-                           direction: str = "forward",
-                           config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+def _resolve_runtime_screen(screen_name: str, layout_name: str, layout_cfg: dict[str, Any],
+                            regions_cfg: dict[str, Any], parser, *,
+                            theme: str, speed: int | float, text: str,
+                            glitch: int | float = 0.0,
+                            default_widget: str | None = None, default_color: str | None = None,
+                            direction: str = "forward",
+                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
-        parser.error(f"screen '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{screen_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
     widget_defaults = widget_defaults_catalog(config_paths)
@@ -1097,22 +1105,22 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     seen = []
     areas = []
     image_paths = []
-    scene_direction = _direction_value(direction) or "forward"
+    screen_direction = _direction_value(direction) or "forward"
     for region_name, region_cfg in regions_cfg.items():
         widget = _widget_name(region_cfg)
         if not widget:
-            parser.error(f"screen '{scene_name}' region '{region_name}' has no widget")
+            parser.error(f"screen '{screen_name}' region '{region_name}' has no widget")
         if not _supported_widget(widget):
-            parser.error(f"screen '{scene_name}' uses unsupported widget '{widget}'")
+            parser.error(f"screen '{screen_name}' uses unsupported widget '{widget}'")
         widget_cfg = widget_defaults.get(widget, {})
-        panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, scene_name)
-        rect = _rect_for_panels(layout_cfg, panel_names, parser, scene_name, region_name)
+        panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, screen_name)
+        rect = _rect_for_panels(layout_cfg, panel_names, parser, screen_name, region_name)
         modifiers = _resolve_area_modifiers(
             widget,
             region_cfg,
             widget_cfg,
             default_color=default_color,
-            scene_direction=scene_direction,
+            screen_direction=screen_direction,
             default_images=default_images,
         )
         area = _build_area_definition(
@@ -1125,7 +1133,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
         )
         overlap = set(panel_names) & set(seen)
         if overlap:
-            parser.error(f"screen '{scene_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
+            parser.error(f"screen '{screen_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
         seen.extend(panel_names)
         if widget == "image":
             image_paths.extend(area["image_paths"])
@@ -1135,7 +1143,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     if uncovered:
         if not default_widget:
             parser.error(
-                f"screen '{scene_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
+                f"screen '{screen_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
             )
         if not _supported_widget(default_widget):
             parser.error(f"default widget '{default_widget}' is unsupported")
@@ -1147,7 +1155,7 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 None,
                 widget_cfg,
                 default_color=default_color,
-                scene_direction=scene_direction,
+                screen_direction=screen_direction,
                 default_images=default_images,
             )
             areas.append(_build_area_definition(
@@ -1167,16 +1175,31 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                 image_paths.extend(modifiers["image_paths"])
 
     return {
-        "scene_name": scene_name,
+        "screen_name": screen_name,
         "theme": theme,
         "speed": speed,
         "text": text,
         "glitch": max(0.0, float(glitch)),
-        "direction": scene_direction,
+        "direction": screen_direction,
         "layout": layout_name,
         "areas": areas,
         "image_paths": image_paths,
     }
+
+
+def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[str, Any],
+                           regions_cfg: dict[str, Any], parser, *,
+                           theme: str, speed: int | float, text: str,
+                           glitch: int | float = 0.0,
+                           default_widget: str | None = None, default_color: str | None = None,
+                           direction: str = "forward",
+                           config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    return _resolve_runtime_screen(
+        scene_name, layout_name, layout_cfg, regions_cfg, parser,
+        theme=theme, speed=speed, text=text, glitch=glitch,
+        default_widget=default_widget, default_color=default_color, direction=direction,
+        config_paths=config_paths,
+    )
 
 
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
@@ -1192,7 +1215,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     layout_cfg = layouts.get(canonical_name) if canonical_name is not None else None
     if not isinstance(layout_cfg, dict):
         parser.error(f"unknown layout '{layout_name}'")
-    return _resolve_runtime_scene(
+    return _resolve_runtime_screen(
         scene_name, canonical_name, layout_cfg, regions_cfg, parser,
         theme=theme, speed=speed, text=text, glitch=glitch,
         default_widget=default_widget, default_color=default_color, direction=direction,
@@ -1200,26 +1223,26 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     )
 
 
-def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+def resolve_config_screen(screen_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
     scenes = catalog.get("screens", {})
     defaults = config_defaults(config_paths)
 
-    if scene_name not in scenes:
-        raise KeyError(scene_name)
+    if screen_name not in scenes:
+        raise KeyError(screen_name)
 
-    scene_cfg = scenes[scene_name]
-    if not isinstance(scene_cfg, dict):
-        parser.error(f"screen '{scene_name}' must be a mapping in {_config_label(config_paths)}")
+    screen_cfg = scenes[screen_name]
+    if not isinstance(screen_cfg, dict):
+        parser.error(f"screen '{screen_name}' must be a mapping in {_config_label(config_paths)}")
 
-    layout_name = scene_cfg.get("layout")
-    regions_cfg = scene_cfg.get("regions", {})
-    resolved = _resolve_scene_runtime_defaults(scene_cfg, defaults)
+    layout_name = screen_cfg.get("layout")
+    regions_cfg = screen_cfg.get("regions", {})
+    resolved = _resolve_screen_runtime_defaults(screen_cfg, defaults)
     return resolve_runtime_layout(
         layout_name,
         regions_cfg,
         parser,
-        scene_name=scene_name,
+        scene_name=screen_name,
         theme=resolved["theme"],
         speed=resolved["speed"],
         text=resolved["text"],
@@ -1229,3 +1252,7 @@ def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] 
         direction=resolved["direction"],
         config_paths=config_paths,
     )
+
+
+def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    return resolve_config_screen(scene_name, parser, config_paths)

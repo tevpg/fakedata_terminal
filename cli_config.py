@@ -1,10 +1,12 @@
 """CLI parsing and startup banner helpers for FakeData Terminal."""
 
 import argparse
+import glob
 import math
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 try:
@@ -13,14 +15,14 @@ try:
         _direction_value,
         config_defaults,
         canonical_layout_name,
-        config_scene_names,
+        config_screen_names,
         discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
         layout_names,
         normalize_region_expr,
-        resolve_config_scene,
+        resolve_config_screen,
         resolve_runtime_layout,
         validate_scene_catalog,
         widget_names,
@@ -32,14 +34,14 @@ except ImportError:
         _direction_value,
         config_defaults,
         canonical_layout_name,
-        config_scene_names,
+        config_screen_names,
         discover_config_paths,
         default_image_paths,
         format_layout_diagrams,
         layout_catalog,
         layout_names,
         normalize_region_expr,
-        resolve_config_scene,
+        resolve_config_screen,
         resolve_runtime_layout,
         validate_scene_catalog,
         widget_names,
@@ -60,7 +62,7 @@ _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _screen_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    return config_scene_names(config_paths)
+    return config_screen_names(config_paths)
 
 
 def _layout_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -195,6 +197,7 @@ def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module
 def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, image_checker,
                               config_paths: tuple[str, ...] | None = None) -> None:
     image_mode_active = False
+    validated_image_paths = set()
     for area in runtime_screen.get("areas", []):
         widget = str(area.get("mode") or "")
         if widget and not widget_enabled(widget, config_paths):
@@ -225,9 +228,40 @@ def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, ima
         for image_path in image_paths:
             if not os.path.isfile(image_path):
                 parser.error(f"resolved screen area '{area.get('name', '?')}' image file not found: {image_path}")
+            if image_path in validated_image_paths:
+                continue
+            validated_image_paths.add(image_path)
+            if image_module is not None:
+                try:
+                    with image_module.open(image_path) as img:
+                        img.verify()
+                except Exception as exc:
+                    parser.error(f"resolved screen area '{area.get('name', '?')}' image file is unreadable: {image_path} ({exc})")
+            if image_mode_active and image_checker():
+                try:
+                    subprocess.run(
+                        ["jp2a", "--width=2", image_path],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                except subprocess.CalledProcessError as exc:
+                    detail = exc.stderr.strip().splitlines()
+                    message = detail[0] if detail else "jp2a failed"
+                    parser.error(
+                        f"resolved screen area '{area.get('name', '?')}' image conversion failed for {image_path}: {message}"
+                    )
 
     if image_mode_active and (image_module is None or not image_checker()):
         parser.error("image widgets require Pillow and jp2a to be available before rendering starts")
+
+
+def _expand_cli_image_value(value: str) -> list[str]:
+    expanded = os.path.expanduser(value)
+    if glob.has_magic(expanded):
+        matches = sorted(glob.glob(expanded))
+        return [os.path.abspath(path) for path in matches]
+    return [os.path.abspath(expanded)]
 
 
 def _widget_attribute_names(widget: str) -> list[str]:
@@ -390,7 +424,7 @@ def _pad_showcase_description(lines: list[str], header_lines: int) -> list[str]:
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
     width = shutil.get_terminal_size((100, 24)).columns
     lines = []
-    lines.extend(_format_catalog_section("Screens (--screens to view all the preset screens)", config_scene_names(config_paths), width))
+    lines.extend(_format_catalog_section("Screens (--screens to view all the preset screens)", config_screen_names(config_paths), width))
     lines.append("")
     lines.extend(_format_catalog_section("Layouts (--layouts to see the layouts)", layout_names(config_paths), width))
     lines.append("")
@@ -606,9 +640,9 @@ def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[s
 
 def _build_screen_screens(parser, config_paths: tuple[str, ...]) -> list[dict]:
     screens = []
-    for scene_name in config_scene_names(config_paths):
-        runtime = resolve_config_scene(scene_name, parser, config_paths)
-        runtime["showcase_header_lines"] = [f"screen: {scene_name}"]
+    for screen_name in config_screen_names(config_paths):
+        runtime = resolve_config_screen(screen_name, parser, config_paths)
+        runtime["showcase_header_lines"] = [f"screen: {screen_name}"]
         screens.append(runtime)
     return screens
 
@@ -794,7 +828,10 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         normalized_target = _normalize_region_key(layout_name, target, parser, "--region-image", config_paths)
         _require_region_widget_support(regions_cfg, normalized_target, target, "image", parser, "--region-image", config_paths)
         image_cfg = regions_cfg[normalized_target].setdefault("image", {})
-        image_cfg.setdefault("paths", []).append(image_path)
+        expanded_paths = _expand_cli_image_value(image_path)
+        if glob.has_magic(os.path.expanduser(image_path)) and not expanded_paths:
+            parser.error(f"--region-image glob for region '{target}' matched no files: {image_path}")
+        image_cfg.setdefault("paths", []).extend(expanded_paths)
 
     return resolve_runtime_layout(
         layout_name,
@@ -914,7 +951,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         config_scene_runtime = widget_showcase["initial"]
         runtime_layout_name = config_scene_runtime["layout"]
     else:
-        base_runtime = resolve_config_scene(args.screen, parser, config_paths) if args.screen else None
+        base_runtime = resolve_config_screen(args.screen, parser, config_paths) if args.screen else None
         runtime_layout_name = args.screen_layout or (base_runtime["layout"] if base_runtime else None)
         if runtime_layout_name is not None:
             runtime_layout_name = canonical_layout_name(runtime_layout_name, config_paths)
@@ -1017,7 +1054,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "config_screen": config_scene_runtime,
         "layout_name": config_scene_runtime["layout"],
         "area_summary": ", ".join(f"{area['name']}={area['mode']}" for area in config_scene_runtime["areas"]),
-        "demo_state": {"active": False, "scenes": [], "idx": 0, "scene": None, "next": float("inf"), "done": False},
+        "demo_state": {"active": False, "screens": [], "idx": 0, "screen": None, "next": float("inf"), "done": False},
         "screen_showcase": widget_showcase,
         "glitch_interval": runtime_glitch if not (args.widgets or args.screens) else max(0.0, args.screen_glitch if glitch_explicit and args.screen_glitch is not None else 0.0),
         "exit_after": args.exit,

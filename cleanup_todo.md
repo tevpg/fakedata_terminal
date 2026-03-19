@@ -45,6 +45,8 @@ That includes:
 
 ### Chunk 1: Rename the user-facing model
 
+Status: largely complete
+
 - replace user-facing `scene` terminology with `screen`
 - adopt `data/screens.yaml` and `screens.<name>.*` terminology consistently
 - update CLI/help/docs/examples to use:
@@ -60,6 +62,8 @@ Exit condition:
 - help text, packaged YAML, examples, and docs all speak the target vocabulary
 
 ### Chunk 2: Lock the target CLI surface
+
+Status: largely complete
 
 - rename `--layout` to `--screen-layout`
 - rename `--theme` to `--screen-theme`
@@ -78,6 +82,8 @@ Exit condition:
 
 ### Chunk 3: Finish the config split and overlay model
 
+Status: mostly complete
+
 - make `widgets.yaml` a first-class packaged base file
 - merge widget overlays from user/project/`--config` sources the same way as layouts and screens
 - remove the remaining compatibility path that sources widget defaults from screen catalogs
@@ -89,6 +95,8 @@ Exit condition:
 
 ### Chunk 4: Implement resolved-screen startup validation
 
+Status: in progress
+
 - add a post-parse, pre-render lint pass for the final resolved screen
 - validate screen/layout compatibility
 - validate resolved widget/modifier compatibility
@@ -97,6 +105,7 @@ Exit condition:
 - eagerly exercise the image-to-ASCII path to surface missing `jp2a`, missing Pillow support, or decode failures
 - validate cycle widget lists contain real supported widgets only
 - allow inert leftover modifiers when a region widget is overridden and the leftover modifier is merely unused baggage
+- reject direct CLI region overrides when the target widget does not support the requested modifier
 
 Examples that should fail before rendering:
 
@@ -111,6 +120,8 @@ Exit condition:
 
 ### Chunk 5: Lock precedence and resolution behavior
 
+Status: partially complete, but not closed
+
 - align code paths with the precedence model in `configuration_model.md`
 - ensure defaults resolve before structure and modifiers
 - ensure `screens.<name>.*` provides screen-wide runtime values, not hidden per-region fallback
@@ -123,6 +134,8 @@ Exit condition:
 - runtime behavior matches the target mental model and precedence document
 
 ### Chunk 6: Finish docs and tests
+
+Status: not started in earnest
 
 - update packaged configs and examples to express only the target model
 - remove stale comments and transitional docs
@@ -152,7 +165,46 @@ Exit condition:
 
 ## Immediate Next Steps
 
-1. Implement Chunk 1 and Chunk 2 together so the user-facing model changes in one aggressive pass.
-2. Implement Chunk 3 immediately after, so the code structure matches the renamed model.
-3. Implement Chunk 4 before further feature work.
-4. Use Chunk 5 and Chunk 6 to stabilize behavior and close out the transition.
+1. Finish Chunk 4 by broadening resolved-screen validation.
+   Priorities:
+   - eager image decode / ASCII conversion validation
+   - any remaining safe widget/modifier checks on the resolved active model
+   - preserve the inert-leftover-modifier exception
+2. Close the remaining Chunk 5 gaps.
+   Priorities:
+   - audit the remaining precedence paths for agreement with `configuration_model.md`
+   - trim any remaining `scene_*` wrappers or local naming that still obscures the target model
+3. Start Chunk 6 with focused tests before more feature work.
+   Priorities:
+   - CLI naming and no-args behavior
+   - screen/layout incompatibility validation
+   - direct CLI modifier/widget validation
+   - disabled-widget and cycle validation
+   - image validation/dependency failures
+
+## Current State Summary
+
+Implemented already:
+
+- user-facing `screen` terminology and `data/screens.yaml`
+- `--screen`, `--screens`, `--screen-layout`, `--screen-theme`, `--screen-glitch`
+- no-args orientation output
+- `data/widgets.yaml` as packaged widget config
+- merged widget overlay loading for metadata/defaults/timing/behavior
+- removal of `defaults.layout` from the active packaged/default config model
+- startup validation for:
+  - disabled widgets in defaults, screens, regions, cycle lists, and resolved runtime screens
+  - invalid/disabled cycle members
+  - empty cycle widgets
+  - image areas with no image sources
+  - missing image files
+  - missing image dependencies before rendering
+  - invalid direct CLI region modifier/widget combinations
+
+Still outstanding:
+
+- `--region-image` glob expansion behavior and validation
+- eager image decode / ASCII conversion validation
+- broader resolved-screen semantic validation beyond the current checks
+- focused regression tests
+- final cleanup of leftover internal `scene_*` names and stale comments/docs

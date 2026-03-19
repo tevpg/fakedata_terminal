@@ -1183,14 +1183,14 @@ def main(stdscr):
                 and not _demo_state["done"]
                 and time.monotonic() >= _demo_state["next"]):
             next_idx = _demo_state["idx"] + 1
-            if next_idx >= len(_demo_state["scenes"]):
+            if next_idx >= len(_demo_state["screens"]):
                 _demo_state["done"] = True
                 break
             _demo_state["idx"] = next_idx
-            _demo_state["scene"] = _demo_state["scenes"][next_idx]
-            THEME_ARG = _demo_state["scene"]["theme"]
-            MAIN_MODE = _demo_state["scene"]["main"]
-            SIDEBAR_MODE = _demo_state["scene"]["sidebar"]
+            _demo_state["screen"] = _demo_state["screens"][next_idx]
+            THEME_ARG = _demo_state["screen"]["theme"]
+            MAIN_MODE = _demo_state["screen"]["main"]
+            SIDEBAR_MODE = _demo_state["screen"]["sidebar"]
             GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
             area_specs = _current_area_specs(rows, cols)
             scene_now = time.monotonic()
@@ -1198,7 +1198,7 @@ def main(stdscr):
             _sync_cycle_start_modes(area_specs, area_states, scene_now)
             for spec in area_specs:
                 _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"], scene_now)
-            _demo_state["next"] = scene_now + _demo_state["scene"]["duration"]
+            _demo_state["next"] = scene_now + _demo_state["screen"]["duration"]
         time.sleep(0.01)
 
 
