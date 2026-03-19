@@ -9,6 +9,7 @@ except ImportError:
 
 
 class OrbitWidget(OrbitalFieldWidget):
+    # Stable orbital cloud: strong radius-based speed variation, no radial drift.
     ORBIT_FACTOR = 1.0
     FALLOFF_EXPONENT = 0.1
     DIFFERENTIAL_BASE = 0.55

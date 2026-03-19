@@ -1,4 +1,45 @@
-"""Shared orbit math helpers for rotate/swirl-style visual widgets."""
+"""Shared orbit-field helpers for rotate/orbit/swirl-style visual widgets.
+
+This module contains both the shared geometry helpers and the shared runtime
+engine for the orbital glyph-family widgets. The public widget names differ
+mainly by choosing different class constants on `OrbitalFieldWidget`.
+
+Tuning constants:
+
+- `ORBIT_FACTOR`
+  Blends between rigid-body rotation and radius-dependent angular speed.
+  `0.0` means every glyph rotates at the same angular speed.
+  `1.0` means glyph speed is fully shaped by radius.
+
+- `FALLOFF_EXPONENT`
+  Shapes how quickly the radius-dependent speed falls off toward the outside.
+  Higher values concentrate speed more strongly toward the centre.
+  Lower values flatten the difference between inner and outer glyphs.
+
+- `DIFFERENTIAL_BASE`
+  Minimum speed multiplier used by the differential-motion profile.
+  This mostly determines how slowly the outer glyphs are allowed to move.
+
+- `DIFFERENTIAL_SPREAD`
+  Extra multiplier added near the centre by the differential-motion profile.
+  This mainly determines how much faster the inner glyphs can get.
+
+- `RADIAL_DECAY_PER_SECOND`
+  Radial drift rate measured in approximate screen columns per second.
+  `0.0` means stable radius.
+  Negative values spiral inward.
+  Positive values spiral outward.
+
+- `RESPAWN_*`
+  Control when drifting glyphs are recycled and where they re-enter.
+  Inner respawn thresholds matter most for inward spirals like `swirl`;
+  outer respawn bands matter most for outward spirals if one is added later.
+
+- `RANDOM_INITIAL_PHASE`
+  If false, the field starts like a rigid plate and all glyphs share phase 0.
+  If true, glyphs start at randomized orbital phases, which feels more like a
+  cloud of independent orbiting objects.
+"""
 
 from __future__ import annotations
 

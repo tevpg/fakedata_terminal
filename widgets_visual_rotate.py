@@ -9,6 +9,7 @@ except ImportError:
 
 
 class RotateWidget(OrbitalFieldWidget):
+    # Rigid rotating plate: no radius-based speed variation, no random phase.
     ORBIT_FACTOR = 0.0
     RANDOM_INITIAL_PHASE = False
     RIGID_SPEED_MULTIPLIER = 1.0
