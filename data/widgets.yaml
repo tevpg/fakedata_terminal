@@ -131,9 +131,9 @@ widgets:
         factor: 0.04
     behavior:
       direction_random:
-        backward_probability: 0.40
-        none_probability: 0.10
-        forward_probability: 0.50
+        backward_probability: 0.30
+        none_probability: 0.0
+        forward_probability: 0.70
         backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
         forward_duration_range_seconds: [0.5, 3.0]

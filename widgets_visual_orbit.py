@@ -24,8 +24,9 @@ Tuning constants:
   Extra multiplier added near the centre by the differential-motion profile.
   This mainly determines how much faster the inner glyphs can get.
 
-- `RADIAL_DECAY_PER_SECOND`
-  Radial drift rate measured in approximate screen columns per second.
+- `RADIAL_DECAY_PER_RADIAN`
+  Radial drift measured in approximate screen columns per radian of angular
+  travel. This keeps spiral paths visually similar across speed settings.
   `0.0` means stable radius.
   Negative values spiral inward.
   Positive values spiral outward.
@@ -34,11 +35,17 @@ Tuning constants:
   Control when drifting glyphs are recycled and where they re-enter.
   Inner respawn thresholds matter most for inward spirals like `swirl`;
   outer respawn bands matter most for outward spirals if one is added later.
+  `RESPAWN_INNER_RADIUS_ABS` can be used to keep the centre cutoff at a mostly
+  fixed visual size instead of scaling with panel size.
 
 - `RANDOM_INITIAL_PHASE`
   If false, the field starts like a rigid plate and all glyphs share phase 0.
   If true, glyphs start at randomized orbital phases, which feels more like a
   cloud of independent orbiting objects.
+
+- `DIRECTION_EASE_SECONDS`
+  Time constant for blending from one direction target to another. This lets
+  orbit-family widgets reverse smoothly instead of snapping instantly.
 """
 
 from __future__ import annotations
@@ -95,8 +102,10 @@ class OrbitalFieldWidget:
     DIFFERENTIAL_BASE = 0.55
     DIFFERENTIAL_SPREAD = 2.10
     FALLOFF_EXPONENT = 1.0
-    RADIAL_DECAY_PER_SECOND = 0.0
+    RADIAL_DECAY_PER_RADIAN = 0.0
+    DIRECTION_EASE_SECONDS = 0.5
     RESPAWN_INNER_RADIUS_NORM = 0.08
+    RESPAWN_INNER_RADIUS_ABS = 0.0
     RESPAWN_OUTER_MIN_RADIUS_NORM = 0.88
     RESPAWN_OUTER_MAX_RADIUS_NORM = 0.98
     RESPAWN_INNER_MIN_RADIUS_NORM = 0.04
@@ -128,6 +137,8 @@ class OrbitalFieldWidget:
             return
         area[self.state_key("sig")] = sig
         area[self.state_key("cells")] = self.seed_cells(rows, width)
+        area[self.state_key("motion")] = 1.0
+        area[self.state_key("target_motion")] = 1.0
 
     def velocity_multiplier(self, radius_norm: float) -> float:
         shaped_falloff = (1.0 - radius_norm) ** self.FALLOFF_EXPONENT
@@ -195,8 +206,13 @@ class OrbitalFieldWidget:
                 max_dy,
                 radius_norm_min=self.RESPAWN_OUTER_MIN_RADIUS_NORM,
                 radius_norm_max=self.RESPAWN_OUTER_MAX_RADIUS_NORM,
-            )
+        )
         return self.build_cell(idx, dx, dy, max_radius, phase=phase)
+
+    def inner_respawn_radius_norm(self, max_radius: float) -> float:
+        if self.RESPAWN_INNER_RADIUS_ABS > 0.0:
+            return self.RESPAWN_INNER_RADIUS_ABS / max(1.0, max_radius)
+        return self.RESPAWN_INNER_RADIUS_NORM
 
     def seed_cells(self, rows: int, width: int) -> list[tuple[float, float, float, str, int, float]]:
         max_dx, max_dy, source_rows, source_width, max_radius = self.orbit_geometry(rows, width)
@@ -209,15 +225,26 @@ class OrbitalFieldWidget:
 
     def update(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int) -> None:
         self.ensure(area, rows, width)
-        motion = resolve_direction_motion(area, self.widget_name, now)
+        target_motion = float(resolve_direction_motion(area, self.widget_name, now))
+        area[self.state_key("target_motion")] = target_motion
+        motion = float(area.get(self.state_key("motion"), target_motion))
+        ease_seconds = max(0.001, float(self.DIRECTION_EASE_SECONDS))
+        max_step = dt / ease_seconds if dt > 0.0 else 1.0
+        delta = target_motion - motion
+        if abs(delta) <= max_step:
+            motion = target_motion
+        else:
+            motion += max_step if delta > 0.0 else -max_step
+        area[self.state_key("motion")] = motion
         cells = area.get(self.state_key("cells")) or []
-        if not cells or motion == 0:
+        if not cells:
             return
         max_dx, max_dy, _source_rows, _source_width, max_radius = self.orbit_geometry(rows, width)
         base_rate = gauge_radians_per_second(speed, widget=self.widget_name) * dt * motion
         updated = []
-        radial_step = self.RADIAL_DECAY_PER_SECOND * dt
+        radial_step = self.RADIAL_DECAY_PER_RADIAN * abs(base_rate)
         outward = radial_step > 0.0
+        inner_respawn_radius_norm = self.inner_respawn_radius_norm(max_radius)
         for dx, dy, phase, glyph, palette_idx, velocity in cells:
             next_phase = (phase + (base_rate * velocity)) % math.tau
             next_dx = dx
@@ -231,7 +258,7 @@ class OrbitalFieldWidget:
                 else:
                     next_dx, next_dy = self.random_offset(max_dx, max_dy, radius_norm_min=0.10, radius_norm_max=0.18)
             radius_norm = min(1.5, math.hypot(next_dx, next_dy * self.CELL_ASPECT_Y) / max(1.0, max_radius))
-            if radius_norm < self.RESPAWN_INNER_RADIUS_NORM or radius_norm > 1.02:
+            if radius_norm < inner_respawn_radius_norm or radius_norm > 1.02:
                 updated.append(
                     self.respawn_cell(
                         palette_idx,
