@@ -1,214 +1,107 @@
 # Overall Roadmap
 
-This is the master roadmap across:
+This document now lists only the remaining cross-cutting work.
+
+Use it to decide execution order across:
 
 - `configuration_model.md`
 - `cleanup_todo.md`
 - `timing_todo.md`
 
-Use it to decide implementation order. The detailed design lives in `configuration_model.md`. The detailed worklists live in the other TODO docs.
+## Remaining Phase Order
 
-## Phase Order
-
-### Phase 1: User-facing model cleanup
-
-Status: mostly complete
-
-Drive from:
-
-- `configuration_model.md`
-- `cleanup_todo.md` Chunk 1
-- `cleanup_todo.md` Chunk 2
-
-Deliverables:
-
-- `screen` terminology everywhere user-facing
-- `--screen-layout`, `--screen-theme`, `--screen-glitch`
-- broad flags removed where they no longer fit the model
-- no-args orientation output
-- packaged config renamed to `data/screens.yaml`
-- main help/examples updated to the target CLI surface
-
-Why first:
-
-- it locks the vocabulary before more structural work lands
-- it prevents doing deeper cleanup against names that will change again
-
-### Phase 2: Config architecture cleanup
-
-Status: mostly complete, with a little cleanup still remaining
-
-Drive from:
-
-- `configuration_model.md`
-- `cleanup_todo.md` Chunk 3
-- `cleanup_todo.md` Chunk 5
-
-Deliverables:
-
-- `widgets.yaml` fully participates in overlays
-- widget metadata/defaults/timing come from the config model
-- runtime precedence matches the documented model
-- packaged widget config lives at `data/widgets.yaml`
-- widget metadata validation runs against merged overlay config
-
-Why second:
-
-- validation and timing work should sit on top of the final config structure
-
-### Phase 3: Startup validation pass
-
-Status: in progress
+### Phase 3: Finish startup validation
 
 Drive from:
 
 - `configuration_model.md` Post-Parse Validation
 - `cleanup_todo.md` Chunk 4
 
-Deliverables:
+Remaining deliverables:
 
-- resolved-screen lint before rendering
-- screen/layout compatibility checks
-- widget/modifier compatibility checks
-- image/dependency validation
-- cycle/disabled-widget validation
-- direct CLI region overrides rejected when the target widget does not support the modifier
+- finish the resolved-screen lint pass
+- broaden semantic validation where it is safe
+- preserve the inert-leftover-modifier exception
+- keep image validation fully pre-render, including decode/conversion failures
+- decide and implement any remaining `cycle`-specific validation semantics
 
-Why third:
-
-- once names and config structure are stable, validation can target the final resolved model cleanly
-
-### Phase 4: Timing cleanup and tuning
-
-Status: not started in earnest
+### Phase 4: Finish precedence and internal cleanup
 
 Drive from:
 
-- `timing_todo.md`
 - `configuration_model.md`
+- `cleanup_todo.md` Chunk 5
 
-Deliverables:
+Remaining deliverables:
 
-- no remaining ad hoc timing paths that should live under the shared timing model
-- tuned widget timing values
-- timing remains widget-level apart from runtime `+` / `-`
-
-Why fourth:
-
-- timing work should not fight with ongoing config-schema churn
+- close any remaining precedence mismatches with the documented model
+- trim leftover internal `scene_*` wrappers and naming where practical
+- remove stale comments/docs that still describe the old model
 
 ### Phase 5: Hardening and closure
-
-Status: not started in earnest
 
 Drive from:
 
 - `cleanup_todo.md` Chunk 6
 - `timing_todo.md`
 
-Deliverables:
+Remaining deliverables:
 
-- regression tests
+- focused regression tests for startup validation and precedence
 - cleaned docs/examples/comments
 - removed transitional code paths
 
-Why last:
+### Phase 6: Timing audit and tuning
 
-- tests and cleanup are most stable after the architecture is no longer moving
+Drive from:
+
+- `timing_todo.md`
+
+Remaining deliverables:
+
+- audit for any remaining ad hoc timing paths
+- tune widget timing/behavior values
+- add timing-focused regression coverage
 
 ## Aggressive Chunking Strategy
 
-If you want large but still manageable code changes, use these implementation batches:
+1. Finish the validation batch
+   - broaden resolved-screen validation
+   - keep failures comprehensive and early
+   - preserve the inert-leftover-modifier exception
 
-1. CLI/vocabulary batch
-   - rename user-facing terms and flags
-   - update help/docs/examples
-   - change no-args behavior
+2. Finish the precedence/internal-cleanup batch
+   - align remaining code paths with the documented model
+   - trim leftover internal `scene_*` naming
+   - eliminate internal-only widget ids from the model
+   - remove stale comments/docs
 
-2. Config split batch
-   - make `widgets.yaml` first-class in overlays
-   - remove old widget-default compatibility paths
-   - align precedence code with the documented model
+3. Finish the hardening batch
+   - add focused regression coverage
+   - clean tests/examples/docs around the implemented model
 
-3. Validation batch
-   - add post-parse resolved-screen lint
-   - make startup failures comprehensive and early
-
-4. Timing batch
-   - move remaining timing stragglers under the shared timing model
+4. Finish the timing batch
+   - audit remaining timing stragglers
    - tune values
    - add timing-focused regression coverage
 
-5. Final hardening batch
-   - remove stale code/docs/tests
-   - add remaining regression coverage
+## Remaining Open Questions
 
-## Current Position
-
-The codebase is now in late Phase 2 / early Phase 3.
-
-Completed or largely completed:
-
-- the user-facing model is `screen`, not `scene`
-- the supported CLI now centers on:
-  - `--screen`
-  - `--screens`
-  - `--screen-layout`
-  - `--screen-theme`
-  - `--screen-glitch`
-  - region-scoped override flags
-- no-args behavior prints the orientation message instead of trying to run a default layout
-- packaged base config now includes:
-  - `data/layouts.yaml`
-  - `data/widgets.yaml`
-  - `data/screens.yaml`
-- widget metadata/defaults/timing now load through the merged overlay-aware config path
-- `defaults.layout` has been removed from the active packaged/default config model
-- pre-render validation now already catches:
-  - disabled widgets in config and resolved screens
-  - invalid or disabled cycle members
-  - empty cycle widgets
-  - image areas without image sources
-  - missing image files
-  - missing image dependencies before rendering starts
-  - invalid direct CLI modifier/widget combinations such as `--region-text` on `life`
-
-Still to do before Phase 3 can be called complete:
-
-- broaden resolved-screen validation beyond the current high-value checks
-- add eager image decode / ASCII conversion validation rather than just existence and dependency checks
-- finish internal naming cleanup where old `scene_*` helper names still remain as wrappers or local names
-- add focused regression tests around the new validation behavior
-
-## Next Tranche
-
-The next concrete batch should be:
-
-1. Finish the resolved-screen validation pass
-   - extend semantic validation where it is safe
-   - preserve the rule that inert leftover modifiers after widget override are not fatal
-   - add eager image decode/ASCII validation
-
-2. Finish the remaining internal cleanup
-   - trim remaining `scene_*` wrapper/helper names where practical
-   - remove stale comments/docs that still describe the old model
-
-3. Start hardening with tests
-   - add focused tests for startup validation, precedence, and CLI behavior
+1. Should `cycle.widgets` gain a magic value such as `all`?
+   Open question:
+   if supported, should `all` mean all enabled widgets in principle, or only the widgets that are actually usable on the current platform and dependency set?
 
 ## Dependency Notes
 
-- Do not do timing tuning before the config split is stable.
-- Do not add deep validation logic against old CLI names that are about to be removed.
-- Do not treat docs cleanup as separate from vocabulary cleanup; they should land together.
 - Keep `configuration_model.md` as the source of truth for precedence and scope.
 - Do not introduce `screens.<name>.defaults`; the direct screen-field model is settled.
-- When implementing `--region-image` glob support, assume quoted patterns are resolved by the application.
 - Keep the rule that direct CLI modifier overrides must be valid for the target widget, while inert inherited leftovers from replaced region assignments are allowed.
+- If `cycle.widgets: all` is added later, define it once and use the same meaning in widget defaults, screen YAML, and any future CLI override surface.
+- Do not preserve a separate class of internal-only widget ids in config/runtime; `gauges` is the current cleanup target.
 
 ## Document Roles
 
 - `configuration_model.md`: target architecture, terminology, precedence, validation principles
 - `cleanup_todo.md`: config/CLI/validation implementation backlog
 - `timing_todo.md`: timing implementation and tuning backlog
-- `overall_todo.doc`: master execution order across the other three docs
+- `overall_todo.doc`: remaining cross-doc execution order

@@ -203,8 +203,14 @@ Implemented already:
 
 Still outstanding:
 
-- `--region-image` glob expansion behavior and validation
-- eager image decode / ASCII conversion validation
 - broader resolved-screen semantic validation beyond the current checks
 - focused regression tests
 - final cleanup of leftover internal `scene_*` names and stale comments/docs
+- eliminate internal-only widget ids from the model entirely
+  - every runtime/config widget id should either be a real public widget or not exist as a widget id at all -- in fact the very concept of internal widget should be removed (wiget_metadata.py and perhaps elsewhere)
+  - current cleanup target: remove the internal widget name `gauges`
+  - rationale: internal widget ids violate the intended model and confuse config/runtime semantics
+  - `gauges` is also redundant with composing screens from multiple regions/layouts
+- deferred design item:
+  - decide whether `cycle.widgets` should support a magic value such as `all`
+  - open question: if `all` exists, should it mean all enabled widgets in principle, or only widgets usable on the current platform/dependency set?

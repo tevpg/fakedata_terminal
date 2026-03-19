@@ -269,7 +269,24 @@ widgets:
   cycle:
     enabled: true
     supports: [speed, theme, color, cycle]
-    defaults: {}
+    defaults:
+      cycle:
+        widgets:
+          - text
+          - text_scant
+          - text_spew
+          - bars
+          - gauge
+          - scope
+          - sparkline
+          - tunnel
+          - text_wide
+          - matrix
+          - blocks
+          - sweep
+          - readouts
+          - image
+          - life
     timing:
       cadence_factor: 0.0
     behavior:
