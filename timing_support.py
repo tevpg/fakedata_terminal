@@ -151,17 +151,6 @@ def read_refresh_interval(widget: str, role: str, theme_name: str | None) -> flo
         return None
 
 
-def feed_scroll_interval(widget: str) -> float | None:
-    settings = _behavior_section(widget).get("feed_scroll")
-    if not isinstance(settings, dict):
-        return None
-    value = settings.get("interval_seconds")
-    try:
-        return max(0.01, float(value))
-    except (TypeError, ValueError):
-        return None
-
-
 def motion_factor(widget: str) -> float:
     motion = _timing_section(widget).get("motion")
     if not isinstance(motion, dict):

@@ -1022,7 +1022,6 @@ def main(stdscr):
             area["next_update"] = shift_deadline(area.get("next_update", 0.0), delta)
             area["cycle_next_change"] = shift_deadline(area.get("cycle_next_change", 0.0), delta)
             area["gauge_next_reads_at"] = shift_deadline(area.get("gauge_next_reads_at", 0.0), delta)
-            area["gauge_next_feed_at"] = shift_deadline(area.get("gauge_next_feed_at", 0.0), delta)
             area["textwall_next_reverse_at"] = shift_deadline(area.get("textwall_next_reverse_at", 0.0), delta)
             area["textwall_pause_until"] = shift_deadline(area.get("textwall_pause_until", 0.0), delta)
             area["direction_next_change"] = shift_deadline(area.get("direction_next_change", 0.0), delta)

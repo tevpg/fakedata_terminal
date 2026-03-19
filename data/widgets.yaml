@@ -203,23 +203,6 @@ widgets:
       # Fast steady bucket: `_steady_mode_delay(...)/1.5`
       cadence_factor: 1.00
 
-  gauges:
-    enabled: true
-    supports: [speed, theme, text, color]
-    defaults: {}
-    timing:
-      # Burst-driven panel updates; read refresh and feed scroll are separate timers.
-      cadence_factor: 0.75
-    behavior:
-      read_refresh:
-        # First-pass simplification of the current per-role refresh logic.
-        main_interval_seconds: 0.30
-        sidebar_interval_seconds: 0.45
-        pharmacy_sidebar_interval_seconds: 0.80
-      feed_scroll:
-        # Replaces the current gauge_tick >= 5 counter with an explicit target cadence.
-        interval_seconds: 0.60
-
   readouts:
     enabled: true
     supports: [theme, text, color]

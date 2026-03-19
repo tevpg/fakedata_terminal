@@ -29,8 +29,7 @@ PUBLIC_WIDGETS = {
     "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
     "sparkline", "readouts", "blank", "cycle",
 }
-INTERNAL_WIDGETS = {"gauges"}
-ALL_WIDGETS = PUBLIC_WIDGETS | INTERNAL_WIDGETS
+ALL_WIDGETS = PUBLIC_WIDGETS
 
 _ACTIVE_CONFIG_PATHS: tuple[str, ...] = ()
 
@@ -130,10 +129,6 @@ def widget_enabled(widget: str, config_paths: tuple[str, ...] | list[str] | None
 
 def public_widget_names() -> list[str]:
     return sorted(PUBLIC_WIDGETS)
-
-
-def all_widget_names() -> list[str]:
-    return sorted(ALL_WIDGETS)
 
 
 def widget_supports(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> list[str]:

@@ -46,6 +46,17 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("--region-text is not valid for widget 'life' in region 'P1'", result.stderr)
 
+    def test_removed_gauges_widget_rejected(self) -> None:
+        result = run_cli(
+            "--screen-layout", "2x2",
+            "--region-widget", "P1=gauges",
+            "--region-widget", "P2=blank",
+            "--region-widget", "P3=text",
+            "--region-widget", "P4=gauge",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("uses unsupported widget 'gauges'", result.stderr)
+
     def test_region_image_glob_must_match_files(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fdt-emptyglob-") as tmpdir:
             result = run_cli(

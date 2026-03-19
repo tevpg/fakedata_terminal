@@ -24,10 +24,10 @@ else:
 
 try:
     from .runtime_support import COLOUR_CHOICES, normalize_colour_spec
-    from .widget_metadata import all_widget_names, public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
+    from .widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CHOICES, normalize_colour_spec
-    from widget_metadata import all_widget_names, public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
+    from widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -746,7 +746,7 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
 
 
 def _supported_widget(widget: str) -> bool:
-    return widget in all_widget_names()
+    return widget in public_widget_names()
 
 
 def _expand_image_spec(image_spec: dict[str, Any] | None) -> list[str]:

@@ -6,14 +6,14 @@ import random
 
 try:
     from .runtime_support import multi_palette_specs
-    from .timing_support import feed_scroll_interval, read_refresh_interval, schedule_next
+    from .timing_support import read_refresh_interval, schedule_next
 except ImportError:
     from runtime_support import multi_palette_specs
-    from timing_support import feed_scroll_interval, read_refresh_interval, schedule_next
+    from timing_support import read_refresh_interval, schedule_next
 
 
 class MetricsWidgets:
-    GAUGE_MODES = {"gauges", "sparkline", "readouts"}
+    GAUGE_MODES = {"sparkline", "readouts"}
 
     def __init__(
         self,
@@ -158,13 +158,6 @@ class MetricsWidgets:
         if not had_last_values or area["gauge_next_reads_at"] <= 0.0:
             interval = read_refresh_interval(mode, role, self.area_theme(area))
             area["gauge_next_reads_at"] = (now + interval) if interval is not None else 0.0
-        if mode == "gauges" and area["gauge_next_feed_at"] <= 0.0:
-            interval = feed_scroll_interval(mode)
-            area["gauge_next_feed_at"] = (now + interval) if interval is not None else 0.0
-        while len(area["gauge_feed"]) < rows:
-            area["gauge_feed"].append(self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role))
-        while len(area["gauge_feed"]) > rows:
-            area["gauge_feed"].pop(0)
 
     def next_gauge_spark(self, area: dict):
         if not callable(area["gauge_signal"]):
@@ -197,16 +190,6 @@ class MetricsWidgets:
         area["gauge_drift"] = drift
         return max(0.01, min(0.99, nxt))
 
-    @staticmethod
-    def gauge_rows(area: dict, rows: int):
-        spark_rows = max(4, rows * 30 // 100)
-        reads_rows = max(4, len(area["gauge_reads"]) + 2)
-        div1 = spark_rows
-        reads_start = div1 + 1
-        div2 = reads_start + reads_rows
-        feed_start = div2 + 1
-        return spark_rows, div1, reads_start, div2, feed_start
-
     def draw_divider(self, y: int, row: int, x: int, width: int, label, cp=3, attr=None):
         inner = f"[ {label} ]"
         dashes = max(0, width - len(inner) - 2)
@@ -221,71 +204,6 @@ class MetricsWidgets:
             self.stdscr.addnstr(y + row, x, txt[:safe_w].ljust(safe_w), safe_w, draw_attr)
         except self.curses.error:
             pass
-
-    def repaint_gauges(self, area: dict, rows: int, y: int, x: int, width: int):
-        spark_rows, div1, reads_start, div2, feed_start = self.gauge_rows(area, rows)
-        spark_chars = " ▁▂▃▄▅▆▇█"
-        vals = area["gauge_spark"][-width:] if len(area["gauge_spark"]) >= width else area["gauge_spark"]
-        for r in range(spark_rows):
-            safe_w = self.safe_row_width(y, r, x, width)
-            if safe_w <= 0:
-                continue
-            chars = []
-            for v in vals:
-                bar_h = int(v * spark_rows)
-                row_from_bottom = spark_rows - 1 - r
-                if bar_h == 0:
-                    chars.append(" ")
-                elif row_from_bottom < bar_h - 1:
-                    chars.append("█")
-                elif row_from_bottom == bar_h - 1:
-                    frac = (v * spark_rows) - int(v * spark_rows)
-                    chars.append(spark_chars[max(1, int(frac * 8))])
-                else:
-                    chars.append(" ")
-            cp = 3 if r / max(1, spark_rows - 1) < 0.25 else (5 if r / max(1, spark_rows - 1) > 0.75 else 6)
-            try:
-                self.stdscr.addnstr(y + r, x, "".join(chars)[:safe_w].ljust(safe_w), safe_w, self.curses.color_pair(cp))
-            except self.curses.error:
-                pass
-        self.draw_divider(y, div1, x, width, area["gauge_title"])
-        for i, (label, val_fn, unit) in enumerate(area["gauge_reads"]):
-            row = reads_start + i
-            if row >= min(rows, div2):
-                break
-            val_str = area["gauge_last_values"][i] if i < len(area["gauge_last_values"]) else val_fn()
-            arrow = area["gauge_arrows"][i] if i < len(area["gauge_arrows"]) else " "
-            line = f" {label[:10]:<10s} {val_str:>8s} {unit[:8]:<8s} {arrow}"
-            safe_w = self.safe_row_width(y, row, x, width)
-            if safe_w <= 0:
-                continue
-            try:
-                self.stdscr.addnstr(y + row, x, line[:safe_w].ljust(safe_w), safe_w, self.curses.color_pair(2))
-            except self.curses.error:
-                pass
-        if div2 < rows:
-            self.draw_divider(y, div2, x, width, area["gauge_scroll_title"])
-        blank = " " * width
-        for r in range(feed_start, rows):
-            idx = r - feed_start
-            if idx >= len(area["gauge_feed"]):
-                break
-            txt, attr, vis = area["gauge_feed"][idx]
-            safe_w = self.safe_row_width(y, r, x, width)
-            if safe_w <= 0:
-                continue
-            try:
-                self.stdscr.addnstr(y + r, x, blank, safe_w, self.curses.color_pair(1))
-            except self.curses.error:
-                pass
-            if not txt:
-                continue
-            try:
-                draw_w = max(0, min(vis, safe_w))
-                if draw_w:
-                    self.stdscr.addnstr(y + r, x, txt[:draw_w].ljust(draw_w), draw_w, attr)
-            except self.curses.error:
-                pass
 
     def repaint_sparkline(self, area: dict, rows: int, y: int, x: int, width: int):
         spark_chars = " ▁▂▃▄▅▆▇█"
@@ -432,21 +350,11 @@ class MetricsWidgets:
             if interval is not None:
                 area["gauge_next_reads_at"] = schedule_next(area["gauge_next_reads_at"], now, interval)
         area["gauge_tick"] += 1
-        if mode == "gauges" and area["gauge_next_feed_at"] > 0.0 and now >= area["gauge_next_feed_at"]:
-            area["gauge_feed"].pop(0)
-            area["gauge_feed"].append(
-                self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role)
-            )
-            interval = feed_scroll_interval(mode)
-            if interval is not None:
-                area["gauge_next_feed_at"] = schedule_next(area["gauge_next_feed_at"], now, interval)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         del role
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
-        if mode == "gauges":
-            self.repaint_gauges(area, rows, y, x, width)
-        elif mode == "sparkline":
+        if mode == "sparkline":
             self.repaint_sparkline(area, rows, y, x, width)
         elif mode == "readouts":
             self.repaint_readouts(area, rows, y, x, width)

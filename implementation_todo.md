@@ -21,7 +21,11 @@ Persistent reference material lives elsewhere:
 - close any remaining precedence mismatches with `configuration_model.md`
 - trim leftover internal `scene_*` wrappers and naming where practical
 - eliminate internal-only widget ids from the model entirely
-- current cleanup target: remove the internal widget id `gauges`
+- rename leftover `MetricsWidgets` `gauge*` / `ensure_gauges` naming that now refers to `sparkline` + `readouts`
+- assess the role and boundary of `MetricsWidgets` itself:
+  - is it still the right abstraction for `sparkline` + `readouts`
+  - which remaining `gauge_*` state is still semantically correct vs stale
+  - whether any state should move, split, or be removed entirely
 - remove stale comments/docs that still describe the old model
 
 ### 3. Finish hardening
@@ -40,6 +44,12 @@ Persistent reference material lives elsewhere:
 - audit for any remaining ad hoc timing paths
 - tune widget timing/behavior values in `data/widgets.yaml`
 - add timing-focused regression coverage
+
+### 5. New feature ideas
+
+- 'swirl' widget
+- gauge multi-all coloured, the sweep arm changes colour to match the colour of current portion of rim
+- flash on/off chaotic disruptive, as though screen is basically going haywire and breaking down
 
 ## Open Questions
 
