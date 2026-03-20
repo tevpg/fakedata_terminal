@@ -12,6 +12,7 @@ try:
     from .widgets_visual_crash import CrashWidget
     from .widgets_visual_gauge import GaugeWidget
     from .widgets_visual_matrix import MatrixWidget
+    from .widgets_visual_orbit import OrbitWidget
     from .widgets_visual_whorl_widget import WhorlWidget
     from .widgets_visual_rotate import RotateWidget
     from .widgets_visual_scope import ScopeWidget
@@ -26,6 +27,7 @@ except ImportError:
     from widgets_visual_crash import CrashWidget
     from widgets_visual_gauge import GaugeWidget
     from widgets_visual_matrix import MatrixWidget
+    from widgets_visual_orbit import OrbitWidget
     from widgets_visual_whorl_widget import WhorlWidget
     from widgets_visual_rotate import RotateWidget
     from widgets_visual_scope import ScopeWidget
@@ -36,7 +38,7 @@ except ImportError:
 
 
 class VisualWidgets:
-    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "whorl", "rotate", "spiral", "sweep", "tunnel", "scope"}
+    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "orbit", "whorl", "rotate", "spiral", "sweep", "tunnel", "scope"}
 
     def __init__(
         self,
@@ -88,6 +90,12 @@ class VisualWidgets:
             draw_centered_overlay_to_canvas=self.draw_centered_overlay_to_canvas,
         )
         self.matrix_widget = MatrixWidget(curses_module=curses_module, stdscr=stdscr, matrix_chars=matrix_chars)
+        self.orbit_widget = OrbitWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            colour_attr_from_spec=colour_attr_from_spec,
+            normalize_colour_spec=normalize_colour_spec,
+        )
         self.whorl_widget = WhorlWidget(
             curses_module=curses_module,
             stdscr=stdscr,
@@ -274,6 +282,9 @@ class VisualWidgets:
     def ensure_rotate(self, area: dict, rows: int, width: int):
         self.rotate_widget.ensure(area, rows, width)
 
+    def ensure_orbit(self, area: dict, rows: int, width: int):
+        self.orbit_widget.ensure(area, rows, width)
+
     def ensure_whorl(self, area: dict, rows: int, width: int):
         self.whorl_widget.ensure(area, rows, width)
 
@@ -283,6 +294,9 @@ class VisualWidgets:
     def update_rotate(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
         self.rotate_widget.update(area, rows, width, now, dt, speed)
 
+    def update_orbit(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
+        self.orbit_widget.update(area, rows, width, now, dt, speed)
+
     def update_whorl(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
         self.whorl_widget.update(area, rows, width, now, dt, speed)
 
@@ -291,6 +305,9 @@ class VisualWidgets:
 
     def repaint_rotate(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.rotate_widget.render(area, nrows, y, x, width)
+
+    def repaint_orbit(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.orbit_widget.render(area, nrows, y, x, width)
 
     def repaint_whorl(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.whorl_widget.render(area, nrows, y, x, width)
@@ -421,6 +438,8 @@ class VisualWidgets:
             self.ensure_crash(area, rows, width)
         elif mode == "rotate":
             self.ensure_rotate(area, rows, width)
+        elif mode == "orbit":
+            self.ensure_orbit(area, rows, width)
         elif mode == "whorl":
             self.ensure_whorl(area, rows, width)
         elif mode == "spiral":
@@ -449,6 +468,8 @@ class VisualWidgets:
             self.update_crash(area, rows, width, speed)
         elif mode == "rotate":
             self.update_rotate(area, rows, width, now, dt, speed)
+        elif mode == "orbit":
+            self.update_orbit(area, rows, width, now, dt, speed)
         elif mode == "whorl":
             self.update_whorl(area, rows, width, now, dt, speed)
         elif mode == "spiral":
@@ -474,6 +495,8 @@ class VisualWidgets:
             self.repaint_crash(area, rows, y, x, width)
         elif mode == "rotate":
             self.repaint_rotate(area, rows, y, x, width)
+        elif mode == "orbit":
+            self.repaint_orbit(area, rows, y, x, width)
         elif mode == "whorl":
             self.repaint_whorl(area, rows, y, x, width)
         elif mode == "spiral":

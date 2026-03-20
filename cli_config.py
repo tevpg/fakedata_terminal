@@ -411,6 +411,12 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "",
             *modifier_lines,
         ],
+        "orbit": [
+            "Physics-based glyph orbits around the region centre.",
+            "",
+            *modifier_lines,
+            "direction controls orbital handedness or pause.",
+        ],
         "whorl": [
             "Glyph field rotating faster near the centre.",
             "",

@@ -26,7 +26,7 @@ WIDGET_METADATA_PATH = PACKAGE_DIR / "data" / "widgets.yaml"
 KNOWN_MODIFIERS = {"speed", "density", "theme", "text", "color", "direction", "image", "cycle"}
 PUBLIC_WIDGETS = {
     "text", "text_wide", "text_scant", "text_spew", "image", "life",
-    "bars", "crash", "gauge", "matrix", "rotate", "scope", "blocks", "spiral", "sweep", "tunnel", "whorl",
+    "bars", "crash", "gauge", "matrix", "orbit", "rotate", "scope", "blocks", "spiral", "sweep", "tunnel", "whorl",
     "sparkline", "readouts", "blank", "cycle",
 }
 ALL_WIDGETS = PUBLIC_WIDGETS

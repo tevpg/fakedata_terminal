@@ -13,7 +13,7 @@ FakeData Terminal renders animated, fake telemetry screens in the terminal. It c
 - Renders multi-panel terminal screens using `curses`
 - Drives text widgets from named theme pools such as `science`, `hacker`, `medicine`, and `finance`
 - Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and screen presets from [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml)
-- Supports widget types including `text`, `gauge`, `matrix`, `bars`, `crash`, `rotate`, `whorl`, `spiral`, `life`, `scope`, `sparkline`, `readouts`, `sweep`, `tunnel`, and `image`
+- Supports widget types including `text`, `gauge`, `matrix`, `bars`, `crash`, `orbit`, `rotate`, `whorl`, `spiral`, `life`, `scope`, `sparkline`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset screen or build a screen explicitly with `--screen-layout`, `--region-widget`, and supported default/region overrides
 - Supports widget-level fallback defaults in YAML via the top-level `widgets:` section
 

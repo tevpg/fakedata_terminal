@@ -15,7 +15,7 @@
 # inputs, not as a complete declarative timing model.
 #
 # Density semantics for the widgets that support it:
-# - `rotate`, `whorl`, `spiral`: seeded glyph count
+# - `orbit`, `rotate`, `whorl`, `spiral`: seeded glyph count
 # - `matrix`: falling glyph / stream coverage
 # - `sweep`: wake/debris glyph density
 # - `life`: initial live-cell seed density
@@ -89,6 +89,26 @@ widgets:
     timing:
       # Fast shared scheduler cadence for hard flicker / overwrite motion.
       cadence_factor: 1.00
+
+  orbit:
+    enabled: true
+    supports: [speed, density, color, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for force-integrated orbital motion.
+      # density controls seeded glyph count.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.35
+        none_probability: 0.15
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.8, 3.5]
+        none_duration_range_seconds: [0.8, 2.0]
+        forward_duration_range_seconds: [0.8, 3.5]
 
   rotate:
     enabled: true
@@ -341,6 +361,7 @@ widgets:
           - crash
           - gauge
           - whorl
+          - orbit
           - rotate
           - scope
           - spiral
