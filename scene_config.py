@@ -51,7 +51,7 @@ TOP_LEVEL_KEYS = {"defaults", "layouts", "screens", "widgets"}
 DEFAULT_KEYS = {"theme", "speed", "image", "widget", "colour", "color", "glitch", "direction", "timing"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
-SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}
+SCENE_KEYS = {"note", "layout", "theme", "speed", "density", "text", "regions", "colour", "color", "glitch", "direction"}
 REGION_KEYS = {"widget", "speed", "density", "text", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
@@ -527,6 +527,8 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         if glitch_value < 0:
                             issues.append(f"{config_label}: screen '{scene_name}' glitch must be >= 0")
                 _speed_issues(scene_cfg.get("speed"), f"{config_label}: screen '{scene_name}' speed", issues)
+                if scene_cfg.get("density") is not None:
+                    _density_issues(scene_cfg.get("density"), f"{config_label}: screen '{scene_name}' density", issues)
                 scene_color = scene_cfg.get("color", scene_cfg.get("colour"))
                 if scene_color is not None and _color_value(scene_color) is None:
                     issues.append(f"{config_label}: screen '{scene_name}' colour must be a recognized colour name")
@@ -843,7 +845,8 @@ def _modifier_source(region_cfg: Any, key: str) -> str | None:
 
 
 def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, Any], *,
-                            default_color: str | None, screen_direction: str, default_images: list[str]) -> dict[str, Any]:
+                            default_color: str | None, screen_density: int | None, screen_direction: str,
+                            default_images: list[str]) -> dict[str, Any]:
     speed = region_cfg.get("speed") if isinstance(region_cfg, dict) else None
     if speed is not None:
         speed_source = _modifier_source(region_cfg, "speed") or "region"
@@ -856,7 +859,11 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
         density_source = _modifier_source(region_cfg, "density") or "region"
     else:
         density = widget_cfg.get("density")
-        density_source = "widget_default" if density is not None else None
+        if density is not None:
+            density_source = "widget_default"
+        else:
+            density = screen_density
+            density_source = "screen" if density is not None else None
 
     text = region_cfg.get("text") if isinstance(region_cfg, dict) else None
     if text is not None:
@@ -971,6 +978,7 @@ def _resolve_screen_runtime_defaults(screen_cfg: dict[str, Any], defaults: dict[
     return {
         "theme": screen_cfg.get("theme", defaults.get("theme", "science")),
         "speed": screen_cfg.get("speed", defaults.get("speed", 50)),
+        "density": screen_cfg.get("density"),
         "text": screen_cfg.get("text", ""),
         "glitch": screen_cfg.get("glitch", defaults.get("glitch", 0.0)),
         "default_widget": defaults.get("widget"),
@@ -1218,7 +1226,7 @@ def _resolve_runtime_screen(screen_name: str, layout_name: str, layout_cfg: dict
                             theme: str, speed: int | float, text: str,
                             glitch: int | float = 0.0,
                             default_widget: str | None = None, default_color: str | None = None,
-                            direction: str = "forward",
+                            direction: str = "forward", density: int | None = None,
                             config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
         parser.error(f"screen '{screen_name}' regions must be a mapping in {_config_label(config_paths)}")
@@ -1244,6 +1252,7 @@ def _resolve_runtime_screen(screen_name: str, layout_name: str, layout_cfg: dict
             region_cfg,
             widget_cfg,
             default_color=default_color,
+            screen_density=density,
             screen_direction=screen_direction,
             default_images=default_images,
         )
@@ -1279,6 +1288,7 @@ def _resolve_runtime_screen(screen_name: str, layout_name: str, layout_cfg: dict
                 None,
                 widget_cfg,
                 default_color=default_color,
+                screen_density=density,
                 screen_direction=screen_direction,
                 default_images=default_images,
             )
@@ -1302,6 +1312,7 @@ def _resolve_runtime_screen(screen_name: str, layout_name: str, layout_cfg: dict
         "screen_name": screen_name,
         "theme": theme,
         "speed": speed,
+        "density": density,
         "text": text,
         "glitch": max(0.0, float(glitch)),
         "direction": screen_direction,
@@ -1316,12 +1327,12 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
                            theme: str, speed: int | float, text: str,
                            glitch: int | float = 0.0,
                            default_widget: str | None = None, default_color: str | None = None,
-                           direction: str = "forward",
+                           direction: str = "forward", density: int | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     return _resolve_runtime_screen(
         scene_name, layout_name, layout_cfg, regions_cfg, parser,
         theme=theme, speed=speed, text=text, glitch=glitch,
-        default_widget=default_widget, default_color=default_color, direction=direction,
+        default_widget=default_widget, default_color=default_color, direction=direction, density=density,
         config_paths=config_paths,
     )
 
@@ -1331,7 +1342,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
                            speed: int | float = 50, text: str = "",
                            glitch: int | float = 0.0,
                            default_widget: str | None = None, default_color: str | None = None,
-                           direction: str = "forward",
+                           direction: str = "forward", density: int | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
@@ -1342,7 +1353,7 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     return _resolve_runtime_screen(
         scene_name, canonical_name, layout_cfg, regions_cfg, parser,
         theme=theme, speed=speed, text=text, glitch=glitch,
-        default_widget=default_widget, default_color=default_color, direction=direction,
+        default_widget=default_widget, default_color=default_color, direction=direction, density=density,
         config_paths=config_paths,
     )
 
@@ -1369,6 +1380,7 @@ def resolve_config_screen(screen_name: str, parser, config_paths: tuple[str, ...
         scene_name=screen_name,
         theme=resolved["theme"],
         speed=resolved["speed"],
+        density=resolved["density"],
         text=resolved["text"],
         glitch=resolved["glitch"],
         default_widget=resolved["default_widget"],

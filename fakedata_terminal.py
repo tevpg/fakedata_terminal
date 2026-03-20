@@ -279,6 +279,7 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
     shortened_data_images = False
     screen_colour = None
     screen_text = config_screen.get("text", "")
+    screen_density = config_screen.get("density")
     direction_values = {
         area.get("direction")
         for area in config_screen.get("areas", [])
@@ -309,9 +310,11 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
         area_text = area.get("text") if area.get("text") is not None else screen_text
         area_colour = area.get("colour") if area.get("colour") is not None else screen_colour
         area_direction = area.get("direction") if area.get("direction") is not None else screen_direction
+        area_density = area.get("density") if area.get("density") is not None else screen_density
         effective_regions.append({
             "area": area,
             "speed": area_speed,
+            "density": area_density,
             "theme": area_theme,
             "text": area_text,
             "colour": area_colour,
@@ -330,6 +333,12 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
         "speed",
         [entry["speed"] for entry in effective_regions],
         current_base_speed,
+    )
+    factored_screen_density = _pick_factored_scene_value(
+        "density",
+        "density",
+        [entry["density"] for entry in effective_regions if "density" in widget_supports(entry["area"]["mode"])],
+        screen_density,
     )
     factored_screen_text = _pick_factored_scene_value(
         "text",
@@ -357,6 +366,8 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
         screen_body["theme"] = factored_screen_theme
     if factored_screen_speed is not _UNFACTORED:
         screen_body["speed"] = factored_screen_speed
+    if factored_screen_density is not _UNFACTORED:
+        screen_body["density"] = factored_screen_density
     if factored_screen_text is not _UNFACTORED:
         screen_body["text"] = _escape_export_text_modifier(factored_screen_text)
     if factored_screen_direction is not _UNFACTORED:
@@ -371,7 +382,8 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
             "widget": area["mode"],
         }
         if "density" in widget_supports(area["mode"]):
-            region_body["density"] = clamp_density(area.get("density"))
+            if factored_screen_density is _UNFACTORED or entry["density"] != factored_screen_density:
+                region_body["density"] = clamp_density(area.get("density"))
 
         if factored_screen_speed is _UNFACTORED or entry["speed"] != factored_screen_speed:
             region_body["speed"] = entry["speed"]

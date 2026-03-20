@@ -139,14 +139,25 @@ class RotationFieldWidget:
     def state_key(self, suffix: str) -> str:
         return f"{self.state_prefix}_{suffix}"
 
+    def initial_motion(self, area: dict) -> float:
+        direction = str(area.get("direction_override") or "forward").lower()
+        if direction == "backward":
+            return -1.0
+        if direction == "none":
+            return 0.0
+        if direction == "forward":
+            return 1.0
+        return float(resolve_direction_motion(area, self.widget_name, 0.0))
+
     def ensure(self, area: dict, rows: int, width: int) -> None:
         sig = (rows, width, clamp_density(area.get("density_override")))
         if area.get(self.state_key("sig")) == sig and area.get(self.state_key("cells")):
             return
         area[self.state_key("sig")] = sig
         area[self.state_key("cells")] = self.seed_cells(area, rows, width)
-        area[self.state_key("motion")] = 1.0
-        area[self.state_key("target_motion")] = 1.0
+        initial_motion = self.initial_motion(area)
+        area[self.state_key("motion")] = initial_motion
+        area[self.state_key("target_motion")] = initial_motion
 
     def velocity_multiplier(self, radius_norm: float) -> float:
         shaped_falloff = (1.0 - radius_norm) ** self.FALLOFF_EXPONENT

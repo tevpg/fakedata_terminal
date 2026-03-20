@@ -115,7 +115,9 @@ widgets:
   rotate:
     enabled: true
     supports: [speed, density, color, direction]
-    defaults: {}
+    defaults:
+      color: multi-all
+      direction: random
     timing:
       # Shared scheduler cadence for rigid-body rotational motion.
       # density controls seeded glyph count.
@@ -134,7 +136,10 @@ widgets:
   whorl:
     enabled: true
     supports: [speed, density, color, direction]
-    defaults: {}
+    defaults:
+      color: multi-all
+      direction: random
+
     timing:
       # Shared scheduler cadence for per-glyph differential rotation.
       # density controls seeded glyph count.
@@ -153,7 +158,9 @@ widgets:
   spiral:
     enabled: true
     supports: [speed, density, color, direction]
-    defaults: {}
+    defaults:
+      color: multi-all
+      direction: random
     timing:
       # Shared scheduler cadence for spiral rotational motion.
       # density controls seeded glyph count.

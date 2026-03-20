@@ -531,3 +531,57 @@ screens:
       P9:
         widget: scope
         speed: 90
+
+  double-whorl:
+    layout: 2x2
+    glitch: 0.0
+    speed: 55
+    text: ''
+    colour: multi-all
+    regions:
+      P1+P2:
+        widget: whorl
+        density: 50
+        direction: forward
+      P3+P4:
+        widget: whorl
+        density: 50
+        direction: backward
+
+  quadruple-whorl:
+    layout: 2x2
+    glitch: 0.0
+    speed: 85
+    density: 80
+    text: ''
+    colour: multi-all
+    regions:
+      P1:
+        widget: whorl
+        direction: forward
+      P2:
+        widget: whorl
+        direction: backward
+      P4:
+        widget: whorl
+        direction: forward
+      P3:
+        widget: whorl
+        direction: backward
+
+  double-spiral:
+    layout: 2x2
+    glitch: 0.0
+    theme: science
+    speed: 100
+    text: ''
+    colour: multi-all
+    regions:
+      P1+P2:
+        widget: spiral
+        density: 100
+        direction: backward
+      P3+P4:
+        widget: spiral
+        density: 100
+        direction: forward

@@ -98,6 +98,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--list", action="store_true",
         help="List configured screens, layouts, widgets, and colours in columns, then exit.")
     parser.add_argument(
+        "--what", dest="list", action="store_true",
+        help=argparse.SUPPRESS)
+    parser.add_argument(
         "--config", action="append", default=[], metavar="PATH",
         help=("Load an extra config overlay. Repeatable. Relative image paths inside that file are "
               "resolved relative to the file itself."))
@@ -563,7 +566,7 @@ def _format_catalog_section(title: str, items: list[str], width: int) -> list[st
 
 
 def _format_widget_matrix_section(title: str, widgets: list[str], width: int) -> list[str]:
-    modifier_columns = ["speed", "theme", "text", "colour", "direction", "image", "cycle"]
+    modifier_columns = ["speed", "density", "theme", "text", "colour", "direction", "image", "cycle"]
     check = "✓"
     widget_width = max(len("widget"), max((len(name) for name in widgets), default=0))
     col_widths = [max(len(name), 1) for name in modifier_columns]
