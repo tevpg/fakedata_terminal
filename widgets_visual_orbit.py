@@ -31,6 +31,11 @@ Tuning constants:
   Negative values spiral inward.
   Positive values spiral outward.
 
+- `RADIAL_DECAY_USES_TARGET_MOTION`
+  If true, radial decay follows the target turn state rather than the eased
+  instantaneous turn rate. This is useful for spirals that should keep falling
+  inward steadily while their handedness reverses smoothly.
+
 - `RESPAWN_*`
   Control when drifting glyphs are recycled and where they re-enter.
   Inner respawn thresholds matter most for inward spirals like `spiral`;
@@ -103,6 +108,7 @@ class OrbitalFieldWidget:
     DIFFERENTIAL_SPREAD = 2.10
     FALLOFF_EXPONENT = 1.0
     RADIAL_DECAY_PER_RADIAN = 0.0
+    RADIAL_DECAY_USES_TARGET_MOTION = False
     DIRECTION_EASE_SECONDS = 0.5
     RESPAWN_INNER_RADIUS_NORM = 0.08
     RESPAWN_INNER_RADIUS_ABS = 0.0
@@ -250,7 +256,8 @@ class OrbitalFieldWidget:
         max_dx, max_dy, _source_rows, _source_width, max_radius = self.orbit_geometry(rows, width)
         base_rate = gauge_radians_per_second(speed, widget=self.widget_name) * dt * motion
         updated = []
-        radial_step = self.RADIAL_DECAY_PER_RADIAN * abs(base_rate)
+        radial_motion = abs(target_motion) if self.RADIAL_DECAY_USES_TARGET_MOTION else abs(motion)
+        radial_step = self.RADIAL_DECAY_PER_RADIAN * gauge_radians_per_second(speed, widget=self.widget_name) * dt * radial_motion
         outward = radial_step > 0.0
         inner_respawn_radius_norm = self.inner_respawn_radius_norm(max_radius)
         for dx, dy, phase, glyph, palette_idx, velocity in cells:

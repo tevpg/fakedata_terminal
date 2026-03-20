@@ -79,3 +79,4 @@ Persistent reference material lives elsewhere:
 - direct CLI modifier overrides must be valid for the target widget
 - inert inherited leftovers from replaced region assignments are allowed
 - do not preserve a separate class of internal-only widget ids in config/runtime
+- treat emitted `exit` YAML as a lossless scene serialization: if pasted into `scenes.yaml`, it should recreate the same resolved scene except where later layout/widget definition changes make that impossible

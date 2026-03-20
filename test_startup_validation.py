@@ -7,7 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from cli_config import prepare_runtime_config
+from fakedata_terminal import _export_screen_definition
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -205,6 +208,60 @@ class StartupValidationTests(unittest.TestCase):
         areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
         self.assertEqual(areas["P1"]["mode"], "rotate")
         self.assertEqual(areas["P1"]["density"], 72)
+
+    def test_exported_screen_yaml_includes_density(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=rotate",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-density", "P1=72",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        exported = _export_screen_definition(
+            runtime["config_screen"],
+            area_states={},
+            current_base_speed=runtime["speed"],
+            current_speed_for_area=lambda _state, _role: runtime["speed"],
+        )
+        self.assertIsNotNone(exported)
+        parsed = yaml.safe_load(exported)
+        screens = parsed["screens"]
+        self.assertEqual(len(screens), 1)
+        screen_body = next(iter(screens.values()))
+        self.assertEqual(screen_body["regions"]["P1"]["density"], 72)
+
+    def test_exported_screen_yaml_includes_implicit_default_density(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=spiral",
+                "--region-widget", "P2=orbit",
+                "--region-widget", "P3=rotate",
+                "--region-widget", "P4=crash",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        exported = _export_screen_definition(
+            runtime["config_screen"],
+            area_states={},
+            current_base_speed=runtime["speed"],
+            current_speed_for_area=lambda _state, _role: runtime["speed"],
+        )
+        self.assertIsNotNone(exported)
+        parsed = yaml.safe_load(exported)
+        screen_body = next(iter(parsed["screens"].values()))
+        self.assertEqual(screen_body["regions"]["P1"]["density"], 50)
+        self.assertEqual(screen_body["regions"]["P2"]["density"], 50)
+        self.assertEqual(screen_body["regions"]["P3"]["density"], 50)
+        self.assertNotIn("density", screen_body["regions"]["P4"])
 
     def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
         runtime = prepare_runtime_config(

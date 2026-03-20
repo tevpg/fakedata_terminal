@@ -179,6 +179,24 @@ Expanded:
 
 This is the main precedence rule users care about.
 
+## Serialization Principle
+
+The `exit` YAML should be treated as a lossless scene serialization.
+
+Target rule:
+
+- if the emitted `exit` YAML is pasted into `scenes.yaml`, it should recreate the same resolved scene
+
+The intended exceptions are only changes outside the serialized scene itself, such as:
+
+- later changes to layout definitions
+- later changes to widget metadata or widget implementations
+
+Practical implication:
+
+- `exit` output should include every resolved, user-visible region or screen value needed to reconstruct the scene faithfully
+- it should not rely on hidden defaults when omitting those values would change the recreated scene
+
 ## What Each Scope Should Be Used For
 
 ### `defaults.*`

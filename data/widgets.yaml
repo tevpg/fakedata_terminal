@@ -9,9 +9,18 @@
 # - extra motion/trace state inside the visual widget implementations
 # - read-refresh deadlines for telemetry-style widgets
 # - direction-driven freezing for certain widgets when `direction: none`
+# - widget-specific interpretations of `density` for occupancy/clutter widgets
 #
 # The values below should therefore be treated as the current tuned scheduler
 # inputs, not as a complete declarative timing model.
+#
+# Density semantics for the widgets that support it:
+# - `rotate`, `orbit`, `spiral`: seeded glyph count
+# - `matrix`: falling glyph / stream coverage
+# - `sweep`: wake/debris glyph density
+# - `life`: initial live-cell seed density
+# - `blocks`: proportion of blocks that are non-black
+# - `gauge`: blip activity density
 
 defaults:
   timing:
@@ -87,6 +96,7 @@ widgets:
     defaults: {}
     timing:
       # Shared scheduler cadence for rigid-body orbital motion.
+      # density controls seeded glyph count.
       cadence_factor: 1.00
       motion:
         units: rpm
@@ -94,8 +104,7 @@ widgets:
     behavior:
       direction_random:
         backward_probability: 0.40
-        none_probability: 0.10
-        forward_probability: 0.50
+        forward_probability: 0.60
         backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
         forward_duration_range_seconds: [0.5, 3.0]
@@ -106,6 +115,7 @@ widgets:
     defaults: {}
     timing:
       # Shared scheduler cadence for per-glyph orbital motion.
+      # density controls seeded glyph count.
       cadence_factor: 1.00
       motion:
         units: rpm
@@ -113,8 +123,7 @@ widgets:
     behavior:
       direction_random:
         backward_probability: 0.40
-        none_probability: 0.10
-        forward_probability: 0.50
+        forward_probability: 0.60
         backward_duration_range_seconds: [0.5, 3.0]
         none_duration_range_seconds: [0.5, 3.0]
         forward_duration_range_seconds: [0.5, 3.0]
@@ -125,6 +134,7 @@ widgets:
     defaults: {}
     timing:
       # Shared scheduler cadence for spiral orbital motion.
+      # density controls seeded glyph count.
       cadence_factor: 1.00
       motion:
         units: rpm
@@ -144,6 +154,7 @@ widgets:
     defaults: {}
     timing:
       # Fast shared scheduler cadence for continuous dial motion.
+      # density controls blip activity.
       cadence_factor: 1.00
       motion:
         units: rpm
@@ -248,6 +259,7 @@ widgets:
     defaults: {}
     timing:
       # Shared scheduler cadence for glyph-column updates.
+      # density controls active falling stream coverage.
       cadence_factor: 0.67
 
   blocks:
@@ -256,6 +268,7 @@ widgets:
     defaults: {}
     timing:
       # Fast shared scheduler cadence for block-field updates.
+      # density controls the proportion of non-black blocks.
       cadence_factor: 1.00
 
   sweep:
@@ -264,6 +277,7 @@ widgets:
     defaults: {}
     timing:
       # Fast shared scheduler cadence for sweep motion.
+      # density controls wake/debris glyph density.
       cadence_factor: 1.00
 
   readouts:
@@ -298,6 +312,7 @@ widgets:
     defaults: {}
     timing:
       # Shared scheduler cadence for automaton generations.
+      # density controls initial live-cell seed density.
       cadence_factor: 0.67
     behavior:
       restart:

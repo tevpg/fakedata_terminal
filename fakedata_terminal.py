@@ -62,6 +62,7 @@ try:
         HELP_TEXT_TOPICS_UNIX,
         HELP_TEXT_TOPICS_WIN,
         build_colour_pairs,
+        clamp_density,
         colour_attr_from_spec as _colour_attr_from_spec,
         life_ramp_specs as _life_ramp_specs,
         line_colour as _line_colour,
@@ -84,6 +85,7 @@ try:
         shift_deadline,
         widget_interval,
     )
+    from .widget_metadata import widget_supports
     from .vocab import (
         GEN_POOL, RCOL_POOL, _P_MAIN_GEN_POOL, _P_MAIN_RCOL_POOL, _P_SIDEBAR_SPIKE_POOL,
         HEX_WORD, _build_pools, get_bar_config, get_gauge_config, random_line, random_rcol_line,
@@ -106,6 +108,7 @@ except ImportError:
         HELP_TEXT_TOPICS_UNIX,
         HELP_TEXT_TOPICS_WIN,
         build_colour_pairs,
+        clamp_density,
         colour_attr_from_spec as _colour_attr_from_spec,
         life_ramp_specs as _life_ramp_specs,
         line_colour as _line_colour,
@@ -128,6 +131,7 @@ except ImportError:
         shift_deadline,
         widget_interval,
     )
+    from widget_metadata import widget_supports
     from vocab import (
         GEN_POOL, RCOL_POOL, _P_MAIN_GEN_POOL, _P_MAIN_RCOL_POOL, _P_SIDEBAR_SPIKE_POOL,
         HEX_WORD, _build_pools, get_bar_config, get_gauge_config, random_line, random_rcol_line,
@@ -366,6 +370,9 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
         region_body = {
             "widget": area["mode"],
         }
+        if "density" in widget_supports(area["mode"]):
+            region_body["density"] = clamp_density(area.get("density"))
+
         if factored_screen_speed is _UNFACTORED or entry["speed"] != factored_screen_speed:
             region_body["speed"] = entry["speed"]
 

@@ -15,6 +15,7 @@ class SpiralWidget(OrbitalFieldWidget):
     DIFFERENTIAL_BASE = 0.60
     DIFFERENTIAL_SPREAD = 2.40
     RADIAL_DECAY_PER_RADIAN = -80
+    RADIAL_DECAY_USES_TARGET_MOTION = True
     RESPAWN_INNER_RADIUS_ABS = 1.8
 
     def __init__(self, *, curses_module, stdscr, colour_attr_from_spec, normalize_colour_spec):
