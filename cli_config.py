@@ -417,7 +417,7 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             *modifier_lines,
             "direction controls orbit direction or pause.",
         ],
-        "swirl": [
+        "spiral": [
             "Glyph field spiraling inward while it rotates.",
             "",
             *modifier_lines,

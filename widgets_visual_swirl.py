@@ -1,4 +1,4 @@
-"""Swirl widget renderer."""
+"""Spiral widget renderer."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ except ImportError:
     from widgets_visual_orbit import OrbitalFieldWidget
 
 
-class SwirlWidget(OrbitalFieldWidget):
+class SpiralWidget(OrbitalFieldWidget):
     # Inward spiral: differential orbit plus steady radial decay toward centre.
     ORBIT_FACTOR = 1.0
     FALLOFF_EXPONENT = 0.45
@@ -23,6 +23,6 @@ class SwirlWidget(OrbitalFieldWidget):
             stdscr=stdscr,
             colour_attr_from_spec=colour_attr_from_spec,
             normalize_colour_spec=normalize_colour_spec,
-            widget_name="swirl",
-            state_prefix="swirl",
+            widget_name="spiral",
+            state_prefix="spiral",
         )

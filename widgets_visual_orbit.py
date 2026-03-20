@@ -1,4 +1,4 @@
-"""Shared orbit-field helpers for rotate/orbit/swirl-style visual widgets.
+"""Shared orbit-field helpers for rotate/orbit/spiral-style visual widgets.
 
 This module contains both the shared geometry helpers and the shared runtime
 engine for the orbital glyph-family widgets. The public widget names differ
@@ -33,7 +33,7 @@ Tuning constants:
 
 - `RESPAWN_*`
   Control when drifting glyphs are recycled and where they re-enter.
-  Inner respawn thresholds matter most for inward spirals like `swirl`;
+  Inner respawn thresholds matter most for inward spirals like `spiral`;
   outer respawn bands matter most for outward spirals if one is added later.
   `RESPAWN_INNER_RADIUS_ABS` can be used to keep the centre cutoff at a mostly
   fixed visual size instead of scaling with panel size.

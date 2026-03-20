@@ -15,7 +15,7 @@ try:
     from .widgets_visual_orbit_widget import OrbitWidget
     from .widgets_visual_rotate import RotateWidget
     from .widgets_visual_scope import ScopeWidget
-    from .widgets_visual_swirl import SwirlWidget
+    from .widgets_visual_swirl import SpiralWidget
     from .widgets_visual_sweep import SweepWidget
     from .widgets_visual_tunnel import TunnelWidget
     from .vocab import _build_pools
@@ -29,14 +29,14 @@ except ImportError:
     from widgets_visual_orbit_widget import OrbitWidget
     from widgets_visual_rotate import RotateWidget
     from widgets_visual_scope import ScopeWidget
-    from widgets_visual_swirl import SwirlWidget
+    from widgets_visual_swirl import SpiralWidget
     from widgets_visual_sweep import SweepWidget
     from widgets_visual_tunnel import TunnelWidget
     from vocab import _build_pools
 
 
 class VisualWidgets:
-    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "orbit", "rotate", "swirl", "sweep", "tunnel", "scope"}
+    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "orbit", "rotate", "spiral", "sweep", "tunnel", "scope"}
 
     def __init__(
         self,
@@ -100,7 +100,7 @@ class VisualWidgets:
             colour_attr_from_spec=colour_attr_from_spec,
             normalize_colour_spec=normalize_colour_spec,
         )
-        self.swirl_widget = SwirlWidget(
+        self.spiral_widget = SpiralWidget(
             curses_module=curses_module,
             stdscr=stdscr,
             colour_attr_from_spec=colour_attr_from_spec,
@@ -277,8 +277,8 @@ class VisualWidgets:
     def ensure_orbit(self, area: dict, rows: int, width: int):
         self.orbit_widget.ensure(area, rows, width)
 
-    def ensure_swirl(self, area: dict, rows: int, width: int):
-        self.swirl_widget.ensure(area, rows, width)
+    def ensure_spiral(self, area: dict, rows: int, width: int):
+        self.spiral_widget.ensure(area, rows, width)
 
     def update_rotate(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
         self.rotate_widget.update(area, rows, width, now, dt, speed)
@@ -286,8 +286,8 @@ class VisualWidgets:
     def update_orbit(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
         self.orbit_widget.update(area, rows, width, now, dt, speed)
 
-    def update_swirl(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
-        self.swirl_widget.update(area, rows, width, now, dt, speed)
+    def update_spiral(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
+        self.spiral_widget.update(area, rows, width, now, dt, speed)
 
     def repaint_rotate(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.rotate_widget.render(area, nrows, y, x, width)
@@ -295,8 +295,8 @@ class VisualWidgets:
     def repaint_orbit(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.orbit_widget.render(area, nrows, y, x, width)
 
-    def repaint_swirl(self, area: dict, nrows: int, y: int, x: int, width: int):
-        self.swirl_widget.render(area, nrows, y, x, width)
+    def repaint_spiral(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.spiral_widget.render(area, nrows, y, x, width)
 
     def ensure_blocks(self, area: dict, rows: int, width: int):
         self.blocks_widget.ensure(area, rows, width)
@@ -423,8 +423,8 @@ class VisualWidgets:
             self.ensure_rotate(area, rows, width)
         elif mode == "orbit":
             self.ensure_orbit(area, rows, width)
-        elif mode == "swirl":
-            self.ensure_swirl(area, rows, width)
+        elif mode == "spiral":
+            self.ensure_spiral(area, rows, width)
         elif mode == "sweep":
             self.ensure_sweep(area, rows, width)
         elif mode == "tunnel":
@@ -451,8 +451,8 @@ class VisualWidgets:
             self.update_rotate(area, rows, width, now, dt, speed)
         elif mode == "orbit":
             self.update_orbit(area, rows, width, now, dt, speed)
-        elif mode == "swirl":
-            self.update_swirl(area, rows, width, now, dt, speed)
+        elif mode == "spiral":
+            self.update_spiral(area, rows, width, now, dt, speed)
         elif mode == "gauge":
             self.update_gauge(area, now, dt, speed)
         elif mode == "matrix":
@@ -476,8 +476,8 @@ class VisualWidgets:
             self.repaint_rotate(area, rows, y, x, width)
         elif mode == "orbit":
             self.repaint_orbit(area, rows, y, x, width)
-        elif mode == "swirl":
-            self.repaint_swirl(area, rows, y, x, width)
+        elif mode == "spiral":
+            self.repaint_spiral(area, rows, y, x, width)
         elif mode == "gauge":
             self.repaint_gauge(area, rows, y, x, width)
         elif mode == "matrix":
