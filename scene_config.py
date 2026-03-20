@@ -52,7 +52,7 @@ DEFAULT_KEYS = {"theme", "speed", "image", "widget", "colour", "color", "glitch"
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
 SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}
-REGION_KEYS = {"widget", "speed", "text", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
+REGION_KEYS = {"widget", "speed", "density", "text", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
@@ -386,6 +386,16 @@ def _speed_issues(value: Any, label: str, issues: list[str]) -> None:
         issues.append(f"{label} must be between 1 and 100")
 
 
+def _density_issues(value: Any, label: str, issues: list[str]) -> None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        issues.append(f"{label} must be an integer between 1 and 100")
+        return
+    if not 1 <= number <= 100:
+        issues.append(f"{label} must be between 1 and 100")
+
+
 def _modifier_is_set(value: Any) -> bool:
     return value not in (None, "", [], {})
 
@@ -393,6 +403,7 @@ def _modifier_is_set(value: Any) -> bool:
 def _config_key_to_modifier(key: str) -> str | None:
     mapping = {
         "speed": "speed",
+        "density": "density",
         "text": "text",
         "theme": "theme",
         "direction": "direction",
@@ -536,6 +547,8 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                         continue
                     _unknown_keys(region_cfg, REGION_KEYS, f"screens.{scene_name}.regions.{region_name}", issues)
                     _speed_issues(region_cfg.get("speed"), f"{config_label}: screen '{scene_name}' region '{region_name}' speed", issues)
+                    if region_cfg.get("density") is not None:
+                        _density_issues(region_cfg.get("density"), f"{config_label}: screen '{scene_name}' region '{region_name}' density", issues)
                     region_color = region_cfg.get("color", region_cfg.get("colour"))
                     if region_color is not None and _color_value(region_color) is None:
                         issues.append(
@@ -838,6 +851,13 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
         speed = widget_cfg.get("speed")
         speed_source = "widget_default" if speed is not None else None
 
+    density = region_cfg.get("density") if isinstance(region_cfg, dict) else None
+    if density is not None:
+        density_source = _modifier_source(region_cfg, "density") or "region"
+    else:
+        density = widget_cfg.get("density")
+        density_source = "widget_default" if density is not None else None
+
     text = region_cfg.get("text") if isinstance(region_cfg, dict) else None
     if text is not None:
         text_source = _modifier_source(region_cfg, "text") or "region"
@@ -900,6 +920,7 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
 
     return {
         "speed": speed,
+        "density": density,
         "text": text,
         "theme": theme,
         "color": color,
@@ -908,6 +929,7 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
         "cycle_widgets": cycle_widgets,
         "modifier_sources": {
             "speed": speed_source,
+            "density": density_source,
             "text": text_source,
             "theme": theme_source,
             "color": color_source,
@@ -929,6 +951,7 @@ def _build_area_definition(*, name: str, widget: str, panels: list[str], rect: d
         "w": rect["w"],
         "h": rect["h"],
         "speed": modifiers["speed"],
+        "density": modifiers["density"],
         "text": modifiers["text"],
         "theme": modifiers["theme"],
         "colour": modifiers["color"],

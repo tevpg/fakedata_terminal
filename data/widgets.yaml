@@ -83,7 +83,7 @@ widgets:
 
   rotate:
     enabled: true
-    supports: [speed, color, direction]
+    supports: [speed, density, color, direction]
     defaults: {}
     timing:
       # Shared scheduler cadence for rigid-body orbital motion.
@@ -102,7 +102,7 @@ widgets:
 
   orbit:
     enabled: true
-    supports: [speed, color, direction]
+    supports: [speed, density, color, direction]
     defaults: {}
     timing:
       # Shared scheduler cadence for per-glyph orbital motion.
@@ -121,14 +121,14 @@ widgets:
 
   spiral:
     enabled: true
-    supports: [speed, color, direction]
+    supports: [speed, density, color, direction]
     defaults: {}
     timing:
       # Shared scheduler cadence for spiral orbital motion.
       cadence_factor: 1.00
       motion:
         units: rpm
-        factor: 0.04
+        factor: 0.01
     behavior:
       direction_random:
         backward_probability: 0.30
@@ -140,7 +140,7 @@ widgets:
 
   gauge:
     enabled: true
-    supports: [speed, color, text, direction]
+    supports: [speed, density, color, text, direction]
     defaults: {}
     timing:
       # Fast shared scheduler cadence for continuous dial motion.
@@ -244,7 +244,7 @@ widgets:
 
   matrix:
     enabled: true
-    supports: [speed]
+    supports: [speed, density]
     defaults: {}
     timing:
       # Shared scheduler cadence for glyph-column updates.
@@ -252,7 +252,7 @@ widgets:
 
   blocks:
     enabled: true
-    supports: [speed, color, direction, text]
+    supports: [speed, density, color, direction, text]
     defaults: {}
     timing:
       # Fast shared scheduler cadence for block-field updates.
@@ -260,7 +260,7 @@ widgets:
 
   sweep:
     enabled: true
-    supports: [speed]
+    supports: [speed, density]
     defaults: {}
     timing:
       # Fast shared scheduler cadence for sweep motion.
@@ -294,7 +294,7 @@ widgets:
 
   life:
     enabled: true
-    supports: [speed, color]
+    supports: [speed, density, color]
     defaults: {}
     timing:
       # Shared scheduler cadence for automaton generations.

@@ -100,6 +100,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["text_override"] = spec.get("text")
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
+            area["density_override"] = spec.get("density")
             area["colour_override"] = spec.get("colour")
             area["direction_override"] = spec.get("direction")
             area["role"] = spec["role"]
@@ -114,6 +115,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["text_override"] = spec.get("text")
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
+            area["density_override"] = spec.get("density")
             area["colour_override"] = spec.get("colour")
             area["direction_override"] = spec.get("direction")
             area["role"] = spec["role"]

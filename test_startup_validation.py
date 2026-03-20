@@ -188,6 +188,24 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(areas["P1"]["direction"], "backward")
         self.assertEqual(areas["P1"]["colour"], "bright-cyan")
 
+    def test_rotate_widget_resolves_with_density(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=rotate",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-density", "P1=72",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["mode"], "rotate")
+        self.assertEqual(areas["P1"]["density"], 72)
+
     def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
         runtime = prepare_runtime_config(
             [
@@ -254,6 +272,18 @@ class StartupValidationTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("--region-text target 'P2' has no matching assignment", result.stderr)
+
+    def test_region_density_rejected_for_text_widget(self) -> None:
+        result = run_cli(
+            "--screen-layout", "2x2",
+            "--region-widget", "P1=text",
+            "--region-widget", "P2=blank",
+            "--region-widget", "P3=blank",
+            "--region-widget", "P4=blank",
+            "--region-density", "P1=75",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--region-density is not valid for widget 'text' in region 'P1'", result.stderr)
 
     def test_region_widget_partial_overlap_is_rejected(self) -> None:
         result = run_cli(

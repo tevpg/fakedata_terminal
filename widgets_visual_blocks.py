@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import random
 
+try:
+    from .runtime_support import density_scale
+except ImportError:
+    from runtime_support import density_scale
+
 BLACK_BLOCK_PROBABILITY = 0.65
 
 
@@ -40,12 +45,13 @@ class BlocksWidget:
             for spec in palette_specs
             if spec in self.colour_pair_indices and self.colour_pair_indices[spec] != area["blocks_bg"]
         ]
+        non_black_ratio = density_scale(area.get("density_override"), low=0.01, mid=0.50, high=0.99)
         for _ in range(rect_count):
             rh = random.randint(1, max(1, rows // 3))
             rw = random.randint(2, max(2, width // 3))
             r0 = random.randint(0, max(0, rows - rh))
             c0 = random.randint(0, max(0, width - rw))
-            cp = 0 if (not palette or random.random() < BLACK_BLOCK_PROBABILITY) else random.choice(palette)
+            cp = 0 if (not palette or random.random() > non_black_ratio) else random.choice(palette)
             for r in range(r0, r0 + rh):
                 cells[r][c0:c0 + rw] = [cp] * rw
 

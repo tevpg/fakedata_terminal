@@ -126,6 +126,9 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--region-speed", dest="region_speed", action="append", default=[], metavar="REGION=N",
         help="Override speed for a specific region or panel group. Repeatable.")
     parser.add_argument(
+        "--region-density", dest="region_density", action="append", default=[], metavar="REGION=N",
+        help="Override density for a specific region or panel group. Repeatable.")
+    parser.add_argument(
         "--region-text", dest="region_text", action="append", default=[], metavar="REGION=TEXT",
         help="Override text for a specific region or panel group. Repeatable.")
     parser.add_argument(
@@ -210,6 +213,7 @@ def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, ima
             sources = area.get("modifier_sources") or {}
             active_modifiers = {
                 "speed": area.get("speed") is not None,
+                "density": area.get("density") is not None,
                 "text": bool(area.get("text")),
                 "theme": bool(area.get("theme")),
                 "color": bool(area.get("colour")),
@@ -309,6 +313,7 @@ def _format_widget_catalog_entry(widget: str) -> str:
 def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
     config_map = {
         "speed": "speed",
+        "density": "density",
         "theme": "theme",
         "text": "text",
         "colour": "colour",
@@ -318,6 +323,7 @@ def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
     }
     cli_map = {
         "speed": "--region-speed",
+        "density": "--region-density",
         "theme": "--screen-theme, --region-theme",
         "text": "--region-text",
         "colour": "--default-colour, --region-colour",
@@ -777,7 +783,7 @@ def _require_region_widget_support(regions_cfg: dict[str, dict], region_key: str
         parser.error(f"{flag_name} is not valid for widget '{widget}' in region '{display_target}'")
 
 
-def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[str], region_speeds: list[str],
+def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[str], region_speeds: list[str], region_densities: list[str],
                             region_texts: list[str], region_themes: list[str], region_directions: list[str], region_colours: list[str], region_images: list[str],
                             parser, *, layout_name: str, scene_name: str, theme: str,
                             speed: int, text: str, glitch: float, default_widget: str | None, default_colour: str | None,
@@ -797,6 +803,10 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
                 entry["speed"] = area["speed"]
                 if sources.get("speed") is not None:
                     _set_modifier_source(entry, "speed", str(sources["speed"]))
+            if area.get("density") is not None:
+                entry["density"] = area["density"]
+                if sources.get("density") is not None:
+                    _set_modifier_source(entry, "density", str(sources["density"]))
             if area.get("text"):
                 entry["text"] = area["text"]
                 if sources.get("text") is not None:
@@ -870,6 +880,19 @@ def _apply_panel_widget_overrides(base_scene: dict | None, region_widgets: list[
         _require_region_widget_support(regions_cfg, normalized_target, target, "speed", parser, "--region-speed", config_paths)
         regions_cfg[normalized_target]["speed"] = panel_speed
         _set_modifier_source(regions_cfg[normalized_target], "speed", "cli")
+
+    for item in region_densities:
+        target, density_text = _parse_equals(item, parser, "--region-density")
+        normalized_target = _normalize_region_key(layout_name, target, parser, "--region-density", config_paths)
+        try:
+            panel_density = int(density_text)
+        except ValueError:
+            parser.error(f"--region-density expects an integer density, got '{density_text}'")
+        if not 1 <= panel_density <= 100:
+            parser.error("--region-density must be between 1 and 100")
+        _require_region_widget_support(regions_cfg, normalized_target, target, "density", parser, "--region-density", config_paths)
+        regions_cfg[normalized_target]["density"] = panel_density
+        _set_modifier_source(regions_cfg[normalized_target], "density", "cli")
 
     for item in region_texts:
         target, panel_text = _parse_equals(item, parser, "--region-text")
@@ -983,6 +1006,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         args.screen_layout is not None or
         args.region_widget or
         args.region_speed or
+        args.region_density or
         args.region_text or
         args.region_theme or
         args.region_direction or
@@ -1047,13 +1071,14 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         runtime_direction = base_runtime["direction"] if base_runtime else configured_defaults.get("direction", "forward")
 
         has_cli_overrides = bool(
-            args.screen_layout or args.region_widget or args.region_speed or args.region_text or args.region_theme or args.region_direction or args.region_colour or args.region_image or theme_explicit or colour_explicit or widget_explicit or glitch_explicit
+            args.screen_layout or args.region_widget or args.region_speed or args.region_density or args.region_text or args.region_theme or args.region_direction or args.region_colour or args.region_image or theme_explicit or colour_explicit or widget_explicit or glitch_explicit
         )
         if base_runtime is None or has_cli_overrides:
             config_scene_runtime = _apply_panel_widget_overrides(
                 base_runtime if (base_runtime and not args.screen_layout) else None,
                 args.region_widget,
                 args.region_speed,
+                args.region_density,
                 args.region_text,
                 args.region_theme,
                 args.region_direction,

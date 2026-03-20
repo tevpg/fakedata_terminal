@@ -448,6 +448,23 @@ def make_text_state():
     return {"theme": theme, "left": left, "countdown": random.randint(35, 50)}
 
 
+def clamp_density(value: int | None, default: int = 50) -> int:
+    try:
+        number = int(value) if value is not None else int(default)
+    except (TypeError, ValueError):
+        number = default
+    return max(1, min(100, number))
+
+
+def density_scale(value: int | None, *, low: float, mid: float = 1.0, high: float) -> float:
+    density = clamp_density(value)
+    if density <= 50:
+        frac = (density - 1) / 49.0
+        return low + ((mid - low) * frac)
+    frac = (density - 50) / 50.0
+    return mid + ((high - mid) * frac)
+
+
 def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) -> dict:
     area_theme = theme_name or default_theme
     bar_headers, bar_labels = get_bar_config(area_theme)
@@ -546,6 +563,7 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "configured_speed": 0,
         "current_speed": 0,
         "theme_override": theme_name,
+        "density_override": None,
         "text_override": None,
         "direction_override": None,
         "unavailable_message": None,

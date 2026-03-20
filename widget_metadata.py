@@ -23,7 +23,7 @@ else:
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 WIDGET_METADATA_PATH = PACKAGE_DIR / "data" / "widgets.yaml"
-KNOWN_MODIFIERS = {"speed", "theme", "text", "color", "direction", "image", "cycle"}
+KNOWN_MODIFIERS = {"speed", "density", "theme", "text", "color", "direction", "image", "cycle"}
 PUBLIC_WIDGETS = {
     "text", "text_wide", "text_scant", "text_spew", "image", "life",
     "bars", "crash", "gauge", "matrix", "orbit", "rotate", "scope", "blocks", "spiral", "sweep", "tunnel",

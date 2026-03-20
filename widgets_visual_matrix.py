@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import random
 
+try:
+    from .runtime_support import density_scale
+except ImportError:
+    from runtime_support import density_scale
+
 
 class MatrixWidget:
     def __init__(self, *, curses_module, stdscr, matrix_chars: str):
@@ -12,19 +17,21 @@ class MatrixWidget:
         self.matrix_chars = matrix_chars
 
     def update(self, area: dict, rows: int, width: int) -> None:
+        density = area.get("density_override")
+        baseline = density_scale(density, low=0.02, mid=1.0, high=3.2)
         cols = area["matrix_cols"]
         while len(cols) < width:
             cols.append({
                 "head": random.randint(-rows, 0),
                 "tail": random.randint(4, max(6, rows // 3)),
                 "speed": random.choice([1, 1, 1, 2]),
-                "active": random.random() < 0.25,
+                "active": random.random() < min(0.92, 0.25 * baseline),
             })
         if len(cols) > width:
             del cols[width:]
         for col in cols:
             if not col["active"]:
-                if random.random() < 0.035:
+                if random.random() < min(0.35, 0.035 * baseline):
                     col["active"] = True
                     col["head"] = random.randint(-rows, 0)
                     col["tail"] = random.randint(4, max(6, rows // 3))

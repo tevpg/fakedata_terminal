@@ -6,10 +6,10 @@ import math
 import random
 
 try:
-    from .runtime_support import multi_palette_specs
+    from .runtime_support import density_scale, multi_palette_specs
     from .timing_support import gauge_radians_per_second, resolve_direction_motion
 except ImportError:
-    from runtime_support import multi_palette_specs
+    from runtime_support import density_scale, multi_palette_specs
     from timing_support import gauge_radians_per_second, resolve_direction_motion
 
 
@@ -40,8 +40,18 @@ class GaugeWidget:
             if ttl > 0:
                 fresh.append((ang, dist, ttl))
         area["gauge_blips"] = fresh
-        if random.random() < 0.18:
-            area["gauge_blips"].append((random.uniform(0, math.pi * 2), random.uniform(0.15, 0.95), random.randint(10, 24)))
+        blip_rate = 0.18 * density_scale(area.get("density_override"), low=0.02, mid=1.0, high=28.0)
+        spawn_count = int(blip_rate)
+        if random.random() < (blip_rate - spawn_count):
+            spawn_count += 1
+        for _ in range(spawn_count):
+            area["gauge_blips"].append(
+                (
+                    random.uniform(0, math.pi * 2),
+                    random.uniform(0.15, 0.95),
+                    random.randint(10, 24),
+                )
+            )
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int) -> None:
         canvas = [[" " for _ in range(width)] for _ in range(rows)]

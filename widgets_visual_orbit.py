@@ -54,10 +54,10 @@ import math
 import random
 
 try:
-    from .runtime_support import multi_palette_specs
+    from .runtime_support import clamp_density, density_scale, multi_palette_specs
     from .timing_support import gauge_radians_per_second, resolve_direction_motion
 except ImportError:
-    from runtime_support import multi_palette_specs
+    from runtime_support import clamp_density, density_scale, multi_palette_specs
     from timing_support import gauge_radians_per_second, resolve_direction_motion
 
 
@@ -94,7 +94,7 @@ class OrbitalFieldWidget:
     CELL_ASPECT_Y = 2.0
     SEED_DIVISOR = 7
     MIN_SEED_COUNT = 24
-    MAX_SEED_COUNT = 420
+    MAX_SEED_COUNT = 900
     MUTATION_PROBABILITY = 0.08
     RANDOM_INITIAL_PHASE = True
     RIGID_SPEED_MULTIPLIER = 1.0
@@ -110,6 +110,8 @@ class OrbitalFieldWidget:
     RESPAWN_OUTER_MAX_RADIUS_NORM = 0.98
     RESPAWN_INNER_MIN_RADIUS_NORM = 0.04
     RESPAWN_INNER_MAX_RADIUS_NORM = 0.18
+    DENSITY_LOW_SCALE = 0.05
+    DENSITY_HIGH_SCALE = 2.40
 
     def __init__(
         self,
@@ -132,11 +134,11 @@ class OrbitalFieldWidget:
         return f"{self.state_prefix}_{suffix}"
 
     def ensure(self, area: dict, rows: int, width: int) -> None:
-        sig = (rows, width)
+        sig = (rows, width, clamp_density(area.get("density_override")))
         if area.get(self.state_key("sig")) == sig and area.get(self.state_key("cells")):
             return
         area[self.state_key("sig")] = sig
-        area[self.state_key("cells")] = self.seed_cells(rows, width)
+        area[self.state_key("cells")] = self.seed_cells(area, rows, width)
         area[self.state_key("motion")] = 1.0
         area[self.state_key("target_motion")] = 1.0
 
@@ -214,9 +216,15 @@ class OrbitalFieldWidget:
             return self.RESPAWN_INNER_RADIUS_ABS / max(1.0, max_radius)
         return self.RESPAWN_INNER_RADIUS_NORM
 
-    def seed_cells(self, rows: int, width: int) -> list[tuple[float, float, float, str, int, float]]:
+    def seed_cells(self, area: dict, rows: int, width: int) -> list[tuple[float, float, float, str, int, float]]:
         max_dx, max_dy, source_rows, source_width, max_radius = self.orbit_geometry(rows, width)
-        count = max(self.MIN_SEED_COUNT, min(self.MAX_SEED_COUNT, (source_rows * source_width) // self.SEED_DIVISOR))
+        density_multiplier = density_scale(
+            area.get("density_override"),
+            low=self.DENSITY_LOW_SCALE,
+            mid=1.0,
+            high=self.DENSITY_HIGH_SCALE,
+        )
+        count = max(self.MIN_SEED_COUNT, min(self.MAX_SEED_COUNT, int(((source_rows * source_width) // self.SEED_DIVISOR) * density_multiplier)))
         cells: list[tuple[float, float, float, str, int, float]] = []
         for idx in range(count):
             dx, dy = self.random_offset(max_dx, max_dy, radius_norm_min=0.10, radius_norm_max=0.98)
