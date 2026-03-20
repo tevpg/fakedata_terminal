@@ -148,7 +148,7 @@ class StartupValidationTests(unittest.TestCase):
         self.assertIn("1x3", result.stdout)
         self.assertIn("2x4", result.stdout)
         self.assertIn("crash", result.stdout)
-        self.assertIn("orbit", result.stdout)
+        self.assertIn("whorl", result.stdout)
         self.assertIn("rotate", result.stdout)
         self.assertIn("spiral", result.stdout)
 
@@ -241,7 +241,7 @@ class StartupValidationTests(unittest.TestCase):
             [
                 "--screen-layout", "2x2",
                 "--region-widget", "P1=spiral",
-                "--region-widget", "P2=orbit",
+                "--region-widget", "P2=whorl",
                 "--region-widget", "P3=rotate",
                 "--region-widget", "P4=crash",
             ],
@@ -263,11 +263,11 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(screen_body["regions"]["P3"]["density"], 50)
         self.assertNotIn("density", screen_body["regions"]["P4"])
 
-    def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
+    def test_whorl_widget_resolves_with_direction_and_colour(self) -> None:
         runtime = prepare_runtime_config(
             [
                 "--screen-layout", "2x2",
-                "--region-widget", "P1=orbit",
+                "--region-widget", "P1=whorl",
                 "--region-widget", "P2=blank",
                 "--region-widget", "P3=text",
                 "--region-widget", "P4=gauge",
@@ -279,7 +279,7 @@ class StartupValidationTests(unittest.TestCase):
             demo_scenes=[],
         )
         areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
-        self.assertEqual(areas["P1"]["mode"], "orbit")
+        self.assertEqual(areas["P1"]["mode"], "whorl")
         self.assertEqual(areas["P1"]["direction"], "forward")
         self.assertEqual(areas["P1"]["colour"], "bright-magenta")
 

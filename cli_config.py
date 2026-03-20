@@ -411,17 +411,17 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "",
             *modifier_lines,
         ],
-        "orbit": [
-            "Glyph field orbiting faster near the centre.",
+        "whorl": [
+            "Glyph field rotating faster near the centre.",
             "",
             *modifier_lines,
-            "direction controls orbit direction or pause.",
+            "direction controls rotation direction or pause.",
         ],
         "rotate": [
             "Preloaded glyph field rotating around the region center.",
             "",
             *modifier_lines,
-            "direction controls orbit direction or pause.",
+            "direction controls rotation direction or pause.",
         ],
         "spiral": [
             "Glyph field spiraling inward while it rotates.",

@@ -1,12 +1,12 @@
-"""Shared orbit-field helpers for rotate/orbit/spiral-style visual widgets.
+"""Shared rotation-field helpers for rotate/whorl/spiral-style visual widgets.
 
 This module contains both the shared geometry helpers and the shared runtime
-engine for the orbital glyph-family widgets. The public widget names differ
-mainly by choosing different class constants on `OrbitalFieldWidget`.
+engine for the rotating glyph-family widgets. The public widget names differ
+mainly by choosing different class constants on `RotationFieldWidget`.
 
 Tuning constants:
 
-- `ORBIT_FACTOR`
+- `ROTATION_FACTOR`
   Blends between rigid-body rotation and radius-dependent angular speed.
   `0.0` means every glyph rotates at the same angular speed.
   `1.0` means glyph speed is fully shaped by radius.
@@ -45,12 +45,12 @@ Tuning constants:
 
 - `RANDOM_INITIAL_PHASE`
   If false, the field starts like a rigid plate and all glyphs share phase 0.
-  If true, glyphs start at randomized orbital phases, which feels more like a
-  cloud of independent orbiting objects.
+  If true, glyphs start at randomized rotation phases, which feels more like a
+  cloud of objects independently circling the centre of the region.
 
 - `DIRECTION_EASE_SECONDS`
   Time constant for blending from one direction target to another. This lets
-  orbit-family widgets reverse smoothly instead of snapping instantly.
+  rotation-family widgets reverse smoothly instead of snapping instantly.
 """
 
 from __future__ import annotations
@@ -66,12 +66,12 @@ except ImportError:
     from timing_support import gauge_radians_per_second, resolve_direction_motion
 
 
-def orbit_field_bounds(rows: int, width: int, *, cell_aspect_y: float = 2.0) -> tuple[float, float, int, int]:
+def rotation_field_bounds(rows: int, width: int, *, cell_aspect_y: float = 2.0) -> tuple[float, float, int, int]:
     half_w = max(1.0, (width - 1) / 2.0)
     half_h_iso = max(1.0, ((rows - 1) / 2.0) * cell_aspect_y)
-    orbit_radius = math.hypot(half_w, half_h_iso)
-    max_dx = max(1.0, orbit_radius - 1.0)
-    max_dy = max(1.0, (orbit_radius / cell_aspect_y) - 0.5)
+    rotation_radius = math.hypot(half_w, half_h_iso)
+    max_dx = max(1.0, rotation_radius - 1.0)
+    max_dy = max(1.0, (rotation_radius / cell_aspect_y) - 0.5)
     source_rows = max(rows, int(round((max_dy * 2.0) + 1.0)))
     source_width = max(width, int(round((max_dx * 2.0) + 1.0)))
     return max_dx, max_dy, source_rows, source_width
@@ -94,7 +94,7 @@ def rotate_offset(dx: float, dy: float, angle: float, *, cell_aspect_y: float = 
     return rot_x, rot_y / cell_aspect_y
 
 
-class OrbitalFieldWidget:
+class RotationFieldWidget:
     GLYPHS = "αβγδεζηθλμξπρστυφχψωΔΘΛΞΠΣΦΨΩ∂∇∞∑∏∫√≈≠≤≥⊕⊗⊙⊛⊜⊝⊞⊟⊠⊡☉☌☍☿♀♁♂♃♄♅♆♇⚝✦✧·∘"
     CELL_ASPECT_Y = 2.0
     SEED_DIVISOR = 7
@@ -103,7 +103,7 @@ class OrbitalFieldWidget:
     MUTATION_PROBABILITY = 0.08
     RANDOM_INITIAL_PHASE = True
     RIGID_SPEED_MULTIPLIER = 1.0
-    ORBIT_FACTOR = 0.0
+    ROTATION_FACTOR = 0.0
     DIFFERENTIAL_BASE = 0.55
     DIFFERENTIAL_SPREAD = 2.10
     FALLOFF_EXPONENT = 1.0
@@ -152,12 +152,12 @@ class OrbitalFieldWidget:
         shaped_falloff = (1.0 - radius_norm) ** self.FALLOFF_EXPONENT
         differential = self.DIFFERENTIAL_BASE + (shaped_falloff * self.DIFFERENTIAL_SPREAD)
         return (
-            ((1.0 - self.ORBIT_FACTOR) * self.RIGID_SPEED_MULTIPLIER)
-            + (self.ORBIT_FACTOR * differential)
+            ((1.0 - self.ROTATION_FACTOR) * self.RIGID_SPEED_MULTIPLIER)
+            + (self.ROTATION_FACTOR * differential)
         )
 
-    def orbit_geometry(self, rows: int, width: int) -> tuple[float, float, int, int, float]:
-        max_dx, max_dy, source_rows, source_width = orbit_field_bounds(rows, width, cell_aspect_y=self.CELL_ASPECT_Y)
+    def rotation_geometry(self, rows: int, width: int) -> tuple[float, float, int, int, float]:
+        max_dx, max_dy, source_rows, source_width = rotation_field_bounds(rows, width, cell_aspect_y=self.CELL_ASPECT_Y)
         max_radius = math.hypot(max_dx, max_dy * self.CELL_ASPECT_Y)
         return max_dx, max_dy, source_rows, source_width, max_radius
 
@@ -223,7 +223,7 @@ class OrbitalFieldWidget:
         return self.RESPAWN_INNER_RADIUS_NORM
 
     def seed_cells(self, area: dict, rows: int, width: int) -> list[tuple[float, float, float, str, int, float]]:
-        max_dx, max_dy, source_rows, source_width, max_radius = self.orbit_geometry(rows, width)
+        max_dx, max_dy, source_rows, source_width, max_radius = self.rotation_geometry(rows, width)
         density_multiplier = density_scale(
             area.get("density_override"),
             low=self.DENSITY_LOW_SCALE,
@@ -253,7 +253,7 @@ class OrbitalFieldWidget:
         cells = area.get(self.state_key("cells")) or []
         if not cells:
             return
-        max_dx, max_dy, _source_rows, _source_width, max_radius = self.orbit_geometry(rows, width)
+        max_dx, max_dy, _source_rows, _source_width, max_radius = self.rotation_geometry(rows, width)
         base_rate = gauge_radians_per_second(speed, widget=self.widget_name) * dt * motion
         updated = []
         radial_motion = abs(target_motion) if self.RADIAL_DECAY_USES_TARGET_MOTION else abs(motion)

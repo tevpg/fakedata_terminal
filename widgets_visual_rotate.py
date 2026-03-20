@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 try:
-    from .widgets_visual_orbit import OrbitalFieldWidget
+    from .widgets_visual_rotation import RotationFieldWidget
 except ImportError:
-    from widgets_visual_orbit import OrbitalFieldWidget
+    from widgets_visual_rotation import RotationFieldWidget
 
 
-class RotateWidget(OrbitalFieldWidget):
+class RotateWidget(RotationFieldWidget):
     # Rigid rotating plate: no radius-based speed variation, no random phase.
-    ORBIT_FACTOR = 0.0
+    ROTATION_FACTOR = 0.0
     RANDOM_INITIAL_PHASE = False
     RIGID_SPEED_MULTIPLIER = 1.0
 

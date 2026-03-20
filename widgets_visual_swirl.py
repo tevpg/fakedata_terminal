@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 try:
-    from .widgets_visual_orbit import OrbitalFieldWidget
+    from .widgets_visual_rotation import RotationFieldWidget
 except ImportError:
-    from widgets_visual_orbit import OrbitalFieldWidget
+    from widgets_visual_rotation import RotationFieldWidget
 
 
-class SpiralWidget(OrbitalFieldWidget):
-    # Inward spiral: differential orbit plus steady radial decay toward centre.
-    ORBIT_FACTOR = 1.0
+class SpiralWidget(RotationFieldWidget):
+    # Inward spiral: differential rotation plus steady radial decay toward centre.
+    ROTATION_FACTOR = 1.0
     FALLOFF_EXPONENT = 0.45
     DIFFERENTIAL_BASE = 0.60
     DIFFERENTIAL_SPREAD = 2.40

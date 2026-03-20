@@ -15,7 +15,7 @@
 # inputs, not as a complete declarative timing model.
 #
 # Density semantics for the widgets that support it:
-# - `rotate`, `orbit`, `spiral`: seeded glyph count
+# - `rotate`, `whorl`, `spiral`: seeded glyph count
 # - `matrix`: falling glyph / stream coverage
 # - `sweep`: wake/debris glyph density
 # - `life`: initial live-cell seed density
@@ -95,7 +95,7 @@ widgets:
     supports: [speed, density, color, direction]
     defaults: {}
     timing:
-      # Shared scheduler cadence for rigid-body orbital motion.
+      # Shared scheduler cadence for rigid-body rotational motion.
       # density controls seeded glyph count.
       cadence_factor: 1.00
       motion:
@@ -109,12 +109,12 @@ widgets:
         none_duration_range_seconds: [0.5, 3.0]
         forward_duration_range_seconds: [0.5, 3.0]
 
-  orbit:
+  whorl:
     enabled: true
     supports: [speed, density, color, direction]
     defaults: {}
     timing:
-      # Shared scheduler cadence for per-glyph orbital motion.
+      # Shared scheduler cadence for per-glyph differential rotation.
       # density controls seeded glyph count.
       cadence_factor: 1.00
       motion:
@@ -133,7 +133,7 @@ widgets:
     supports: [speed, density, color, direction]
     defaults: {}
     timing:
-      # Shared scheduler cadence for spiral orbital motion.
+      # Shared scheduler cadence for spiral rotational motion.
       # density controls seeded glyph count.
       cadence_factor: 1.00
       motion:
@@ -340,7 +340,7 @@ widgets:
           - bars
           - crash
           - gauge
-          - orbit
+          - whorl
           - rotate
           - scope
           - spiral
