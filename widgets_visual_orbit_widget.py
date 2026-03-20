@@ -11,9 +11,9 @@ except ImportError:
 class OrbitWidget(OrbitalFieldWidget):
     # Stable orbital cloud: strong radius-based speed variation, no radial drift.
     ORBIT_FACTOR = 1.0
-    FALLOFF_EXPONENT = 0.1
-    DIFFERENTIAL_BASE = 0.55
-    DIFFERENTIAL_SPREAD = 2.10
+    FALLOFF_EXPONENT = 3.8
+    DIFFERENTIAL_BASE = 0.03
+    DIFFERENTIAL_SPREAD = 4.20
 
     def __init__(self, *, curses_module, stdscr, colour_attr_from_spec, normalize_colour_spec):
         super().__init__(
