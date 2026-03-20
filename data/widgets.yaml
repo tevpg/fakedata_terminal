@@ -1,0 +1,391 @@
+# Widget metadata plus timing/behavior tunables.
+#
+# The scheduler now uses `widget_interval(...)` from `timing_support.py` as the
+# common update gate for all widgets. `cadence_factor` therefore means "fraction
+# of the shared base update rate" rather than an old burst/steady bucket name.
+#
+# Some widgets still have local animation details that are not fully declarative
+# here yet, for example:
+# - extra motion/trace state inside the visual widget implementations
+# - read-refresh deadlines for telemetry-style widgets
+# - direction-driven freezing for certain widgets when `direction: none`
+# - widget-specific interpretations of `density` for occupancy/clutter widgets
+#
+# The values below should therefore be treated as the current tuned scheduler
+# inputs, not as a complete declarative timing model.
+#
+# Density semantics for the widgets that support it:
+# - `orbit`, `rotate`, `whorl`, `spiral`: seeded glyph count
+# - `matrix`: falling glyph / stream coverage
+# - `sweep`: wake/debris glyph density
+# - `life`: initial live-cell seed density
+# - `blocks`: proportion of blocks that are non-black
+# - `gauge`: blip activity density
+
+defaults:
+  timing:
+    speed:
+      min_iterations_per_second: 1.0
+      max_iterations_per_second: 200.0
+      curve: linear
+      dt_clamp_seconds: 0.5
+
+widgets:
+  text:
+    enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence; each update scrolls the text buffer.
+      cadence_factor: 0.55
+    behavior:
+      direction_random:
+        # First-pass shared text reroll model.
+        backward_probability: 0.12
+        none_probability: 0.10
+        forward_probability: 0.78
+        backward_duration_range_seconds: [1.0, 4.0]
+        none_duration_range_seconds: [1.0, 1.0]
+        forward_duration_range_seconds: [5.0, 15.0]
+
+  text_scant:
+    enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
+    timing:
+      # Slower shared scheduler cadence for sparser text motion.
+      cadence_factor: 0.25
+    behavior:
+      direction_random:
+        # First-pass shared text reroll model.
+        backward_probability: 0.12
+        none_probability: 0.10
+        forward_probability: 0.78
+        backward_duration_range_seconds: [1.0, 4.0]
+        none_duration_range_seconds: [1.0, 1.0]
+        forward_duration_range_seconds: [5.0, 15.0]
+
+  text_spew:
+    enabled: true
+    supports: [speed, theme, text]
+    defaults: {}
+    timing:
+      # Maximum shared scheduler cadence for the most aggressive text mode.
+      cadence_factor: 1.00
+
+  bars:
+    enabled: true
+    supports: [speed, theme, text]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for bar-value drift updates.
+      cadence_factor: 0.55
+
+  crash:
+    enabled: true
+    supports: [speed, theme, color]
+    defaults:
+      color: multi-all
+    timing:
+      # Fast shared scheduler cadence for hard flicker / overwrite motion.
+      cadence_factor: 1.00
+
+  orbit:
+    enabled: true
+    supports: [speed, density, color, direction]
+    defaults:
+      color: multi-bright
+      density: 10
+    timing:
+      # Shared scheduler cadence for force-integrated orbital motion.
+      # density controls seeded glyph count.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.35
+        none_probability: 0.15
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.8, 3.5]
+        none_duration_range_seconds: [0.8, 2.0]
+        forward_duration_range_seconds: [0.8, 3.5]
+
+  rotate:
+    enabled: true
+    supports: [speed, density, color, direction]
+    defaults:
+      color: multi-all
+      direction: random
+    timing:
+      # Shared scheduler cadence for rigid-body rotational motion.
+      # density controls seeded glyph count.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.40
+        forward_probability: 0.60
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  whorl:
+    enabled: true
+    supports: [speed, density, color, direction]
+    defaults:
+      color: multi-all
+      direction: random
+
+    timing:
+      # Shared scheduler cadence for per-glyph differential rotation.
+      # density controls seeded glyph count.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.04
+    behavior:
+      direction_random:
+        backward_probability: 0.40
+        forward_probability: 0.60
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  spiral:
+    enabled: true
+    supports: [speed, density, color, direction]
+    defaults:
+      color: multi-all
+      direction: random
+    timing:
+      # Shared scheduler cadence for spiral rotational motion.
+      # density controls seeded glyph count.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.01
+    behavior:
+      direction_random:
+        backward_probability: 0.30
+        none_probability: 0.0
+        forward_probability: 0.70
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  gauge:
+    enabled: true
+    supports: [speed, density, color, text, direction]
+    defaults: {}
+    timing:
+      # Fast shared scheduler cadence for continuous dial motion.
+      # density controls blip activity.
+      cadence_factor: 1.00
+      motion:
+        units: rpm
+        factor: 0.09
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  scope:
+    enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for waveform/trace updates.
+      cadence_factor: 1.0
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  sparkline:
+    enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for sample history updates.
+      # Read-refresh deadlines remain explicit and separate.
+      cadence_factor: 0.55
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  tunnel:
+    enabled: true
+    supports: [speed, color, text, direction]
+    defaults: {}
+    timing:
+      # Fast shared scheduler cadence for tunnel motion.
+      cadence_factor: 1.00
+    behavior:
+      direction_random:
+        # Taken directly from the current gauge/scope/tunnel-style direction logic.
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
+
+  text_wide:
+    enabled: true
+    supports: [speed, theme, text, direction]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence plus special direction-reroll behavior.
+      cadence_factor: 0.55
+    behavior:
+      direction_random:
+        # text_wide is the closest thing to "textwall" in the current code.
+        #
+        # The current implementation does not use the same random-direction model
+        # as the widgets above. Instead it:
+        # - scrolls forward/up for 5 to 15 seconds
+        # - pauses for 1 second
+        # - reverses for 10 to 80 update steps
+        #
+        # The values below are an approximation that fit the new shared
+        # direction-reroll model:
+        # - forward ~= forward/up
+        # - none ~= pause
+        # - backward ~= reverse/down
+        #
+        # These should be treated as initial estimates, not as faithful
+        # translations.
+        backward_probability: 0.12
+        none_probability: 0.10
+        forward_probability: 0.78
+        backward_duration_range_seconds: [0.25, 0.75]
+        none_duration_range_seconds: [1.0, 1.0]
+        forward_duration_range_seconds: [3.5, 6.0]
+
+  matrix:
+    enabled: true
+    supports: [speed, density]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for glyph-column updates.
+      # density controls active falling stream coverage.
+      cadence_factor: 0.67
+
+  blocks:
+    enabled: true
+    supports: [speed, density, color, direction, text]
+    defaults: {}
+    timing:
+      # Fast shared scheduler cadence for block-field updates.
+      # density controls the proportion of non-black blocks.
+      cadence_factor: 1.00
+
+  sweep:
+    enabled: true
+    supports: [speed, density]
+    defaults: {}
+    timing:
+      # Fast shared scheduler cadence for sweep motion.
+      # density controls wake/debris glyph density.
+      cadence_factor: 1.00
+
+  readouts:
+    enabled: true
+    supports: [theme, text, color]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for telemetry panel repaint/update work.
+      # Read-refresh is a separate explicit deadline.
+      cadence_factor: 0.55
+    behavior:
+      read_refresh:
+        main_interval_seconds: 0.30
+        sidebar_interval_seconds: 0.45
+        pharmacy_sidebar_interval_seconds: 0.80
+
+  image:
+    enabled: true
+    supports: [speed, image]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for image wipe/frame transitions.
+      cadence_factor: 0.67
+    behavior:
+      transition:
+        mode: wipe
+        colour_cycle_on_frame_change: true
+
+  life:
+    enabled: true
+    supports: [speed, density, color]
+    defaults: {}
+    timing:
+      # Shared scheduler cadence for automaton generations.
+      # density controls initial live-cell seed density.
+      cadence_factor: 0.67
+    behavior:
+      restart:
+        on_stable_or_loop: true
+        on_max_iterations: true
+
+  blank:
+    enabled: true
+    supports: [text, color]
+    defaults: {}
+    timing:
+      cadence_factor: 0.0
+    behavior:
+      static: true
+
+  cycle:
+    enabled: true
+    supports: [speed, theme, color, cycle]
+    defaults:
+      cycle:
+        widgets:
+          - text
+          - text_scant
+          - text_spew
+          - bars
+          - crash
+          - gauge
+          - whorl
+          - orbit
+          - rotate
+          - scope
+          - spiral
+          - sparkline
+          - tunnel
+          - text_wide
+          - matrix
+          - blocks
+          - sweep
+          - readouts
+          - image
+          - life
+    timing:
+      cadence_factor: 0.0
+    behavior:
+      controller:
+        change_interval_seconds: 10.0
+        start_jitter_range_seconds: [0.0, 10.0]

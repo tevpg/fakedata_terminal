@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import random
 
+try:
+    from .runtime_support import density_scale
+except ImportError:
+    from runtime_support import density_scale
+
 
 class SweepWidget:
     def __init__(self, *, curses_module, stdscr, sweep_symbols: str):
@@ -13,6 +18,7 @@ class SweepWidget:
 
     def ensure(self, area: dict, rows: int, width: int) -> None:
         cells = area["sweep_cells"]
+        density_multiplier = density_scale(area.get("density_override"), low=0.03, mid=1.0, high=2.4)
         while len(cells) < rows:
             cells.append([(" ", 1)] * width)
         if len(cells) > rows:
@@ -27,7 +33,7 @@ class SweepWidget:
             palette = [2, 3, 6, 7]
             for r in range(rows):
                 for c in range(width):
-                    if random.random() < 0.02:
+                    if random.random() < min(0.35, 0.02 * density_multiplier):
                         cells[r][c] = (random.choice(self.sweep_symbols), random.choice(palette))
 
     @staticmethod
@@ -37,6 +43,8 @@ class SweepWidget:
     def update(self, area: dict, rows: int, width: int) -> None:
         self.ensure(area, rows, width)
         cells = area["sweep_cells"]
+        mono_density_multiplier = density_scale(area.get("density_override"), low=0.03, mid=1.0, high=2.4)
+        multi_density_multiplier = density_scale(area.get("density_override"), low=0.03, mid=1.0, high=4.8)
 
         def drop_symbol(base_cp, spawn_prob: float):
             if random.random() >= spawn_prob:
@@ -51,7 +59,9 @@ class SweepWidget:
             head_cols = {c for c in range(pos, min(span, pos + 3))}
             tail_cols = [pos - 2, pos - 1] if area["sweep_dir"] > 0 else [pos + 3, pos + 4]
             wake_cp = 4 if area["sweep_dir"] > 0 else [2, 3, 6, 7]
-            spawn_prob = 0.01 if area["sweep_dir"] > 0 else 0.02
+            spawn_prob = (0.01 if area["sweep_dir"] > 0 else 0.02) * (
+                mono_density_multiplier if area["sweep_dir"] > 0 else multi_density_multiplier
+            )
             for r in range(rows):
                 for c in head_cols:
                     cells[r][c] = (" ", 1)
@@ -67,7 +77,9 @@ class SweepWidget:
             span = max(1, rows)
             pos = max(0, min(span - 1, area["sweep_pos"]))
             wake_cp = 4 if area["sweep_dir"] > 0 else [2, 3, 6, 7]
-            spawn_prob = 0.01 if area["sweep_dir"] > 0 else 0.02
+            spawn_prob = (0.01 if area["sweep_dir"] > 0 else 0.02) * (
+                mono_density_multiplier if area["sweep_dir"] > 0 else multi_density_multiplier
+            )
             for c in range(width):
                 cells[pos][c] = (" ", 1)
             for wake_row in [r for r in range(pos - 2 * area["sweep_dir"], pos, area["sweep_dir"])]:

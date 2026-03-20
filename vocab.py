@@ -1290,8 +1290,9 @@ def random_rcol_line():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Per-style gauge definitions for gauges mode
-# Each entry: (graph_title, signal_fn, reads_list, scroll_title)
+# Per-style telemetry definitions shared by sparkline/readouts widgets and
+# reused as a signal source for scope-style visuals.
+# Each entry: (graph_title, signal_fn, reads_list, aux_title)
 #   signal_fn  : () -> float 0..1   (normalised, drives the sparkline)
 #   reads_list : list of (label, value_fn, unit_str)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1569,4 +1570,3 @@ _BAR_CONFIGS = {
 
 def get_bar_config(style: str):
     return _BAR_CONFIGS.get(style, _BAR_HACKER)
-

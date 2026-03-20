@@ -1,17 +1,16 @@
-# Starter config sketch for a layout/region/scene driven version of
+# Starter config sketch for a layout/region/screen driven version of
 # fakedata-terminal.py.
 #
 # Design rules captured here:
 # - layouts define panel geometry
 # - regions are named aliases for one or more panels
 # - widgets can define per-widget fallback attributes
-# - scenes bind widgets/options to regions
-# - defaults < widget defaults < scene < CLI override
+# - screens bind widgets/options to regions
+# - defaults < widget defaults < screen < CLI override
 # - panel aggregation is explicit; no implicit expansion from "none"
 # - stable packaged layouts live in data/layouts.yaml
 
 defaults:
-  layout: 2x2
   theme: science
   speed: 55
   # colour: green
@@ -19,7 +18,7 @@ defaults:
   image:
     glob: "geom*.png"
 
-scenes:
+screens:
 
   clocks:
     note: >
@@ -256,7 +255,7 @@ scenes:
 
   science:
     note: >
-      Derived from: --scene science --main scroller --sidebar gauge --sidebar-speed 80
+      Derived from: --screen science --main scroller --sidebar gauge --sidebar-speed 80
     layout: 3x3
     theme: science
     text: "*** DO NOT USE DOORBELL ***"
@@ -374,7 +373,7 @@ scenes:
 
   geometries:
     note: >
-      Derived from: --scene hacker --main image --image geom*png --sidebar gauges
+      Derived from: screen preset with image widget regions and packaged image defaults
     layout: L2x2_R3
     theme: hacker
     regions:
@@ -392,7 +391,7 @@ scenes:
       P7:
         widget: text_scant
         text: "FEED"
-        source_theme: hacker
+        theme: hacker
 
   tunnel:
     note: >
@@ -432,7 +431,7 @@ scenes:
 
   test2:
     note: >
-      Full-screen single-widget skeleton scene.
+      Full-screen single-widget skeleton screen.
     layout: full
     theme: finance
     regions:
@@ -533,40 +532,56 @@ scenes:
         widget: scope
         speed: 90
 
-widgets:
-  # Widget-specific fallback attributes use the same keys as region entries,
-  # except "widget" itself is implied by the mapping key. Supported here:
-  # speed, text, source_theme, colour/color, image, and cycle.
-  #
-  # Example:
-  # sweep:
-  #   colour: cyan
-  # image:
-  #   image:
-  #     glob: "geom*.png"
-  # cycle:
-  #   cycle:
-  #     widgets: [text, bars, matrix, tunnel]
+  double-whorl:
+    layout: 2x2
+    glitch: 0.0
+    speed: 55
+    text: ''
+    colour: multi-all
+    regions:
+      P1+P2:
+        widget: whorl
+        density: 50
+        direction: forward
+      P3+P4:
+        widget: whorl
+        density: 50
+        direction: backward
 
-  # Existing single-region widgets
-  atomic:
-    - text
-    - text_wide
-    - text_scant
-    - text_spew
-    - image
-    - life
-    - bars
-    - gauge
-    - matrix
-    - scope
-    - blocks
-    - sweep
-    - tunnel
-    - cycle
+  quadruple-whorl:
+    layout: 2x2
+    glitch: 0.0
+    speed: 85
+    density: 80
+    text: ''
+    colour: multi-all
+    regions:
+      P1:
+        widget: whorl
+        direction: forward
+      P2:
+        widget: whorl
+        direction: backward
+      P4:
+        widget: whorl
+        direction: forward
+      P3:
+        widget: whorl
+        direction: backward
 
-  # Proposed names for the current "gauges" composite when split into regions.
-  composite_parts:
-    - sparkline
-    - readouts
-    - text_scant
+  double-spiral:
+    layout: 2x2
+    glitch: 0.0
+    theme: science
+    speed: 100
+    text: ''
+    colour: multi-all
+    regions:
+      P1+P2:
+        widget: spiral
+        density: 100
+        direction: backward
+      P3+P4:
+        widget: spiral
+        density: 100
+        direction: forward

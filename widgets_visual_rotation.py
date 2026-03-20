@@ -1,0 +1,341 @@
+"""Shared rotation-field helpers for rotate/whorl/spiral-style visual widgets.
+
+This module contains both the shared geometry helpers and the shared runtime
+engine for the rotating glyph-family widgets. The public widget names differ
+mainly by choosing different class constants on `RotationFieldWidget`.
+
+Tuning constants:
+
+- `ROTATION_FACTOR`
+  Blends between rigid-body rotation and radius-dependent angular speed.
+  `0.0` means every glyph rotates at the same angular speed.
+  `1.0` means glyph speed is fully shaped by radius.
+
+- `FALLOFF_EXPONENT`
+  Shapes how quickly the radius-dependent speed falls off toward the outside.
+  Higher values concentrate speed more strongly toward the centre.
+  Lower values flatten the difference between inner and outer glyphs.
+
+- `DIFFERENTIAL_BASE`
+  Minimum speed multiplier used by the differential-motion profile.
+  This mostly determines how slowly the outer glyphs are allowed to move.
+
+- `DIFFERENTIAL_SPREAD`
+  Extra multiplier added near the centre by the differential-motion profile.
+  This mainly determines how much faster the inner glyphs can get.
+
+- `RADIAL_DECAY_PER_RADIAN`
+  Radial drift measured in approximate screen columns per radian of angular
+  travel. This keeps spiral paths visually similar across speed settings.
+  `0.0` means stable radius.
+  Negative values spiral inward.
+  Positive values spiral outward.
+
+- `RADIAL_DECAY_USES_TARGET_MOTION`
+  If true, radial decay follows the target turn state rather than the eased
+  instantaneous turn rate. This is useful for spirals that should keep falling
+  inward steadily while their handedness reverses smoothly.
+
+- `RESPAWN_*`
+  Control when drifting glyphs are recycled and where they re-enter.
+  Inner respawn thresholds matter most for inward spirals like `spiral`;
+  outer respawn bands matter most for outward spirals if one is added later.
+  `RESPAWN_INNER_RADIUS_ABS` can be used to keep the centre cutoff at a mostly
+  fixed visual size instead of scaling with panel size.
+
+- `RANDOM_INITIAL_PHASE`
+  If false, the field starts like a rigid plate and all glyphs share phase 0.
+  If true, glyphs start at randomized rotation phases, which feels more like a
+  cloud of objects independently circling the centre of the region.
+
+- `DIRECTION_EASE_SECONDS`
+  Time constant for blending from one direction target to another. This lets
+  rotation-family widgets reverse smoothly instead of snapping instantly.
+"""
+
+from __future__ import annotations
+
+import math
+import random
+
+try:
+    from .runtime_support import clamp_density, density_scale, multi_palette_specs
+    from .timing_support import gauge_radians_per_second, resolve_direction_motion
+except ImportError:
+    from runtime_support import clamp_density, density_scale, multi_palette_specs
+    from timing_support import gauge_radians_per_second, resolve_direction_motion
+
+
+def rotation_field_bounds(rows: int, width: int, *, cell_aspect_y: float = 2.0) -> tuple[float, float, int, int]:
+    half_w = max(1.0, (width - 1) / 2.0)
+    half_h_iso = max(1.0, ((rows - 1) / 2.0) * cell_aspect_y)
+    rotation_radius = math.hypot(half_w, half_h_iso)
+    max_dx = max(1.0, rotation_radius - 1.0)
+    max_dy = max(1.0, (rotation_radius / cell_aspect_y) - 0.5)
+    source_rows = max(rows, int(round((max_dy * 2.0) + 1.0)))
+    source_width = max(width, int(round((max_dx * 2.0) + 1.0)))
+    return max_dx, max_dy, source_rows, source_width
+
+
+def rotate_offset(dx: float, dy: float, angle: float, *, cell_aspect_y: float = 2.0) -> tuple[float, float]:
+    """Rotate a screen-space offset using isotropic math.
+
+    Terminal character cells are typically about twice as tall as they are wide,
+    so the y axis is scaled into isotropic space before rotation and scaled back
+    into screen rows afterward.
+    """
+
+    iso_x = dx
+    iso_y = dy * cell_aspect_y
+    cos_a = math.cos(angle)
+    sin_a = math.sin(angle)
+    rot_x = (iso_x * cos_a) - (iso_y * sin_a)
+    rot_y = (iso_x * sin_a) + (iso_y * cos_a)
+    return rot_x, rot_y / cell_aspect_y
+
+
+class RotationFieldWidget:
+    GLYPHS = "αβγδεζηθλμξπρστυφχψωΔΘΛΞΠΣΦΨΩ∂∇∞∑∏∫√≈≠≤≥⊕⊗⊙⊛⊜⊝⊞⊟⊠⊡☉☌☍☿♀♁♂♃♄♅♆♇⚝✦✧·∘"
+    CELL_ASPECT_Y = 2.0
+    SEED_DIVISOR = 7
+    MIN_SEED_COUNT = 24
+    MAX_SEED_COUNT = 900
+    MUTATION_PROBABILITY = 0.08
+    RANDOM_INITIAL_PHASE = True
+    RIGID_SPEED_MULTIPLIER = 1.0
+    ROTATION_FACTOR = 0.0
+    DIFFERENTIAL_BASE = 0.55
+    DIFFERENTIAL_SPREAD = 2.10
+    FALLOFF_EXPONENT = 1.0
+    RADIAL_DECAY_PER_RADIAN = 0.0
+    RADIAL_DECAY_USES_TARGET_MOTION = False
+    DIRECTION_EASE_SECONDS = 0.5
+    RESPAWN_INNER_RADIUS_NORM = 0.08
+    RESPAWN_INNER_RADIUS_ABS = 0.0
+    RESPAWN_OUTER_MIN_RADIUS_NORM = 0.88
+    RESPAWN_OUTER_MAX_RADIUS_NORM = 0.98
+    RESPAWN_INNER_MIN_RADIUS_NORM = 0.04
+    RESPAWN_INNER_MAX_RADIUS_NORM = 0.18
+    DENSITY_LOW_SCALE = 0.05
+    DENSITY_HIGH_SCALE = 2.40
+
+    def __init__(
+        self,
+        *,
+        curses_module,
+        stdscr,
+        colour_attr_from_spec,
+        normalize_colour_spec,
+        widget_name: str,
+        state_prefix: str,
+    ):
+        self.curses = curses_module
+        self.stdscr = stdscr
+        self.colour_attr_from_spec = colour_attr_from_spec
+        self.normalize_colour_spec = normalize_colour_spec
+        self.widget_name = widget_name
+        self.state_prefix = state_prefix
+
+    def state_key(self, suffix: str) -> str:
+        return f"{self.state_prefix}_{suffix}"
+
+    def initial_motion(self, area: dict) -> float:
+        direction = str(area.get("direction_override") or "forward").lower()
+        if direction == "backward":
+            return -1.0
+        if direction == "none":
+            return 0.0
+        if direction == "forward":
+            return 1.0
+        return float(resolve_direction_motion(area, self.widget_name, 0.0))
+
+    def ensure(self, area: dict, rows: int, width: int) -> None:
+        sig = (rows, width, clamp_density(area.get("density_override")))
+        if area.get(self.state_key("sig")) == sig and area.get(self.state_key("cells")):
+            return
+        area[self.state_key("sig")] = sig
+        area[self.state_key("cells")] = self.seed_cells(area, rows, width)
+        initial_motion = self.initial_motion(area)
+        area[self.state_key("motion")] = initial_motion
+        area[self.state_key("target_motion")] = initial_motion
+
+    def velocity_multiplier(self, radius_norm: float) -> float:
+        shaped_falloff = (1.0 - radius_norm) ** self.FALLOFF_EXPONENT
+        differential = self.DIFFERENTIAL_BASE + (shaped_falloff * self.DIFFERENTIAL_SPREAD)
+        return (
+            ((1.0 - self.ROTATION_FACTOR) * self.RIGID_SPEED_MULTIPLIER)
+            + (self.ROTATION_FACTOR * differential)
+        )
+
+    def rotation_geometry(self, rows: int, width: int) -> tuple[float, float, int, int, float]:
+        max_dx, max_dy, source_rows, source_width = rotation_field_bounds(rows, width, cell_aspect_y=self.CELL_ASPECT_Y)
+        max_radius = math.hypot(max_dx, max_dy * self.CELL_ASPECT_Y)
+        return max_dx, max_dy, source_rows, source_width, max_radius
+
+    def random_offset(
+        self,
+        max_dx: float,
+        max_dy: float,
+        *,
+        radius_norm_min: float = 0.0,
+        radius_norm_max: float = 1.0,
+    ) -> tuple[float, float]:
+        radius_norm_min = max(0.0, min(1.0, radius_norm_min))
+        radius_norm_max = max(radius_norm_min, min(1.0, radius_norm_max))
+        theta = random.uniform(0.0, math.tau)
+        radius_norm = random.uniform(radius_norm_min ** 2, radius_norm_max ** 2) ** 0.5
+        dx = math.cos(theta) * max_dx * radius_norm
+        dy = math.sin(theta) * max_dy * radius_norm
+        return dx, dy
+
+    def build_cell(
+        self,
+        idx: int,
+        dx: float,
+        dy: float,
+        max_radius: float,
+        *,
+        phase: float | None = None,
+    ) -> tuple[float, float, float, str, int, float]:
+        radius_norm = min(1.0, math.hypot(dx, dy * self.CELL_ASPECT_Y) / max(1.0, max_radius))
+        velocity = self.velocity_multiplier(radius_norm)
+        cell_phase = random.uniform(0.0, math.tau) if phase is None and self.RANDOM_INITIAL_PHASE else (phase or 0.0)
+        return (dx, dy, cell_phase, random.choice(self.GLYPHS), idx, velocity)
+
+    def respawn_cell(
+        self,
+        idx: int,
+        max_dx: float,
+        max_dy: float,
+        max_radius: float,
+        *,
+        outward: bool,
+        phase: float | None = None,
+    ) -> tuple[float, float, float, str, int, float]:
+        if outward:
+            dx, dy = self.random_offset(
+                max_dx,
+                max_dy,
+                radius_norm_min=self.RESPAWN_INNER_MIN_RADIUS_NORM,
+                radius_norm_max=self.RESPAWN_INNER_MAX_RADIUS_NORM,
+            )
+        else:
+            dx, dy = self.random_offset(
+                max_dx,
+                max_dy,
+                radius_norm_min=self.RESPAWN_OUTER_MIN_RADIUS_NORM,
+                radius_norm_max=self.RESPAWN_OUTER_MAX_RADIUS_NORM,
+        )
+        return self.build_cell(idx, dx, dy, max_radius, phase=phase)
+
+    def inner_respawn_radius_norm(self, max_radius: float) -> float:
+        if self.RESPAWN_INNER_RADIUS_ABS > 0.0:
+            return self.RESPAWN_INNER_RADIUS_ABS / max(1.0, max_radius)
+        return self.RESPAWN_INNER_RADIUS_NORM
+
+    def seed_cells(self, area: dict, rows: int, width: int) -> list[tuple[float, float, float, str, int, float]]:
+        max_dx, max_dy, source_rows, source_width, max_radius = self.rotation_geometry(rows, width)
+        density_multiplier = density_scale(
+            area.get("density_override"),
+            low=self.DENSITY_LOW_SCALE,
+            mid=1.0,
+            high=self.DENSITY_HIGH_SCALE,
+        )
+        count = max(self.MIN_SEED_COUNT, min(self.MAX_SEED_COUNT, int(((source_rows * source_width) // self.SEED_DIVISOR) * density_multiplier)))
+        cells: list[tuple[float, float, float, str, int, float]] = []
+        for idx in range(count):
+            dx, dy = self.random_offset(max_dx, max_dy, radius_norm_min=0.10, radius_norm_max=0.98)
+            cells.append(self.build_cell(idx, dx, dy, max_radius))
+        return cells
+
+    def update(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int) -> None:
+        self.ensure(area, rows, width)
+        target_motion = float(resolve_direction_motion(area, self.widget_name, now))
+        area[self.state_key("target_motion")] = target_motion
+        motion = float(area.get(self.state_key("motion"), target_motion))
+        ease_seconds = max(0.001, float(self.DIRECTION_EASE_SECONDS))
+        max_step = dt / ease_seconds if dt > 0.0 else 1.0
+        delta = target_motion - motion
+        if abs(delta) <= max_step:
+            motion = target_motion
+        else:
+            motion += max_step if delta > 0.0 else -max_step
+        area[self.state_key("motion")] = motion
+        cells = area.get(self.state_key("cells")) or []
+        if not cells:
+            return
+        max_dx, max_dy, _source_rows, _source_width, max_radius = self.rotation_geometry(rows, width)
+        base_rate = gauge_radians_per_second(speed, widget=self.widget_name) * dt * motion
+        updated = []
+        radial_motion = abs(target_motion) if self.RADIAL_DECAY_USES_TARGET_MOTION else abs(motion)
+        radial_step = self.RADIAL_DECAY_PER_RADIAN * gauge_radians_per_second(speed, widget=self.widget_name) * dt * radial_motion
+        outward = radial_step > 0.0
+        inner_respawn_radius_norm = self.inner_respawn_radius_norm(max_radius)
+        for dx, dy, phase, glyph, palette_idx, velocity in cells:
+            next_phase = (phase + (base_rate * velocity)) % math.tau
+            next_dx = dx
+            next_dy = dy
+            if radial_step != 0.0:
+                radius = math.hypot(dx, dy * self.CELL_ASPECT_Y)
+                if radius > 0.0:
+                    scale = max(0.0, (radius + radial_step) / radius)
+                    next_dx = dx * scale
+                    next_dy = dy * scale
+                else:
+                    next_dx, next_dy = self.random_offset(max_dx, max_dy, radius_norm_min=0.10, radius_norm_max=0.18)
+            radius_norm = min(1.5, math.hypot(next_dx, next_dy * self.CELL_ASPECT_Y) / max(1.0, max_radius))
+            if radius_norm < inner_respawn_radius_norm or radius_norm > 1.02:
+                updated.append(
+                    self.respawn_cell(
+                        palette_idx,
+                        max_dx,
+                        max_dy,
+                        max_radius,
+                        outward=outward,
+                        phase=next_phase,
+                    )
+                )
+                continue
+            next_velocity = self.velocity_multiplier(min(1.0, radius_norm))
+            updated.append((next_dx, next_dy, next_phase, glyph, palette_idx, next_velocity))
+        area[self.state_key("cells")] = updated
+        if random.random() < self.MUTATION_PROBABILITY:
+            idx = random.randrange(len(updated))
+            dx, dy, phase, _old_glyph, palette_idx, velocity = updated[idx]
+            updated[idx] = (dx, dy, phase, random.choice(self.GLYPHS), palette_idx, velocity)
+
+    def render(self, area: dict, rows: int, y: int, x: int, width: int) -> None:
+        self.ensure(area, rows, width)
+        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "green"
+        multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-normal")
+        palette = [
+            self.colour_attr_from_spec(self.curses, spec, default=spec, bold=True)
+            for spec in multi_specs
+        ]
+        if not palette:
+            palette = [self.colour_attr_from_spec(self.curses, "green", default="green", bold=True)]
+
+        blank_attr = self.curses.color_pair(1)
+        for r in range(rows):
+            try:
+                self.stdscr.addnstr(y + r, x, " " * width, width, blank_attr)
+            except self.curses.error:
+                pass
+
+        cx = (width - 1) / 2.0
+        cy = (rows - 1) / 2.0
+        occupied: set[tuple[int, int]] = set()
+        for dx, dy, phase, glyph, palette_idx, _velocity in area.get(self.state_key("cells")) or []:
+            rot_x, rot_y = rotate_offset(dx, dy, phase, cell_aspect_y=self.CELL_ASPECT_Y)
+            col = int(round(cx + rot_x))
+            row = int(round(cy + rot_y))
+            if not (0 <= row < rows and 0 <= col < width):
+                continue
+            if (row, col) in occupied:
+                continue
+            occupied.add((row, col))
+            attr = palette[palette_idx % len(palette)]
+            try:
+                self.stdscr.addch(y + row, x + col, glyph, attr)
+            except self.curses.error:
+                pass

@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import random
 
+try:
+    from .timing_support import cycle_start_deadline
+except ImportError:
+    from timing_support import cycle_start_deadline
+
 
 def sidebar_cycle_modes_for_main(main_mode: str, sidebar_cycle_modes: list[str]) -> list[str]:
     if main_mode in ("text", "text_wide"):
@@ -16,8 +21,8 @@ def sidebar_cycle_modes_for_main(main_mode: str, sidebar_cycle_modes: list[str])
 
 def cycle_widget_names(include_image: bool) -> list[str]:
     names = [
-        "bars", "blocks", "gauge", "image", "life", "matrix",
-        "scope", "readouts", "sparkline", "sweep", "tunnel",
+        "bars", "blocks", "crash", "gauge", "image", "life", "matrix",
+        "orbit", "rotate", "scope", "readouts", "sparkline", "spiral", "sweep", "tunnel", "whorl",
         "text", "text_scant", "text_spew", "text_wide",
     ]
     if not include_image:
@@ -95,6 +100,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["text_override"] = spec.get("text")
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
+            area["density_override"] = spec.get("density")
             area["colour_override"] = spec.get("colour")
             area["direction_override"] = spec.get("direction")
             area["role"] = spec["role"]
@@ -109,6 +115,7 @@ def sync_areas(area_specs: list[dict], area_states: dict[str, dict], make_area, 
             area["text_override"] = spec.get("text")
             area["label"] = spec.get("label")
             area["speed_override"] = spec.get("speed")
+            area["density_override"] = spec.get("density")
             area["colour_override"] = spec.get("colour")
             area["direction_override"] = spec.get("direction")
             area["role"] = spec["role"]
@@ -142,6 +149,6 @@ def sync_cycle_start_modes(area_specs: list[dict], area_states: dict[str, dict],
         area["label"] = current
         if current in area["cycle_order"]:
             area["cycle_idx"] = area["cycle_order"].index(current)
-        area["cycle_next_change"] = now + random.uniform(0.0, 10.0)
+        area["cycle_next_change"] = cycle_start_deadline(now)
         area["next_update"] = 0.0
         used.add(current)

@@ -2,49 +2,16 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 import math
-from pathlib import Path
 import random
-import subprocess
-import sys
-
-if sys.platform == "win32":
-    try:
-        import yaml
-    except ImportError:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "pyyaml"],
-            stdout=subprocess.DEVNULL,
-        )
-        import yaml
-else:
-    import yaml
-
-
-PACKAGE_DIR = Path(__file__).resolve().parent
-TIMING_CONFIG_PATH = PACKAGE_DIR / "widgets.yaml"
-
-
-@lru_cache(maxsize=1)
-def load_timing_config() -> dict:
-    try:
-        with TIMING_CONFIG_PATH.open("r", encoding="utf-8") as handle:
-            data = yaml.safe_load(handle) or {}
-    except OSError:
-        data = {}
-    if not isinstance(data, dict):
-        return {}
-    return data
+try:
+    from .widget_metadata import widget_behavior, widget_timing, widget_timing_defaults
+except ImportError:
+    from widget_metadata import widget_behavior, widget_timing, widget_timing_defaults
 
 
 def _timing_defaults() -> dict:
-    config = load_timing_config()
-    defaults = config.get("defaults")
-    if not isinstance(defaults, dict):
-        return {}
-    timing = defaults.get("timing")
-    return timing if isinstance(timing, dict) else {}
+    return widget_timing_defaults()
 
 
 def _speed_defaults() -> dict:
@@ -82,18 +49,8 @@ def base_iterations_per_second(speed: int) -> float:
     return lo + ((hi - lo) * t)
 
 
-def widget_settings(widget: str) -> dict:
-    config = load_timing_config()
-    widgets = config.get("widgets")
-    if not isinstance(widgets, dict):
-        return {}
-    entry = widgets.get(widget)
-    return entry if isinstance(entry, dict) else {}
-
-
 def _timing_section(widget: str) -> dict:
-    timing = widget_settings(widget).get("timing")
-    return timing if isinstance(timing, dict) else {}
+    return widget_timing(widget)
 
 
 def widget_cadence_factor(widget: str) -> float:
@@ -134,8 +91,7 @@ def shift_deadline(deadline: float, delta: float) -> float:
 
 
 def _behavior_section(widget: str) -> dict:
-    behavior = widget_settings(widget).get("behavior")
-    return behavior if isinstance(behavior, dict) else {}
+    return widget_behavior(widget)
 
 
 def cycle_change_interval_seconds() -> float:
@@ -189,17 +145,6 @@ def read_refresh_interval(widget: str, role: str, theme_name: str | None) -> flo
     else:
         key = "main_interval_seconds"
     value = settings.get(key)
-    try:
-        return max(0.01, float(value))
-    except (TypeError, ValueError):
-        return None
-
-
-def feed_scroll_interval(widget: str) -> float | None:
-    settings = _behavior_section(widget).get("feed_scroll")
-    if not isinstance(settings, dict):
-        return None
-    value = settings.get("interval_seconds")
     try:
         return max(0.01, float(value))
     except (TypeError, ValueError):

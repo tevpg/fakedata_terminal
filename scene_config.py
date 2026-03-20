@@ -1,9 +1,11 @@
-"""Load YAML scene definitions, merge overlays, and adapt them to the runtime."""
+"""Load YAML screen definitions, merge overlays, and adapt them to the runtime."""
 
 from __future__ import annotations
 
+from fractions import Fraction
 from functools import lru_cache
 import glob
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -24,29 +26,33 @@ else:
 
 try:
     from .runtime_support import COLOUR_CHOICES, normalize_colour_spec
+    from .widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CHOICES, normalize_colour_spec
+    from widget_metadata import public_widget_names, widget_defaults as widget_metadata_defaults, widget_enabled, widget_supports
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 LAYOUT_CONFIG_PATH = PACKAGE_DIR / "data" / "layouts.yaml"
-SCENE_CONFIG_PATH = PACKAGE_DIR / "data" / "scenes.yaml"
+SCREEN_CONFIG_PATH = PACKAGE_DIR / "data" / "screens.yaml"
+WIDGET_CONFIG_PATH = PACKAGE_DIR / "data" / "widgets.yaml"
 PACKAGE_CONFIG_PATHS = (
     LAYOUT_CONFIG_PATH,
-    SCENE_CONFIG_PATH,
+    WIDGET_CONFIG_PATH,
+    SCREEN_CONFIG_PATH,
 )
-USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "scenes.yaml"
+USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "screens.yaml"
 PROJECT_CONFIG_NAMES = (
     ".fakedata-terminal.yaml",
     ".fakedata-terminal.yml",
 )
 
-TOP_LEVEL_KEYS = {"defaults", "layouts", "scenes", "widgets"}
-DEFAULT_KEYS = {"layout", "theme", "speed", "image", "widget", "colour", "color", "glitch", "direction"}
+TOP_LEVEL_KEYS = {"defaults", "layouts", "screens", "widgets"}
+DEFAULT_KEYS = {"theme", "speed", "image", "widget", "colour", "color", "glitch", "direction", "timing"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
-SCENE_KEYS = {"note", "layout", "theme", "speed", "text", "regions", "colour", "color", "glitch", "direction"}
-REGION_KEYS = {"widget", "speed", "text", "source_theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
+SCENE_KEYS = {"note", "layout", "theme", "speed", "density", "text", "regions", "colour", "color", "glitch", "direction"}
+REGION_KEYS = {"widget", "speed", "density", "text", "theme", "image", "paths", "path", "glob", "cycle", "colour", "color", "direction"}
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
@@ -180,11 +186,11 @@ def _normalize_config_paths(config_paths: list[str] | tuple[str, ...] | None) ->
 def _load_catalog_file(config_path: str) -> dict[str, Any]:
     path = Path(config_path)
     if not path.is_file():
-        raise ValueError(f"Scene config file not found: {path}")
+        raise ValueError(f"Screen config file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Scene config root must be a mapping: {path}")
+        raise ValueError(f"Screen config root must be a mapping: {path}")
     return _normalize_catalog_paths(data, path)
 
 
@@ -208,12 +214,16 @@ def load_scene_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str,
     return catalog
 
 
-def config_scene_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+def config_screen_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     catalog = load_scene_catalog(config_paths)
-    scenes = catalog.get("scenes", {})
-    if not isinstance(scenes, dict):
+    screens = catalog.get("screens", {})
+    if not isinstance(screens, dict):
         return []
-    return list(scenes.keys())
+    return list(screens.keys())
+
+
+def config_scene_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
+    return config_screen_names(config_paths)
 
 
 def layout_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -311,35 +321,16 @@ def layout_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, Any
 
 
 def widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
-    catalog = load_scene_catalog(config_paths)
-    widgets = catalog.get("widgets", {})
-    names = set()
-    if isinstance(widgets, dict):
-        for key, value in widgets.items():
-            if isinstance(value, list):
-                names.update(str(item) for item in value)
-            elif isinstance(value, dict) and _supported_widget(str(key)):
-                names.add(str(key))
-    names.update({
-        "text", "text_wide", "text_scant", "text_spew", "image", "life",
-        "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
-        "sparkline", "readouts", "blank", "cycle",
-    })
-    return sorted(names)
+    del config_paths
+    return public_widget_names()
 
 
 def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
-    catalog = load_scene_catalog(config_paths)
-    widgets = catalog.get("widgets", {})
-    defaults: dict[str, dict[str, Any]] = {}
-    if not isinstance(widgets, dict):
-        return defaults
-    for key, value in widgets.items():
-        widget_name = str(key)
-        if not isinstance(value, dict) or not _supported_widget(widget_name):
-            continue
-        defaults[widget_name] = value
-    return defaults
+    return {
+        widget_name: dict(widget_metadata_defaults(widget_name, config_paths))
+        for widget_name in public_widget_names()
+        if widget_metadata_defaults(widget_name, config_paths)
+    }
 
 
 def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -355,16 +346,14 @@ def config_defaults(config_paths: tuple[str, ...] | None = None) -> dict[str, An
     defaults = catalog.get("defaults", {})
     if not isinstance(defaults, dict):
         defaults = {}
-    colour = defaults.get("colour")
-    if colour is None:
-        colour = defaults.get("color")
-    layout_name = defaults.get("layout")
+    color = defaults.get("color")
+    if color is None:
+        color = defaults.get("colour")
     return {
-        "layout": canonical_layout_name(layout_name, config_paths) if layout_name is not None else None,
         "theme": defaults.get("theme", "science"),
         "speed": defaults.get("speed", 50),
         "widget": defaults.get("widget"),
-        "colour": colour,
+        "color": color,
         "image": defaults.get("image"),
         "glitch": defaults.get("glitch", 0.0),
         "direction": _direction_value(defaults.get("direction")) or "forward",
@@ -378,7 +367,7 @@ def _direction_value(value: Any) -> str | None:
     return _DIRECTION_ALIASES.get(text)
 
 
-def _colour_value(value: Any) -> str | None:
+def _color_value(value: Any) -> str | None:
     if value is None:
         return None
     normalized = normalize_colour_spec(str(value))
@@ -397,6 +386,50 @@ def _speed_issues(value: Any, label: str, issues: list[str]) -> None:
         issues.append(f"{label} must be between 1 and 100")
 
 
+def _density_issues(value: Any, label: str, issues: list[str]) -> None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        issues.append(f"{label} must be an integer between 1 and 100")
+        return
+    if not 1 <= number <= 100:
+        issues.append(f"{label} must be between 1 and 100")
+
+
+def _modifier_is_set(value: Any) -> bool:
+    return value not in (None, "", [], {})
+
+
+def _config_key_to_modifier(key: str) -> str | None:
+    mapping = {
+        "speed": "speed",
+        "density": "density",
+        "text": "text",
+        "theme": "theme",
+        "direction": "direction",
+        "colour": "color",
+        "color": "color",
+        "image": "image",
+        "paths": "image",
+        "path": "image",
+        "glob": "image",
+        "cycle": "cycle",
+    }
+    return mapping.get(key)
+
+
+def _validate_supported_modifiers(widget_name: str, mapping: dict[str, Any], context: str, issues: list[str],
+                                  config_paths: tuple[str, ...] | None = None) -> None:
+    supported = set(widget_supports(widget_name, config_paths))
+    for key, value in mapping.items():
+        if key == "widget" or not _modifier_is_set(value):
+            continue
+        modifier = _config_key_to_modifier(str(key))
+        if modifier is None or modifier in supported:
+            continue
+        issues.append(f"{context} uses unsupported modifier '{key}' for widget '{widget_name}'")
+
+
 def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[str]:
     catalog = load_scene_catalog(config_paths)
     issues: list[str] = []
@@ -412,12 +445,11 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
             issues.append(f"{config_label}: defaults must be a mapping")
         else:
             _unknown_keys(defaults, DEFAULT_KEYS, "defaults", issues)
-            layout_name = defaults.get("layout")
-            if layout_name is not None and canonical_layout_name(layout_name, config_paths) is None:
-                issues.append(f"{config_label}: defaults.layout references unknown layout '{layout_name}'")
             widget = defaults.get("widget")
             if widget is not None and not _supported_widget(str(widget)):
                 issues.append(f"{config_label}: defaults.widget uses unsupported widget '{widget}'")
+            elif widget is not None and not widget_enabled(str(widget), config_paths):
+                issues.append(f"{config_label}: defaults.widget references disabled widget '{widget}'")
             image_spec = defaults.get("image")
             if image_spec is not None and not isinstance(image_spec, dict):
                 issues.append(f"{config_label}: defaults.image must be a mapping")
@@ -433,12 +465,15 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                     if glitch_value < 0:
                         issues.append(f"{config_label}: defaults.glitch must be >= 0")
             _speed_issues(defaults.get("speed"), f"{config_label}: defaults.speed", issues)
-            defaults_colour = defaults.get("colour", defaults.get("color"))
-            if defaults_colour is not None and _colour_value(defaults_colour) is None:
+            defaults_color = defaults.get("color", defaults.get("colour"))
+            if defaults_color is not None and _color_value(defaults_color) is None:
                 issues.append(f"{config_label}: defaults.colour must be a recognized colour name")
             direction = defaults.get("direction")
             if direction is not None and _direction_value(direction) is None:
                 issues.append(f"{config_label}: defaults.direction must be one of: forward, backward, random, none")
+            timing = defaults.get("timing")
+            if timing is not None and not isinstance(timing, dict):
+                issues.append(f"{config_label}: defaults.timing must be a mapping")
 
     layouts = catalog.get("layouts", {})
     if layouts is not None:
@@ -468,155 +503,128 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                 if not isinstance(regions, dict):
                     issues.append(f"{config_label}: layout '{layout_name}' regions must be a mapping")
 
-    scenes = catalog.get("scenes", {})
-    if scenes is not None:
-        if not isinstance(scenes, dict):
-            issues.append(f"{config_label}: scenes must be a mapping")
+    screens = catalog.get("screens", {})
+    if screens is not None:
+        if not isinstance(screens, dict):
+            issues.append(f"{config_label}: screens must be a mapping")
         else:
             layout_names_set = set(layout_names(config_paths))
-            for scene_name, scene_cfg in scenes.items():
+            for scene_name, scene_cfg in screens.items():
                 if not isinstance(scene_cfg, dict):
-                    issues.append(f"{config_label}: scene '{scene_name}' must be a mapping")
+                    issues.append(f"{config_label}: screen '{scene_name}' must be a mapping")
                     continue
-                _unknown_keys(scene_cfg, SCENE_KEYS, f"scenes.{scene_name}", issues)
+                _unknown_keys(scene_cfg, SCENE_KEYS, f"screens.{scene_name}", issues)
                 layout_name = scene_cfg.get("layout")
                 if layout_name and canonical_layout_name(layout_name, config_paths) is None:
-                    issues.append(f"{config_label}: scene '{scene_name}' references unknown layout '{layout_name}'")
+                    issues.append(f"{config_label}: screen '{scene_name}' references unknown layout '{layout_name}'")
                 glitch = scene_cfg.get("glitch")
                 if glitch is not None:
                     try:
                         glitch_value = float(glitch)
                     except (TypeError, ValueError):
-                        issues.append(f"{config_label}: scene '{scene_name}' glitch must be a number")
+                        issues.append(f"{config_label}: screen '{scene_name}' glitch must be a number")
                     else:
                         if glitch_value < 0:
-                            issues.append(f"{config_label}: scene '{scene_name}' glitch must be >= 0")
-                _speed_issues(scene_cfg.get("speed"), f"{config_label}: scene '{scene_name}' speed", issues)
-                scene_colour = scene_cfg.get("colour", scene_cfg.get("color"))
-                if scene_colour is not None and _colour_value(scene_colour) is None:
-                    issues.append(f"{config_label}: scene '{scene_name}' colour must be a recognized colour name")
+                            issues.append(f"{config_label}: screen '{scene_name}' glitch must be >= 0")
+                _speed_issues(scene_cfg.get("speed"), f"{config_label}: screen '{scene_name}' speed", issues)
+                if scene_cfg.get("density") is not None:
+                    _density_issues(scene_cfg.get("density"), f"{config_label}: screen '{scene_name}' density", issues)
+                scene_color = scene_cfg.get("color", scene_cfg.get("colour"))
+                if scene_color is not None and _color_value(scene_color) is None:
+                    issues.append(f"{config_label}: screen '{scene_name}' colour must be a recognized colour name")
                 direction = scene_cfg.get("direction")
                 if direction is not None and _direction_value(direction) is None:
                     issues.append(
-                        f"{config_label}: scene '{scene_name}' direction must be one of: forward, backward, random, none"
+                        f"{config_label}: screen '{scene_name}' direction must be one of: forward, backward, random, none"
                     )
                 regions = scene_cfg.get("regions", {})
                 if not isinstance(regions, dict):
-                    issues.append(f"{config_label}: scene '{scene_name}' regions must be a mapping")
+                    issues.append(f"{config_label}: screen '{scene_name}' regions must be a mapping")
                     continue
                 for region_name, region_cfg in regions.items():
                     if not isinstance(region_cfg, dict):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' must be a mapping"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' must be a mapping"
                         )
                         continue
-                    _unknown_keys(region_cfg, REGION_KEYS, f"scenes.{scene_name}.regions.{region_name}", issues)
-                    _speed_issues(region_cfg.get("speed"), f"{config_label}: scene '{scene_name}' region '{region_name}' speed", issues)
-                    region_colour = region_cfg.get("colour", region_cfg.get("color"))
-                    if region_colour is not None and _colour_value(region_colour) is None:
+                    _unknown_keys(region_cfg, REGION_KEYS, f"screens.{scene_name}.regions.{region_name}", issues)
+                    _speed_issues(region_cfg.get("speed"), f"{config_label}: screen '{scene_name}' region '{region_name}' speed", issues)
+                    if region_cfg.get("density") is not None:
+                        _density_issues(region_cfg.get("density"), f"{config_label}: screen '{scene_name}' region '{region_name}' density", issues)
+                    region_color = region_cfg.get("color", region_cfg.get("colour"))
+                    if region_color is not None and _color_value(region_color) is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' colour must be a recognized colour name"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' colour must be a recognized colour name"
                         )
                     direction = region_cfg.get("direction")
                     if direction is not None and _direction_value(direction) is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' direction must be one of: forward, backward, random, none"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' direction must be one of: forward, backward, random, none"
                         )
                     widget = region_cfg.get("widget")
                     if widget is None:
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' is missing 'widget'"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' is missing 'widget'"
                         )
                     elif not _supported_widget(str(widget)):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' uses unsupported widget '{widget}'"
+                        )
+                    elif not widget_enabled(str(widget), config_paths):
+                        issues.append(
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' references disabled widget '{widget}'"
+                        )
+                    else:
+                        _validate_supported_modifiers(
+                            str(widget),
+                            region_cfg,
+                            f"{config_label}: screen '{scene_name}' region '{region_name}'",
+                            issues,
+                            config_paths,
                         )
                     cycle_spec = region_cfg.get("cycle")
                     if cycle_spec is not None and not isinstance(cycle_spec, dict):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' cycle must be a mapping"
+                                f"{config_label}: screen '{scene_name}' region '{region_name}' cycle must be a mapping"
                         )
                     elif isinstance(cycle_spec, dict):
-                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"scenes.{scene_name}.regions.{region_name}.cycle", issues)
+                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"screens.{scene_name}.regions.{region_name}.cycle", issues)
                         widgets = cycle_spec.get("widgets")
                         if widgets is not None and not isinstance(widgets, list):
                             issues.append(
-                                f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets must be a list"
+                                f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets must be a list"
                             )
                         elif isinstance(widgets, list):
                             if str(widget) != "cycle":
                                 issues.append(
-                                    f"{config_label}: scene '{scene_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
+                                    f"{config_label}: screen '{scene_name}' region '{region_name}' defines cycle.widgets but widget is '{widget}'"
                                 )
                             for idx, cycle_widget in enumerate(widgets):
                                 cycle_widget_name = str(cycle_widget)
                                 if not _supported_widget(cycle_widget_name):
                                     issues.append(
-                                        f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
+                                        f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
+                                    )
+                                elif not widget_enabled(cycle_widget_name, config_paths):
+                                    issues.append(
+                                        f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] references disabled widget '{cycle_widget_name}'"
                                     )
                                 elif cycle_widget_name in {"cycle", "blank"}:
                                     issues.append(
-                                        f"{config_label}: scene '{scene_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
+                                        f"{config_label}: screen '{scene_name}' region '{region_name}' cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
                                     )
                     image_spec = region_cfg.get("image")
                     if image_spec is not None and not isinstance(image_spec, dict):
                         issues.append(
-                            f"{config_label}: scene '{scene_name}' region '{region_name}' image must be a mapping"
+                            f"{config_label}: screen '{scene_name}' region '{region_name}' image must be a mapping"
                         )
                     elif isinstance(image_spec, dict):
-                        _unknown_keys(image_spec, IMAGE_KEYS, f"scenes.{scene_name}.regions.{region_name}.image", issues)
+                        _unknown_keys(image_spec, IMAGE_KEYS, f"screens.{scene_name}.regions.{region_name}.image", issues)
 
     widgets = catalog.get("widgets", {})
     if widgets is not None:
         if not isinstance(widgets, dict):
             issues.append(f"{config_label}: widgets must be a mapping")
-        else:
-            for widget_name, widget_cfg in widgets.items():
-                widget_name = str(widget_name)
-                if isinstance(widget_cfg, list):
-                    continue
-                if not isinstance(widget_cfg, dict):
-                    issues.append(f"{config_label}: widgets.{widget_name} must be a mapping or list")
-                    continue
-                if not _supported_widget(widget_name):
-                    issues.append(f"{config_label}: widgets.{widget_name} is not a supported widget name")
-                    continue
-                _unknown_keys(widget_cfg, WIDGET_DEFAULT_KEYS, f"widgets.{widget_name}", issues)
-                _speed_issues(widget_cfg.get("speed"), f"{config_label}: widgets.{widget_name}.speed", issues)
-                widget_colour = widget_cfg.get("colour", widget_cfg.get("color"))
-                if widget_colour is not None and _colour_value(widget_colour) is None:
-                    issues.append(f"{config_label}: widgets.{widget_name}.colour must be a recognized colour name")
-                direction = widget_cfg.get("direction")
-                if direction is not None and _direction_value(direction) is None:
-                    issues.append(f"{config_label}: widgets.{widget_name}.direction must be one of: forward, backward, random, none")
-                cycle_spec = widget_cfg.get("cycle")
-                if cycle_spec is not None and not isinstance(cycle_spec, dict):
-                    issues.append(f"{config_label}: widgets.{widget_name}.cycle must be a mapping")
-                elif isinstance(cycle_spec, dict):
-                    _unknown_keys(cycle_spec, CYCLE_KEYS, f"widgets.{widget_name}.cycle", issues)
-                    cycle_widgets = cycle_spec.get("widgets")
-                    if cycle_widgets is not None and not isinstance(cycle_widgets, list):
-                        issues.append(f"{config_label}: widgets.{widget_name}.cycle.widgets must be a list")
-                    elif isinstance(cycle_widgets, list):
-                        if widget_name != "cycle":
-                            issues.append(
-                                f"{config_label}: widgets.{widget_name}.cycle is only valid for widget 'cycle'"
-                            )
-                        for idx, cycle_widget in enumerate(cycle_widgets):
-                            cycle_widget_name = str(cycle_widget)
-                            if not _supported_widget(cycle_widget_name):
-                                issues.append(
-                                    f"{config_label}: widgets.{widget_name}.cycle.widgets[{idx}] uses unsupported widget '{cycle_widget_name}'"
-                                )
-                            elif cycle_widget_name in {"cycle", "blank"}:
-                                issues.append(
-                                    f"{config_label}: widgets.{widget_name}.cycle.widgets[{idx}] may not be '{cycle_widget_name}'"
-                                )
-                image_spec = widget_cfg.get("image")
-                if image_spec is not None and not isinstance(image_spec, dict):
-                    issues.append(f"{config_label}: widgets.{widget_name}.image must be a mapping")
-                elif isinstance(image_spec, dict):
-                    _unknown_keys(image_spec, IMAGE_KEYS, f"widgets.{widget_name}.image", issues)
 
     return issues
 
@@ -638,8 +646,14 @@ def format_layout_diagrams(config_paths: tuple[str, ...] | None = None) -> str:
 def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
     panels = layout_cfg.get("panels", {})
     regions = layout_cfg.get("regions", {})
-    width = 31
-    height = 7
+    x_bounds = _axis_boundaries(panels, axis="x")
+    y_bounds = _axis_boundaries(panels, axis="y")
+    x_steps = _axis_step_sizes(x_bounds)
+    y_steps = _axis_step_sizes(y_bounds)
+    x_positions = _scaled_axis_positions(x_steps, scale=4)
+    y_positions = _scaled_axis_positions(y_steps, scale=2)
+    width = x_positions[-1] + 1 if x_positions else 1
+    height = y_positions[-1] + 1 if y_positions else 1
     masks = [[0 for _ in range(width)] for _ in range(height)]
 
     left = 1
@@ -648,21 +662,16 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
     down = 8
     eps = 0.0005
 
-    specs = {
-        name: {
-            "x0": float(spec["x"]),
-            "y0": float(spec["y"]),
-            "x1": float(spec["x"]) + float(spec["w"]),
-            "y1": float(spec["y"]) + float(spec["h"]),
-        }
-        for name, spec in panels.items()
-    }
+    specs = {}
+    for name, spec in panels.items():
+        x0 = _as_fraction(spec["x"])
+        y0 = _as_fraction(spec["y"])
+        x1 = x0 + _as_fraction(spec["w"])
+        y1 = y0 + _as_fraction(spec["h"])
+        specs[name] = {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
 
-    def xmap(value: float) -> int:
-        return int(round(value * (width - 1)))
-
-    def ymap(value: float) -> int:
-        return int(round(value * (height - 1)))
+    x_lookup = {bound: pos for bound, pos in zip(x_bounds, x_positions)}
+    y_lookup = {bound: pos for bound, pos in zip(y_bounds, y_positions)}
 
     def add_horizontal(y: int, x0: int, x1: int) -> None:
         for x in range(x0, x1 + 1):
@@ -678,26 +687,15 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
             if y < y1:
                 masks[y][x] |= down
 
-    add_horizontal(0, 0, width - 1)
-    add_horizontal(height - 1, 0, width - 1)
-    add_vertical(0, 0, height - 1)
-    add_vertical(width - 1, 0, height - 1)
-
-    panel_items = list(specs.items())
-    for idx, (_, a) in enumerate(panel_items):
-        for _, b in panel_items[idx + 1:]:
-            if abs(a["x1"] - b["x0"]) <= eps or abs(b["x1"] - a["x0"]) <= eps:
-                shared_x = a["x1"] if abs(a["x1"] - b["x0"]) <= eps else b["x1"]
-                overlap_y0 = max(a["y0"], b["y0"])
-                overlap_y1 = min(a["y1"], b["y1"])
-                if overlap_y1 - overlap_y0 > eps:
-                    add_vertical(xmap(shared_x), ymap(overlap_y0), ymap(overlap_y1))
-            if abs(a["y1"] - b["y0"]) <= eps or abs(b["y1"] - a["y0"]) <= eps:
-                shared_y = a["y1"] if abs(a["y1"] - b["y0"]) <= eps else b["y1"]
-                overlap_x0 = max(a["x0"], b["x0"])
-                overlap_x1 = min(a["x1"], b["x1"])
-                if overlap_x1 - overlap_x0 > eps:
-                    add_horizontal(ymap(shared_y), xmap(overlap_x0), xmap(overlap_x1))
+    for spec in specs.values():
+        x0 = x_lookup[spec["x0"]]
+        x1 = x_lookup[spec["x1"]]
+        y0 = y_lookup[spec["y0"]]
+        y1 = y_lookup[spec["y1"]]
+        add_horizontal(y0, x0, x1)
+        add_horizontal(y1, x0, x1)
+        add_vertical(x0, y0, y1)
+        add_vertical(x1, y0, y1)
 
     glyphs = {
         left | right: "─",
@@ -718,10 +716,10 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
             canvas[y][x] = glyphs.get(masks[y][x], " ")
 
     for panel_name, spec in specs.items():
-        x0 = xmap(spec["x0"])
-        x1 = xmap(spec["x1"])
-        y0 = ymap(spec["y0"])
-        y1 = ymap(spec["y1"])
+        x0 = x_lookup[spec["x0"]]
+        x1 = x_lookup[spec["x1"]]
+        y0 = y_lookup[spec["y0"]]
+        y1 = y_lookup[spec["y1"]]
         cx = (x0 + x1) // 2
         cy = (y0 + y1) // 2
         label = panel_name
@@ -754,12 +752,47 @@ def _format_single_layout(layout_name: str, layout_cfg: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _as_fraction(value: Any) -> Fraction:
+    try:
+        return Fraction(str(value)).limit_denominator(120)
+    except (ValueError, ZeroDivisionError):
+        return Fraction(float(value)).limit_denominator(120)
+
+
+def _axis_boundaries(panels: dict[str, Any], *, axis: str) -> list[Fraction]:
+    size_key = "w" if axis == "x" else "h"
+    boundaries = set()
+    for panel_cfg in panels.values():
+        if not isinstance(panel_cfg, dict):
+            continue
+        start = _as_fraction(panel_cfg[axis])
+        size = _as_fraction(panel_cfg[size_key])
+        boundaries.add(start)
+        boundaries.add(start + size)
+    return sorted(boundaries)
+
+
+def _axis_step_sizes(boundaries: list[Fraction]) -> list[int]:
+    if len(boundaries) < 2:
+        return [1]
+    intervals = [boundaries[idx + 1] - boundaries[idx] for idx in range(len(boundaries) - 1)]
+    lcm = 1
+    for interval in intervals:
+        lcm = math.lcm(lcm, interval.denominator)
+    return [max(1, int(interval * lcm)) for interval in intervals]
+
+
+def _scaled_axis_positions(steps: list[int], *, scale: int) -> list[int]:
+    positions = [0]
+    total = 0
+    for step in steps:
+        total += max(1, step * scale)
+        positions.append(total)
+    return positions
+
+
 def _supported_widget(widget: str) -> bool:
-    return widget in {
-        "text", "text_wide", "text_scant", "text_spew", "image", "life",
-        "bars", "gauge", "matrix", "scope", "blocks", "sweep", "tunnel",
-        "sparkline", "readouts", "blank", "cycle",
-    }
+    return widget in public_widget_names()
 
 
 def _expand_image_spec(image_spec: dict[str, Any] | None) -> list[str]:
@@ -787,11 +820,182 @@ def _region_image_paths(region_cfg: Any) -> list[str]:
     return []
 
 
+def _region_theme(region_cfg: Any) -> str | None:
+    if not isinstance(region_cfg, dict):
+        return None
+    value = region_cfg.get("theme")
+    return str(value) if value is not None else None
+
+
+def _first_non_none(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _modifier_source(region_cfg: Any, key: str) -> str | None:
+    if not isinstance(region_cfg, dict):
+        return None
+    sources = region_cfg.get("__modifier_sources__")
+    if not isinstance(sources, dict):
+        return None
+    value = sources.get(key)
+    return str(value) if value is not None else None
+
+
+def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, Any], *,
+                            default_color: str | None, screen_density: int | None, screen_direction: str,
+                            default_images: list[str]) -> dict[str, Any]:
+    speed = region_cfg.get("speed") if isinstance(region_cfg, dict) else None
+    if speed is not None:
+        speed_source = _modifier_source(region_cfg, "speed") or "region"
+    else:
+        speed = widget_cfg.get("speed")
+        speed_source = "widget_default" if speed is not None else None
+
+    density = region_cfg.get("density") if isinstance(region_cfg, dict) else None
+    if density is not None:
+        density_source = _modifier_source(region_cfg, "density") or "region"
+    else:
+        density = widget_cfg.get("density")
+        if density is not None:
+            density_source = "widget_default"
+        else:
+            density = screen_density
+            density_source = "screen" if density is not None else None
+
+    text = region_cfg.get("text") if isinstance(region_cfg, dict) else None
+    if text is not None:
+        text_source = _modifier_source(region_cfg, "text") or "region"
+    else:
+        text = widget_cfg.get("text")
+        text_source = "widget_default" if text is not None else None
+
+    theme = _region_theme(region_cfg)
+    if theme is not None:
+        theme_source = _modifier_source(region_cfg, "theme") or "region"
+    else:
+        theme = _region_theme(widget_cfg)
+        theme_source = "widget_default" if theme is not None else None
+
+    color = _region_color(region_cfg)
+    if color is not None:
+        color_source = _modifier_source(region_cfg, "color") or "region"
+    else:
+        color = _region_color(widget_cfg)
+        if color is not None:
+            color_source = "widget_default"
+        else:
+            color = default_color
+            color_source = "default" if color is not None else None
+
+    direction = _region_direction(region_cfg)
+    if direction is not None:
+        direction_source = _modifier_source(region_cfg, "direction") or "region"
+    else:
+        direction = _region_direction(widget_cfg)
+        if direction is not None:
+            direction_source = "widget_default"
+        else:
+            direction = screen_direction
+            direction_source = "screen" if direction is not None else None
+
+    area_images: list[str] = []
+    image_source: str | None = None
+    if widget == "image":
+        area_images = _region_image_paths(region_cfg)
+        if not area_images:
+            area_images = _region_image_paths(widget_cfg)
+            if area_images:
+                image_source = "widget_default"
+        else:
+            image_source = _modifier_source(region_cfg, "image") or "region"
+        if not area_images:
+            area_images = default_images[:]
+            if area_images:
+                image_source = "default"
+
+    cycle_widgets: list[str] = []
+    cycle_source: str | None = None
+    if widget == "cycle":
+        cycle_widgets = _region_cycle_widgets(region_cfg) or _region_cycle_widgets(widget_cfg)
+        if _region_cycle_widgets(region_cfg):
+            cycle_source = _modifier_source(region_cfg, "cycle") or "region"
+        elif cycle_widgets:
+            cycle_source = "widget_default"
+
+    return {
+        "speed": speed,
+        "density": density,
+        "text": text,
+        "theme": theme,
+        "color": color,
+        "direction": direction,
+        "image_paths": area_images,
+        "cycle_widgets": cycle_widgets,
+        "modifier_sources": {
+            "speed": speed_source,
+            "density": density_source,
+            "text": text_source,
+            "theme": theme_source,
+            "color": color_source,
+            "direction": direction_source,
+            "image": image_source,
+            "cycle": cycle_source,
+        },
+    }
+
+
+def _build_area_definition(*, name: str, widget: str, panels: list[str], rect: dict[str, float], region_cfg: Any,
+                           modifiers: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": name,
+        "mode": widget,
+        "panels": panels,
+        "x": rect["x"],
+        "y": rect["y"],
+        "w": rect["w"],
+        "h": rect["h"],
+        "speed": modifiers["speed"],
+        "density": modifiers["density"],
+        "text": modifiers["text"],
+        "theme": modifiers["theme"],
+        "colour": modifiers["color"],
+        "direction": modifiers["direction"],
+        "image_paths": modifiers["image_paths"],
+        "cycle_widgets": modifiers["cycle_widgets"],
+        "modifier_sources": modifiers["modifier_sources"],
+        "allow_inert_modifiers": bool(region_cfg.get("__allow_inert_modifiers__")) if isinstance(region_cfg, dict) else False,
+        "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
+        "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
+        "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,
+        "static_align": region_cfg.get("static_align") if isinstance(region_cfg, dict) else None,
+    }
+
+
+def _resolve_screen_runtime_defaults(screen_cfg: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "theme": screen_cfg.get("theme", defaults.get("theme", "science")),
+        "speed": screen_cfg.get("speed", defaults.get("speed", 50)),
+        "density": screen_cfg.get("density"),
+        "text": screen_cfg.get("text", ""),
+        "glitch": screen_cfg.get("glitch", defaults.get("glitch", 0.0)),
+        "default_widget": defaults.get("widget"),
+        "default_color": _region_color(screen_cfg) or defaults.get("color"),
+        "direction": _region_direction(screen_cfg) or defaults.get("direction", "forward"),
+    }
+
+
+def _resolve_scene_runtime_defaults(scene_cfg: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    return _resolve_screen_runtime_defaults(scene_cfg, defaults)
+
+
 def _config_label(config_paths: tuple[str, ...] | None) -> str:
     normalized = _normalize_config_paths(config_paths)
     if len(normalized) == 1:
         return Path(normalized[0]).name
-    return "merged scene config"
+    return "merged screen config"
 
 
 def _resolve_config_path(pathish: Any, base_dir: Path) -> str:
@@ -855,12 +1059,14 @@ def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict
         for widget_cfg in widgets.values():
             if not isinstance(widget_cfg, dict):
                 continue
-            if any(key in widget_cfg for key in ("paths", "path", "glob")):
-                _normalize_image_mapping(widget_cfg, base_dir)
-            _normalize_image_mapping(widget_cfg.get("image"), base_dir)
-    scenes = catalog.get("scenes")
-    if isinstance(scenes, dict):
-        for scene_cfg in scenes.values():
+            defaults_cfg = widget_cfg.get("defaults")
+            if isinstance(defaults_cfg, dict):
+                if any(key in defaults_cfg for key in ("paths", "path", "glob")):
+                    _normalize_image_mapping(defaults_cfg, base_dir)
+                _normalize_image_mapping(defaults_cfg.get("image"), base_dir)
+    screens = catalog.get("screens")
+    if isinstance(screens, dict):
+        for scene_cfg in screens.values():
             if not isinstance(scene_cfg, dict):
                 continue
             regions = scene_cfg.get("regions")
@@ -894,12 +1100,12 @@ def _region_cycle_widgets(region_cfg: Any) -> list[str]:
     return [str(widget) for widget in widgets]
 
 
-def _region_colour(region_cfg: Any) -> str | None:
+def _region_color(region_cfg: Any) -> str | None:
     if not isinstance(region_cfg, dict):
         return None
-    value = region_cfg.get("colour")
+    value = region_cfg.get("color")
     if value is None:
-        value = region_cfg.get("color")
+        value = region_cfg.get("colour")
     return str(value) if value is not None else None
 
 
@@ -911,7 +1117,7 @@ def _region_direction(region_cfg: Any) -> str | None:
 
 def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
-    scenes = catalog.get("scenes", {})
+    scenes = catalog.get("screens", {})
     defaults = catalog.get("defaults", {})
 
     if scene_name not in scenes:
@@ -919,24 +1125,24 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
 
     scene_cfg = scenes[scene_name]
     if not isinstance(scene_cfg, dict):
-        parser.error(f"scene '{scene_name}' must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{scene_name}' must be a mapping in {_config_label(config_paths)}")
 
     layout = scene_cfg.get("layout")
     regions = scene_cfg.get("regions", {})
     if not isinstance(regions, dict):
-        parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     scene_speed = scene_cfg.get("speed", defaults.get("speed", 50))
     theme = scene_cfg.get("theme", defaults.get("theme", "science"))
-    scene_colour = _region_colour(scene_cfg) or defaults.get("colour")
+    scene_color = _region_color(scene_cfg) or defaults.get("color", defaults.get("colour"))
 
     if layout == "full":
         full_cfg = regions.get("full")
         widget = _widget_name(full_cfg)
         if not widget:
-            parser.error(f"scene '{scene_name}' uses layout 'full' but has no 'full' widget assignment")
+            parser.error(f"screen '{scene_name}' uses layout 'full' but has no 'full' widget assignment")
         if not _supported_widget(widget) or widget in {"sparkline", "readouts"}:
-            parser.error(f"scene '{scene_name}' uses widget '{widget}', which is not supported by the legacy runtime")
+            parser.error(f"screen '{scene_name}' uses widget '{widget}', which is not supported by the legacy runtime")
         return {
             "scene_name": scene_name,
             "theme": theme,
@@ -946,7 +1152,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             "main_speed": full_cfg.get("speed") if isinstance(full_cfg, dict) else None,
             "sidebar_speed": None,
             "text": scene_cfg.get("text", ""),
-            "colour": scene_colour,
+            "colour": scene_color,
             "image_paths": _expand_image_spec(full_cfg.get("image")) if isinstance(full_cfg, dict) else [],
         }
 
@@ -956,11 +1162,11 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
         left_widget = _widget_name(left_cfg)
         right_widget = _widget_name(right_cfg)
         if not left_widget or not right_widget:
-            parser.error(f"scene '{scene_name}' uses layout 'split_left_right' but must define both 'left' and 'right'")
+            parser.error(f"screen '{scene_name}' uses layout 'split_left_right' but must define both 'left' and 'right'")
         if (not _supported_widget(left_widget) or left_widget in {"sparkline", "readouts"}
                 or not _supported_widget(right_widget) or right_widget in {"sparkline", "readouts"}):
             bad = left_widget if (not _supported_widget(left_widget) or left_widget in {"sparkline", "readouts"}) else right_widget
-            parser.error(f"scene '{scene_name}' uses widget '{bad}', which is not supported by the legacy runtime")
+            parser.error(f"screen '{scene_name}' uses widget '{bad}', which is not supported by the legacy runtime")
         return {
             "scene_name": scene_name,
             "theme": theme,
@@ -970,7 +1176,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
             "main_speed": left_cfg.get("speed") if isinstance(left_cfg, dict) else None,
             "sidebar_speed": right_cfg.get("speed") if isinstance(right_cfg, dict) else None,
             "text": scene_cfg.get("text", ""),
-            "colour": scene_colour,
+            "colour": scene_color,
             "image_paths": (
                 _expand_image_spec(left_cfg.get("image")) if left_widget == "image" and isinstance(left_cfg, dict) else
                 _expand_image_spec(right_cfg.get("image")) if right_widget == "image" and isinstance(right_cfg, dict) else
@@ -979,7 +1185,7 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
         }
 
     parser.error(
-        f"scene '{scene_name}' uses layout '{layout}', which is not yet supported by the current runtime; "
+        f"screen '{scene_name}' uses layout '{layout}', which is not yet supported by the current runtime; "
         "currently supported config layouts: full, split_left_right"
     )
 
@@ -987,10 +1193,10 @@ def adapt_scene_to_legacy(scene_name: str, parser, config_paths: tuple[str, ...]
 def _parse_region_spec(layout_name: str, layout_cfg: dict[str, Any], region_name: str, parser, scene_name: str) -> list[str]:
     normalized = _normalize_region_expr_in_layout(layout_name, layout_cfg, region_name)
     if normalized is None:
-        parser.error(f"scene '{scene_name}' references unknown region '{region_name}'")
+        parser.error(f"screen '{scene_name}' references unknown region '{region_name}'")
     panel_names = normalized.split("+")
     if not panel_names:
-        parser.error(f"scene '{scene_name}' has empty region spec for '{region_name}'")
+        parser.error(f"screen '{scene_name}' has empty region spec for '{region_name}'")
     return panel_names
 
 
@@ -1010,20 +1216,20 @@ def _rect_for_panels(layout_cfg: dict[str, Any], panel_names: list[str], parser,
     bbox = (x1 - x0) * (y1 - y0)
     if abs(covered - bbox) > 0.0005:
         parser.error(
-            f"scene '{scene_name}' region '{region_name}' does not resolve to a single rectangle"
+            f"screen '{scene_name}' region '{region_name}' does not resolve to a single rectangle"
         )
     return {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
 
 
-def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[str, Any],
-                           regions_cfg: dict[str, Any], parser, *,
-                           theme: str, speed: int | float, text: str,
-                           glitch: int | float = 0.0,
-                           default_widget: str | None = None, default_colour: str | None = None,
-                           direction: str = "forward",
-                           config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+def _resolve_runtime_screen(screen_name: str, layout_name: str, layout_cfg: dict[str, Any],
+                            regions_cfg: dict[str, Any], parser, *,
+                            theme: str, speed: int | float, text: str,
+                            glitch: int | float = 0.0,
+                            default_widget: str | None = None, default_color: str | None = None,
+                            direction: str = "forward", density: int | None = None,
+                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     if not isinstance(regions_cfg, dict):
-        parser.error(f"scene '{scene_name}' regions must be a mapping in {_config_label(config_paths)}")
+        parser.error(f"screen '{screen_name}' regions must be a mapping in {_config_label(config_paths)}")
 
     default_images = default_image_paths(config_paths)
     widget_defaults = widget_defaults_catalog(config_paths)
@@ -1031,60 +1237,36 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     seen = []
     areas = []
     image_paths = []
-    scene_direction = _direction_value(direction) or "forward"
+    screen_direction = _direction_value(direction) or "forward"
     for region_name, region_cfg in regions_cfg.items():
         widget = _widget_name(region_cfg)
         if not widget:
-            parser.error(f"scene '{scene_name}' region '{region_name}' has no widget")
+            parser.error(f"screen '{screen_name}' region '{region_name}' has no widget")
         if not _supported_widget(widget):
-            parser.error(f"scene '{scene_name}' uses unsupported widget '{widget}'")
+            parser.error(f"screen '{screen_name}' uses unsupported widget '{widget}'")
         widget_cfg = widget_defaults.get(widget, {})
-        panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, scene_name)
-        rect = _rect_for_panels(layout_cfg, panel_names, parser, scene_name, region_name)
-        area_images = []
-        if widget == "image" and isinstance(region_cfg, dict):
-            area_images = _region_image_paths(region_cfg)
-        if widget == "image" and not area_images:
-            area_images = _region_image_paths(widget_cfg)
-        if widget == "image" and not area_images:
-            area_images = default_images[:]
-        area = {
-            "name": region_name,
-            "mode": widget,
-            "panels": panel_names,
-            "x": rect["x"],
-            "y": rect["y"],
-            "w": rect["w"],
-            "h": rect["h"],
-            "speed": (
-                region_cfg.get("speed")
-                if isinstance(region_cfg, dict) and region_cfg.get("speed") is not None
-                else widget_cfg.get("speed")
-            ),
-            "text": (
-                region_cfg.get("text")
-                if isinstance(region_cfg, dict) and region_cfg.get("text") is not None
-                else widget_cfg.get("text")
-            ),
-            "theme": (
-                region_cfg.get("source_theme")
-                if isinstance(region_cfg, dict) and region_cfg.get("source_theme") is not None
-                else widget_cfg.get("source_theme")
-            ),
-            "colour": _region_colour(region_cfg) or _region_colour(widget_cfg) or default_colour,
-            "direction": _region_direction(region_cfg) or _region_direction(widget_cfg) or scene_direction,
-            "image_paths": area_images,
-            "cycle_widgets": (
-                _region_cycle_widgets(region_cfg) or _region_cycle_widgets(widget_cfg)
-            ) if widget == "cycle" else [],
-            "label": region_cfg.get("label") if isinstance(region_cfg, dict) else None,
-            "unavailable_message": region_cfg.get("unavailable_message") if isinstance(region_cfg, dict) else None,
-            "static_lines": region_cfg.get("static_lines") if isinstance(region_cfg, dict) else None,
-            "static_align": region_cfg.get("static_align") if isinstance(region_cfg, dict) else None,
-        }
+        panel_names = _parse_region_spec(layout_name, layout_cfg, region_name, parser, screen_name)
+        rect = _rect_for_panels(layout_cfg, panel_names, parser, screen_name, region_name)
+        modifiers = _resolve_area_modifiers(
+            widget,
+            region_cfg,
+            widget_cfg,
+            default_color=default_color,
+            screen_density=density,
+            screen_direction=screen_direction,
+            default_images=default_images,
+        )
+        area = _build_area_definition(
+            name=region_name,
+            widget=widget,
+            panels=panel_names,
+            rect=rect,
+            region_cfg=region_cfg,
+            modifiers=modifiers,
+        )
         overlap = set(panel_names) & set(seen)
         if overlap:
-            parser.error(f"scene '{scene_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
+            parser.error(f"screen '{screen_name}' has overlapping panel assignments: {', '.join(sorted(overlap))}")
         seen.extend(panel_names)
         if widget == "image":
             image_paths.extend(area["image_paths"])
@@ -1094,58 +1276,73 @@ def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[s
     if uncovered:
         if not default_widget:
             parser.error(
-                f"scene '{scene_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
+                f"screen '{screen_name}' leaves panels unassigned ({', '.join(sorted(uncovered))}) and no default widget is configured"
             )
         if not _supported_widget(default_widget):
             parser.error(f"default widget '{default_widget}' is unsupported")
         for panel_name in uncovered:
             panel_cfg = panel_map[panel_name]
             widget_cfg = widget_defaults.get(default_widget, {})
-            area_images = _region_image_paths(widget_cfg) if default_widget == "image" else []
-            if default_widget == "image" and not area_images:
-                area_images = default_images[:]
-            areas.append({
-                "name": panel_name,
-                "mode": default_widget,
-                "panels": [panel_name],
-                "x": float(panel_cfg["x"]),
-                "y": float(panel_cfg["y"]),
-                "w": float(panel_cfg["w"]),
-                "h": float(panel_cfg["h"]),
-                "speed": widget_cfg.get("speed"),
-                "text": widget_cfg.get("text"),
-                "theme": widget_cfg.get("source_theme"),
-                "colour": _region_colour(widget_cfg) or default_colour,
-                "direction": _region_direction(widget_cfg) or scene_direction,
-                "image_paths": area_images,
-                "cycle_widgets": _region_cycle_widgets(widget_cfg) if default_widget == "cycle" else [],
-                "label": None,
-                "unavailable_message": None,
-                "static_lines": None,
-                "static_align": None,
-            })
+            modifiers = _resolve_area_modifiers(
+                default_widget,
+                None,
+                widget_cfg,
+                default_color=default_color,
+                screen_density=density,
+                screen_direction=screen_direction,
+                default_images=default_images,
+            )
+            areas.append(_build_area_definition(
+                name=panel_name,
+                widget=default_widget,
+                panels=[panel_name],
+                rect={
+                    "x": float(panel_cfg["x"]),
+                    "y": float(panel_cfg["y"]),
+                    "w": float(panel_cfg["w"]),
+                    "h": float(panel_cfg["h"]),
+                },
+                region_cfg=None,
+                modifiers=modifiers,
+            ))
             if default_widget == "image":
-                image_paths.extend(area_images)
+                image_paths.extend(modifiers["image_paths"])
 
     return {
-        "scene_name": scene_name,
+        "screen_name": screen_name,
         "theme": theme,
         "speed": speed,
+        "density": density,
         "text": text,
         "glitch": max(0.0, float(glitch)),
-        "direction": scene_direction,
+        "direction": screen_direction,
         "layout": layout_name,
         "areas": areas,
         "image_paths": image_paths,
     }
 
 
+def _resolve_runtime_scene(scene_name: str, layout_name: str, layout_cfg: dict[str, Any],
+                           regions_cfg: dict[str, Any], parser, *,
+                           theme: str, speed: int | float, text: str,
+                           glitch: int | float = 0.0,
+                           default_widget: str | None = None, default_color: str | None = None,
+                           direction: str = "forward", density: int | None = None,
+                           config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    return _resolve_runtime_screen(
+        scene_name, layout_name, layout_cfg, regions_cfg, parser,
+        theme=theme, speed=speed, text=text, glitch=glitch,
+        default_widget=default_widget, default_color=default_color, direction=direction, density=density,
+        config_paths=config_paths,
+    )
+
+
 def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser, *,
                            scene_name: str = "<cli>", theme: str = "science",
                            speed: int | float = 50, text: str = "",
                            glitch: int | float = 0.0,
-                           default_widget: str | None = None, default_colour: str | None = None,
-                           direction: str = "forward",
+                           default_widget: str | None = None, default_color: str | None = None,
+                           direction: str = "forward", density: int | None = None,
                            config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
     catalog = load_scene_catalog(config_paths)
     layouts = catalog.get("layouts", {})
@@ -1153,39 +1350,45 @@ def resolve_runtime_layout(layout_name: str, regions_cfg: dict[str, Any], parser
     layout_cfg = layouts.get(canonical_name) if canonical_name is not None else None
     if not isinstance(layout_cfg, dict):
         parser.error(f"unknown layout '{layout_name}'")
-    return _resolve_runtime_scene(
+    return _resolve_runtime_screen(
         scene_name, canonical_name, layout_cfg, regions_cfg, parser,
         theme=theme, speed=speed, text=text, glitch=glitch,
-        default_widget=default_widget, default_colour=default_colour, direction=direction,
+        default_widget=default_widget, default_color=default_color, direction=direction, density=density,
+        config_paths=config_paths,
+    )
+
+
+def resolve_config_screen(screen_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
+    catalog = load_scene_catalog(config_paths)
+    scenes = catalog.get("screens", {})
+    defaults = config_defaults(config_paths)
+
+    if screen_name not in scenes:
+        raise KeyError(screen_name)
+
+    screen_cfg = scenes[screen_name]
+    if not isinstance(screen_cfg, dict):
+        parser.error(f"screen '{screen_name}' must be a mapping in {_config_label(config_paths)}")
+
+    layout_name = screen_cfg.get("layout")
+    regions_cfg = screen_cfg.get("regions", {})
+    resolved = _resolve_screen_runtime_defaults(screen_cfg, defaults)
+    return resolve_runtime_layout(
+        layout_name,
+        regions_cfg,
+        parser,
+        scene_name=screen_name,
+        theme=resolved["theme"],
+        speed=resolved["speed"],
+        density=resolved["density"],
+        text=resolved["text"],
+        glitch=resolved["glitch"],
+        default_widget=resolved["default_widget"],
+        default_color=resolved["default_color"],
+        direction=resolved["direction"],
         config_paths=config_paths,
     )
 
 
 def resolve_config_scene(scene_name: str, parser, config_paths: tuple[str, ...] | None = None) -> dict[str, Any]:
-    catalog = load_scene_catalog(config_paths)
-    scenes = catalog.get("scenes", {})
-    defaults = config_defaults(config_paths)
-
-    if scene_name not in scenes:
-        raise KeyError(scene_name)
-
-    scene_cfg = scenes[scene_name]
-    if not isinstance(scene_cfg, dict):
-        parser.error(f"scene '{scene_name}' must be a mapping in {_config_label(config_paths)}")
-
-    layout_name = scene_cfg.get("layout")
-    regions_cfg = scene_cfg.get("regions", {})
-    return resolve_runtime_layout(
-        layout_name,
-        regions_cfg,
-        parser,
-        scene_name=scene_name,
-        theme=scene_cfg.get("theme", defaults.get("theme", "science")),
-        speed=scene_cfg.get("speed", defaults.get("speed", 50)),
-        text=scene_cfg.get("text", ""),
-        glitch=scene_cfg.get("glitch", defaults.get("glitch", 0.0)),
-        default_widget=defaults.get("widget"),
-        default_colour=_region_colour(scene_cfg) or defaults.get("colour"),
-        direction=_region_direction(scene_cfg) or defaults.get("direction", "forward"),
-        config_paths=config_paths,
-    )
+    return resolve_config_screen(scene_name, parser, config_paths)

@@ -9,24 +9,36 @@ try:
     from .runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from .timing_support import resolve_direction_motion as resolve_shared_direction_motion
     from .widgets_visual_blocks import BlocksWidget
+    from .widgets_visual_crash import CrashWidget
     from .widgets_visual_gauge import GaugeWidget
     from .widgets_visual_matrix import MatrixWidget
+    from .widgets_visual_orbit import OrbitWidget
+    from .widgets_visual_whorl_widget import WhorlWidget
+    from .widgets_visual_rotate import RotateWidget
     from .widgets_visual_scope import ScopeWidget
+    from .widgets_visual_swirl import SpiralWidget
     from .widgets_visual_sweep import SweepWidget
     from .widgets_visual_tunnel import TunnelWidget
+    from .vocab import _build_pools
 except ImportError:
     from runtime_support import COLOUR_PAIR_INDICES, blocks_palette_specs
     from timing_support import resolve_direction_motion as resolve_shared_direction_motion
     from widgets_visual_blocks import BlocksWidget
+    from widgets_visual_crash import CrashWidget
     from widgets_visual_gauge import GaugeWidget
     from widgets_visual_matrix import MatrixWidget
+    from widgets_visual_orbit import OrbitWidget
+    from widgets_visual_whorl_widget import WhorlWidget
+    from widgets_visual_rotate import RotateWidget
     from widgets_visual_scope import ScopeWidget
+    from widgets_visual_swirl import SpiralWidget
     from widgets_visual_sweep import SweepWidget
     from widgets_visual_tunnel import TunnelWidget
+    from vocab import _build_pools
 
 
 class VisualWidgets:
-    VISUAL_MODES = {"bars", "gauge", "matrix", "blocks", "sweep", "tunnel", "scope"}
+    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "orbit", "whorl", "rotate", "spiral", "sweep", "tunnel", "scope"}
 
     def __init__(
         self,
@@ -61,6 +73,15 @@ class VisualWidgets:
             blocks_palette_specs=blocks_palette_specs,
             colour_pair_indices=COLOUR_PAIR_INDICES,
         )
+        self.crash_widget = CrashWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            safe_row_width=safe_row_width,
+            area_theme=area_theme,
+            build_pools=_build_pools,
+            normalize_colour_spec=normalize_colour_spec,
+            colour_attr_from_spec=colour_attr_from_spec,
+        )
         self.gauge_widget = GaugeWidget(
             curses_module=curses_module,
             stdscr=stdscr,
@@ -69,6 +90,30 @@ class VisualWidgets:
             draw_centered_overlay_to_canvas=self.draw_centered_overlay_to_canvas,
         )
         self.matrix_widget = MatrixWidget(curses_module=curses_module, stdscr=stdscr, matrix_chars=matrix_chars)
+        self.orbit_widget = OrbitWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            colour_attr_from_spec=colour_attr_from_spec,
+            normalize_colour_spec=normalize_colour_spec,
+        )
+        self.whorl_widget = WhorlWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            colour_attr_from_spec=colour_attr_from_spec,
+            normalize_colour_spec=normalize_colour_spec,
+        )
+        self.rotate_widget = RotateWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            colour_attr_from_spec=colour_attr_from_spec,
+            normalize_colour_spec=normalize_colour_spec,
+        )
+        self.spiral_widget = SpiralWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            colour_attr_from_spec=colour_attr_from_spec,
+            normalize_colour_spec=normalize_colour_spec,
+        )
         self.scope_widget = ScopeWidget(
             curses_module=curses_module,
             stdscr=stdscr,
@@ -225,6 +270,51 @@ class VisualWidgets:
     def repaint_gauge(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.gauge_widget.render(area, nrows, y, x, width)
 
+    def ensure_crash(self, area: dict, rows: int, width: int):
+        self.crash_widget.ensure(area, rows, width)
+
+    def update_crash(self, area: dict, rows: int, width: int, speed: int):
+        self.crash_widget.update(area, rows, width, speed)
+
+    def repaint_crash(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.crash_widget.render(area, nrows, y, x, width)
+
+    def ensure_rotate(self, area: dict, rows: int, width: int):
+        self.rotate_widget.ensure(area, rows, width)
+
+    def ensure_orbit(self, area: dict, rows: int, width: int):
+        self.orbit_widget.ensure(area, rows, width)
+
+    def ensure_whorl(self, area: dict, rows: int, width: int):
+        self.whorl_widget.ensure(area, rows, width)
+
+    def ensure_spiral(self, area: dict, rows: int, width: int):
+        self.spiral_widget.ensure(area, rows, width)
+
+    def update_rotate(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
+        self.rotate_widget.update(area, rows, width, now, dt, speed)
+
+    def update_orbit(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
+        self.orbit_widget.update(area, rows, width, now, dt, speed)
+
+    def update_whorl(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
+        self.whorl_widget.update(area, rows, width, now, dt, speed)
+
+    def update_spiral(self, area: dict, rows: int, width: int, now: float, dt: float, speed: int):
+        self.spiral_widget.update(area, rows, width, now, dt, speed)
+
+    def repaint_rotate(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.rotate_widget.render(area, nrows, y, x, width)
+
+    def repaint_orbit(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.orbit_widget.render(area, nrows, y, x, width)
+
+    def repaint_whorl(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.whorl_widget.render(area, nrows, y, x, width)
+
+    def repaint_spiral(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.spiral_widget.render(area, nrows, y, x, width)
+
     def ensure_blocks(self, area: dict, rows: int, width: int):
         self.blocks_widget.ensure(area, rows, width)
 
@@ -344,6 +434,16 @@ class VisualWidgets:
                 for _ in range(max(12, min(36, rows * 3))):
                     self.update_blocks(area, rows, width)
                 area["blocks_warmed"] = True
+        elif mode == "crash":
+            self.ensure_crash(area, rows, width)
+        elif mode == "rotate":
+            self.ensure_rotate(area, rows, width)
+        elif mode == "orbit":
+            self.ensure_orbit(area, rows, width)
+        elif mode == "whorl":
+            self.ensure_whorl(area, rows, width)
+        elif mode == "spiral":
+            self.ensure_spiral(area, rows, width)
         elif mode == "sweep":
             self.ensure_sweep(area, rows, width)
         elif mode == "tunnel":
@@ -364,6 +464,16 @@ class VisualWidgets:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.update_bars(area)
+        elif mode == "crash":
+            self.update_crash(area, rows, width, speed)
+        elif mode == "rotate":
+            self.update_rotate(area, rows, width, now, dt, speed)
+        elif mode == "orbit":
+            self.update_orbit(area, rows, width, now, dt, speed)
+        elif mode == "whorl":
+            self.update_whorl(area, rows, width, now, dt, speed)
+        elif mode == "spiral":
+            self.update_spiral(area, rows, width, now, dt, speed)
         elif mode == "gauge":
             self.update_gauge(area, now, dt, speed)
         elif mode == "matrix":
@@ -381,6 +491,16 @@ class VisualWidgets:
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "bars":
             self.repaint_bars(area, rows, y, x, width)
+        elif mode == "crash":
+            self.repaint_crash(area, rows, y, x, width)
+        elif mode == "rotate":
+            self.repaint_rotate(area, rows, y, x, width)
+        elif mode == "orbit":
+            self.repaint_orbit(area, rows, y, x, width)
+        elif mode == "whorl":
+            self.repaint_whorl(area, rows, y, x, width)
+        elif mode == "spiral":
+            self.repaint_spiral(area, rows, y, x, width)
         elif mode == "gauge":
             self.repaint_gauge(area, rows, y, x, width)
         elif mode == "matrix":

@@ -448,6 +448,23 @@ def make_text_state():
     return {"theme": theme, "left": left, "countdown": random.randint(35, 50)}
 
 
+def clamp_density(value: int | None, default: int = 50) -> int:
+    try:
+        number = int(value) if value is not None else int(default)
+    except (TypeError, ValueError):
+        number = default
+    return max(1, min(100, number))
+
+
+def density_scale(value: int | None, *, low: float, mid: float = 1.0, high: float) -> float:
+    density = clamp_density(value)
+    if density <= 50:
+        frac = (density - 1) / 49.0
+        return low + ((mid - low) * frac)
+    frac = (density - 50) / 50.0
+    return mid + ((high - mid) * frac)
+
+
 def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) -> dict:
     area_theme = theme_name or default_theme
     bar_headers, bar_labels = get_bar_config(area_theme)
@@ -460,12 +477,27 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "bars_labels": bar_labels[:],
         "bars_values": [random.uniform(0.08, 0.92) for _ in bar_labels],
         "bars_drift": [random.gauss(0, 0.02) for _ in bar_labels],
+        "crash_lines": [],
+        "crash_phase": 0,
+        "crash_flash_frames": 0,
+        "crash_blank_frames": 0,
+        "crash_invert_frames": 0,
+        "crash_static_frames": 0,
         "scope_vals": [],
         "scope_drift": 0.0,
         "scope_phase": random.uniform(0.0, math.tau),
         "scope_warmed": False,
         "matrix_cols": [],
         "matrix_warmed": False,
+        "orbit_sig": None,
+        "orbit_cells": [],
+        "whorl_sig": None,
+        "whorl_cells": [],
+        "rotate_sig": None,
+        "rotate_cells": [],
+        "rotate_angle": 0.0,
+        "spiral_sig": None,
+        "spiral_cells": [],
         "sweep_warmed": False,
         "cycle_catalog": [],
         "cycle_widgets": [],
@@ -481,23 +513,19 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "direction_next_change": 0.0,
         "direction_motion": 1,
         "direction_motion_prev": 1,
-        "gauge_tick": 0,
-        "gauge_signal": None,
-        "gauge_title": "",
+        "metrics_signal": None,
+        "metrics_title": "",
         "colour_override": None,
-        "gauge_base_reads": [],
-        "gauge_reads": [],
-        "gauge_scroll_title": "",
-        "gauge_spark": [],
-        "gauge_drift": 0.0,
-        "gauge_feed": [],
-        "gauge_hist": [],
-        "gauge_arrows": [],
-        "gauge_last_values": [],
-        "gauge_next_reads_at": 0.0,
-        "gauge_next_feed_at": 0.0,
-        "gauge_count": 0,
-        "gauge_prime_idx": 0,
+        "metrics_base_reads": [],
+        "metrics_reads": [],
+        "metrics_spark": [],
+        "metrics_drift": 0.0,
+        "metrics_hist": [],
+        "metrics_arrows": [],
+        "metrics_last_values": [],
+        "metrics_next_reads_at": 0.0,
+        "metrics_count": 0,
+        "metrics_prime_idx": 0,
         "blocks_bg": random.choice([1, 3, 7]),
         "blocks_cells": [],
         "blocks_warmed": False,
@@ -537,6 +565,7 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "configured_speed": 0,
         "current_speed": 0,
         "theme_override": theme_name,
+        "density_override": None,
         "text_override": None,
         "direction_override": None,
         "unavailable_message": None,

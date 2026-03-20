@@ -8,9 +8,9 @@ import subprocess
 import textwrap
 
 try:
-    from .runtime_support import multi_palette_specs
+    from .runtime_support import density_scale, multi_palette_specs
 except ImportError:
-    from runtime_support import multi_palette_specs
+    from runtime_support import density_scale, multi_palette_specs
 
 
 class ImageWidgets:
@@ -173,7 +173,8 @@ class ImageWidgets:
         return tuple("".join("1" if cell else "0" for cell in row) for row in cells)
 
     def seed_life(self, area: dict, rows: int, width: int, sig=None):
-        density = 0.22 if rows * width <= 1200 else 0.16
+        default_density = 0.22 if rows * width <= 1200 else 0.16
+        density = density_scale(area.get("density_override"), low=0.046, mid=default_density, high=0.60)
         cells = []
         ages = []
         for _ in range(rows):
@@ -192,7 +193,7 @@ class ImageWidgets:
         area["life_hashes"] = collections.deque([self.life_hash(cells)], maxlen=8)
 
     def ensure_life(self, area: dict, rows: int, width: int):
-        sig = (rows, width)
+        sig = (rows, width, area.get("density_override"))
         if area["life_sig"] == sig:
             return
         self.seed_life(area, rows, width, sig=sig)

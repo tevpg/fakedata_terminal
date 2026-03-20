@@ -1,4 +1,4 @@
-"""Metrics, sparkline, and readout widget helpers for FakeData Terminal."""
+"""Shared telemetry-driven helpers for sparkline and readout widgets."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ import random
 
 try:
     from .runtime_support import multi_palette_specs
-    from .timing_support import feed_scroll_interval, read_refresh_interval, schedule_next
+    from .timing_support import read_refresh_interval, schedule_next
 except ImportError:
     from runtime_support import multi_palette_specs
-    from timing_support import feed_scroll_interval, read_refresh_interval, schedule_next
+    from timing_support import read_refresh_interval, schedule_next
 
 
 class MetricsWidgets:
-    GAUGE_MODES = {"gauges", "sparkline", "readouts"}
+    METRICS_MODES = {"sparkline", "readouts"}
 
     def __init__(
         self,
@@ -22,7 +22,6 @@ class MetricsWidgets:
         stdscr,
         safe_row_width,
         area_theme,
-        new_area_text_entry,
         inject_text_getter,
         get_gauge_config,
         normalize_colour_spec,
@@ -33,7 +32,6 @@ class MetricsWidgets:
         self.stdscr = stdscr
         self.safe_row_width = safe_row_width
         self.area_theme = area_theme
-        self.new_area_text_entry = new_area_text_entry
         self.inject_text_getter = inject_text_getter
         self.get_gauge_config = get_gauge_config
         self.normalize_colour_spec = normalize_colour_spec
@@ -79,7 +77,7 @@ class MetricsWidgets:
                 pass
 
     @staticmethod
-    def gauge_parse_num(s: str):
+    def parse_metric_num(s: str):
         try:
             return float(s.replace(",", "").replace("+", ""))
         except (ValueError, TypeError):
@@ -109,71 +107,68 @@ class MetricsWidgets:
         return fillers.get(theme_name, default_rows)
 
     def next_prime_value(self, area: dict) -> str:
-        idx = area["gauge_prime_idx"] % len(self.prime_values)
+        idx = area["metrics_prime_idx"] % len(self.prime_values)
         value = self.prime_values[idx]
-        area["gauge_prime_idx"] = (idx + 1) % len(self.prime_values)
+        area["metrics_prime_idx"] = (idx + 1) % len(self.prime_values)
         return value
 
     def refresh_readout_rows(self, area: dict, rows: int):
         target_lines = self.readout_line_capacity(rows)
         if target_lines <= 1:
-            area["gauge_reads"] = [("COUNT", lambda area=area: str(area["gauge_count"]), "")]
+            area["metrics_reads"] = [("COUNT", lambda area=area: str(area["metrics_count"]), "")]
             return
         fillers = self.readout_filler_rows(self.area_theme(area))
-        data_lines = list(area["gauge_base_reads"][:max(0, target_lines - 2)])
+        data_lines = list(area["metrics_base_reads"][:max(0, target_lines - 2)])
         fill_idx = 0
         while len(data_lines) < max(0, target_lines - 2):
             data_lines.append(fillers[fill_idx % len(fillers)])
             fill_idx += 1
         data_lines.append(("PRIME", lambda area=area: self.next_prime_value(area), ""))
-        data_lines.append(("COUNT", lambda area=area: str(area["gauge_count"]), ""))
-        area["gauge_reads"] = data_lines
+        data_lines.append(("COUNT", lambda area=area: str(area["metrics_count"]), ""))
+        area["metrics_reads"] = data_lines
 
-    def sync_gauge_vectors(self, area: dict):
-        count = len(area["gauge_reads"])
-        if len(area["gauge_hist"]) != count:
-            area["gauge_hist"] = [[0.0] * 4 for _ in area["gauge_reads"]]
-        if len(area["gauge_arrows"]) != count:
-            area["gauge_arrows"] = ["─" for _ in area["gauge_reads"]]
-        if len(area["gauge_last_values"]) != count:
-            vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
-            area["gauge_last_values"] = vals
+    def sync_metric_vectors(self, area: dict):
+        count = len(area["metrics_reads"])
+        if len(area["metrics_hist"]) != count:
+            area["metrics_hist"] = [[0.0] * 4 for _ in area["metrics_reads"]]
+        if len(area["metrics_arrows"]) != count:
+            area["metrics_arrows"] = ["─" for _ in area["metrics_reads"]]
+        if len(area["metrics_last_values"]) != count:
+            vals = [val_fn() for _, val_fn, _ in area["metrics_reads"]]
+            area["metrics_last_values"] = vals
             for i, val_str in enumerate(vals):
-                num = self.gauge_parse_num(val_str)
+                num = self.parse_metric_num(val_str)
                 if num is not None:
-                    area["gauge_hist"][i] = [num]
+                    area["metrics_hist"][i] = [num]
 
-    def ensure_gauges(self, area: dict, rows: int, width: int, role: str, mode: str, now: float):
+    def ensure_metrics_state(self, area: dict, rows: int, width: int, role: str, mode: str, now: float):
         cfg = self.get_gauge_config(self.area_theme(area))
-        area["gauge_title"], area["gauge_signal"], area["gauge_base_reads"], area["gauge_scroll_title"] = cfg
-        area["gauge_reads"] = area["gauge_base_reads"]
+        area["metrics_title"], area["metrics_signal"], area["metrics_base_reads"], _unused_scroll_title = cfg
+        area["metrics_reads"] = area["metrics_base_reads"]
         if mode == "readouts":
             self.refresh_readout_rows(area, rows)
-        had_last_values = bool(area["gauge_last_values"])
-        if not area["gauge_spark"]:
-            area["gauge_spark"] = [0.5]
+        had_last_values = bool(area["metrics_last_values"])
+        if not area["metrics_spark"]:
+            area["metrics_spark"] = [0.5]
             for _ in range(max(7, width - 1)):
-                area["gauge_spark"].append(self.next_gauge_spark(area))
-        self.sync_gauge_vectors(area)
-        if not had_last_values or area["gauge_next_reads_at"] <= 0.0:
+                area["metrics_spark"].append(self.next_metrics_spark(area))
+        self.sync_metric_vectors(area)
+        if not had_last_values or area["metrics_next_reads_at"] <= 0.0:
             interval = read_refresh_interval(mode, role, self.area_theme(area))
-            area["gauge_next_reads_at"] = (now + interval) if interval is not None else 0.0
-        if mode == "gauges" and area["gauge_next_feed_at"] <= 0.0:
-            interval = feed_scroll_interval(mode)
-            area["gauge_next_feed_at"] = (now + interval) if interval is not None else 0.0
-        while len(area["gauge_feed"]) < rows:
-            area["gauge_feed"].append(self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role))
-        while len(area["gauge_feed"]) > rows:
-            area["gauge_feed"].pop(0)
+            area["metrics_next_reads_at"] = (now + interval) if interval is not None else 0.0
 
-    def next_gauge_spark(self, area: dict):
-        if not callable(area["gauge_signal"]):
-            area["gauge_title"], area["gauge_signal"], area["gauge_reads"], area["gauge_scroll_title"] = self.get_gauge_config(self.area_theme(area))
-        self.sync_gauge_vectors(area)
-        prev = area["gauge_spark"][-1] if area["gauge_spark"] else 0.5
-        raw = area["gauge_signal"]()
+    def next_metrics_spark(self, area: dict):
+        if not callable(area["metrics_signal"]):
+            title, signal, base_reads, _unused_scroll_title = self.get_gauge_config(self.area_theme(area))
+            area["metrics_title"] = title
+            area["metrics_signal"] = signal
+            area["metrics_base_reads"] = base_reads
+            area["metrics_reads"] = base_reads
+        self.sync_metric_vectors(area)
+        prev = area["metrics_spark"][-1] if area["metrics_spark"] else 0.5
+        raw = area["metrics_signal"]()
         target = 0.14 + raw * 0.72
-        drift = area["gauge_drift"]
+        drift = area["metrics_drift"]
         drift += (target - prev) * 0.30
         drift += random.gauss(0, 0.04)
         drift *= 0.82
@@ -194,18 +189,8 @@ class MetricsWidgets:
         elif nxt > 0.99:
             nxt = 0.99 - (nxt - 0.99) * 0.40
             drift = -abs(drift) * 0.62 - random.uniform(0.01, 0.04)
-        area["gauge_drift"] = drift
+        area["metrics_drift"] = drift
         return max(0.01, min(0.99, nxt))
-
-    @staticmethod
-    def gauge_rows(area: dict, rows: int):
-        spark_rows = max(4, rows * 30 // 100)
-        reads_rows = max(4, len(area["gauge_reads"]) + 2)
-        div1 = spark_rows
-        reads_start = div1 + 1
-        div2 = reads_start + reads_rows
-        feed_start = div2 + 1
-        return spark_rows, div1, reads_start, div2, feed_start
 
     def draw_divider(self, y: int, row: int, x: int, width: int, label, cp=3, attr=None):
         inner = f"[ {label} ]"
@@ -222,78 +207,13 @@ class MetricsWidgets:
         except self.curses.error:
             pass
 
-    def repaint_gauges(self, area: dict, rows: int, y: int, x: int, width: int):
-        spark_rows, div1, reads_start, div2, feed_start = self.gauge_rows(area, rows)
-        spark_chars = " ▁▂▃▄▅▆▇█"
-        vals = area["gauge_spark"][-width:] if len(area["gauge_spark"]) >= width else area["gauge_spark"]
-        for r in range(spark_rows):
-            safe_w = self.safe_row_width(y, r, x, width)
-            if safe_w <= 0:
-                continue
-            chars = []
-            for v in vals:
-                bar_h = int(v * spark_rows)
-                row_from_bottom = spark_rows - 1 - r
-                if bar_h == 0:
-                    chars.append(" ")
-                elif row_from_bottom < bar_h - 1:
-                    chars.append("█")
-                elif row_from_bottom == bar_h - 1:
-                    frac = (v * spark_rows) - int(v * spark_rows)
-                    chars.append(spark_chars[max(1, int(frac * 8))])
-                else:
-                    chars.append(" ")
-            cp = 3 if r / max(1, spark_rows - 1) < 0.25 else (5 if r / max(1, spark_rows - 1) > 0.75 else 6)
-            try:
-                self.stdscr.addnstr(y + r, x, "".join(chars)[:safe_w].ljust(safe_w), safe_w, self.curses.color_pair(cp))
-            except self.curses.error:
-                pass
-        self.draw_divider(y, div1, x, width, area["gauge_title"])
-        for i, (label, val_fn, unit) in enumerate(area["gauge_reads"]):
-            row = reads_start + i
-            if row >= min(rows, div2):
-                break
-            val_str = area["gauge_last_values"][i] if i < len(area["gauge_last_values"]) else val_fn()
-            arrow = area["gauge_arrows"][i] if i < len(area["gauge_arrows"]) else " "
-            line = f" {label[:10]:<10s} {val_str:>8s} {unit[:8]:<8s} {arrow}"
-            safe_w = self.safe_row_width(y, row, x, width)
-            if safe_w <= 0:
-                continue
-            try:
-                self.stdscr.addnstr(y + row, x, line[:safe_w].ljust(safe_w), safe_w, self.curses.color_pair(2))
-            except self.curses.error:
-                pass
-        if div2 < rows:
-            self.draw_divider(y, div2, x, width, area["gauge_scroll_title"])
-        blank = " " * width
-        for r in range(feed_start, rows):
-            idx = r - feed_start
-            if idx >= len(area["gauge_feed"]):
-                break
-            txt, attr, vis = area["gauge_feed"][idx]
-            safe_w = self.safe_row_width(y, r, x, width)
-            if safe_w <= 0:
-                continue
-            try:
-                self.stdscr.addnstr(y + r, x, blank, safe_w, self.curses.color_pair(1))
-            except self.curses.error:
-                pass
-            if not txt:
-                continue
-            try:
-                draw_w = max(0, min(vis, safe_w))
-                if draw_w:
-                    self.stdscr.addnstr(y + r, x, txt[:draw_w].ljust(draw_w), draw_w, attr)
-            except self.curses.error:
-                pass
-
     def repaint_sparkline(self, area: dict, rows: int, y: int, x: int, width: int):
         spark_chars = " ▁▂▃▄▅▆▇█"
         motion = area.get("direction_motion", 1)
-        if len(area["gauge_spark"]) >= width:
-            vals = area["gauge_spark"][:width] if motion < 0 else area["gauge_spark"][-width:]
+        if len(area["metrics_spark"]) >= width:
+            vals = area["metrics_spark"][:width] if motion < 0 else area["metrics_spark"][-width:]
         else:
-            vals = area["gauge_spark"]
+            vals = area["metrics_spark"]
         for r in range(rows):
             safe_w = self.safe_row_width(y, r, x, width)
             if safe_w <= 0:
@@ -322,7 +242,7 @@ class MetricsWidgets:
 
     def repaint_readouts(self, area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width
-        title = area["gauge_title"]
+        title = area["metrics_title"]
         use_title = self.readout_use_title(rows)
         colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
         multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-normal")
@@ -331,7 +251,7 @@ class MetricsWidgets:
             for spec in multi_specs
         ]
         single_attr = self.colour_attr_from_spec(self.curses, colour_spec, default="white")
-        data_rows = min(len(area["gauge_reads"]), max(1, rows - (1 if use_title else 0)))
+        data_rows = min(len(area["metrics_reads"]), max(1, rows - (1 if use_title else 0)))
         content_rows = min(rows, data_rows + (1 if use_title else 0))
         top_pad = max(0, (rows - content_rows) // 2)
         start_row = top_pad + (2 if use_title else 0)
@@ -345,15 +265,15 @@ class MetricsWidgets:
         if use_title:
             title_attr = multi_attrs[0] if colour_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"} and multi_attrs else single_attr
             self.draw_divider(y, top_pad, x, width, title, attr=title_attr | self.curses.A_DIM)
-        for i, (label, val_fn, unit) in enumerate(area["gauge_reads"]):
+        for i, (label, val_fn, unit) in enumerate(area["metrics_reads"]):
             row = start_row + i
             if row >= rows:
                 break
             if label == "COUNT":
-                val_str = str(area["gauge_count"])
+                val_str = str(area["metrics_count"])
             else:
-                val_str = area["gauge_last_values"][i] if i < len(area["gauge_last_values"]) else val_fn()
-            arrow = " " if label in {"COUNT", "PRIME"} else (area["gauge_arrows"][i] if i < len(area["gauge_arrows"]) else " ")
+                val_str = area["metrics_last_values"][i] if i < len(area["metrics_last_values"]) else val_fn()
+            arrow = " " if label in {"COUNT", "PRIME"} else (area["metrics_arrows"][i] if i < len(area["metrics_arrows"]) else " ")
             line = (" " * block_pad) + f"{label[:10]:<10s} {val_str:>8s} {unit[:8]:<8s} {arrow}"
             safe_w = self.safe_row_width(y, row, x, width)
             if safe_w <= 0:
@@ -369,84 +289,71 @@ class MetricsWidgets:
                 pass
 
     def handles_mode(self, mode: str) -> bool:
-        return mode in self.GAUGE_MODES
+        return mode in self.METRICS_MODES
 
     def ensure(self, area: dict, rows: int, width: int, role: str, now: float | None = None) -> None:
         now = 0.0 if now is None else now
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
-        if mode in self.GAUGE_MODES:
-            self.ensure_gauges(area, rows, width, role, mode, now)
+        if mode in self.METRICS_MODES:
+            self.ensure_metrics_state(area, rows, width, role, mode, now)
             if area.get("text_override"):
                 if mode == "readouts":
-                    area["gauge_title"] = area["text_override"]
-                else:
-                    area["gauge_scroll_title"] = area["text_override"]
+                    area["metrics_title"] = area["text_override"]
 
     def update(self, area: dict, rows: int, width: int, role: str, now: float, dt: float, *,
                resolved_direction_motion, stabilize_direction_history) -> None:
         del dt
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
-        if mode not in self.GAUGE_MODES:
+        if mode not in self.METRICS_MODES:
             return
         if mode == "sparkline":
             motion = resolved_direction_motion(area, now)
             if motion != 0:
-                stabilize_direction_history(area, width, motion, "gauge_spark")
-                sample = self.next_gauge_spark(area)
+                stabilize_direction_history(area, width, motion, "metrics_spark")
+                sample = self.next_metrics_spark(area)
                 if motion < 0:
-                    area["gauge_spark"].insert(0, sample)
+                    area["metrics_spark"].insert(0, sample)
                 else:
-                    area["gauge_spark"].append(sample)
-                if len(area["gauge_spark"]) > width + 20:
+                    area["metrics_spark"].append(sample)
+                if len(area["metrics_spark"]) > width + 20:
                     if motion < 0:
-                        area["gauge_spark"].pop()
+                        area["metrics_spark"].pop()
                     else:
-                        area["gauge_spark"].pop(0)
+                        area["metrics_spark"].pop(0)
                 area["direction_motion_prev"] = motion
         else:
-            area["gauge_spark"].append(self.next_gauge_spark(area))
-            if len(area["gauge_spark"]) > width + 20:
-                area["gauge_spark"].pop(0)
-        if area["gauge_next_reads_at"] > 0.0 and now >= area["gauge_next_reads_at"]:
-            vals = [val_fn() for _, val_fn, _ in area["gauge_reads"]]
+            area["metrics_spark"].append(self.next_metrics_spark(area))
+            if len(area["metrics_spark"]) > width + 20:
+                area["metrics_spark"].pop(0)
+        if area["metrics_next_reads_at"] > 0.0 and now >= area["metrics_next_reads_at"]:
+            vals = [val_fn() for _, val_fn, _ in area["metrics_reads"]]
             for i, val_str in enumerate(vals):
-                label = area["gauge_reads"][i][0] if i < len(area["gauge_reads"]) else ""
+                label = area["metrics_reads"][i][0] if i < len(area["metrics_reads"]) else ""
                 if label in {"COUNT", "PRIME"}:
                     continue
-                num = self.gauge_parse_num(val_str)
+                num = self.parse_metric_num(val_str)
                 if num is None:
                     continue
-                hist = area["gauge_hist"][i]
+                hist = area["metrics_hist"][i]
                 prev_num = hist[-1] if hist else None
                 if prev_num is not None:
                     eps = max(0.005, 0.005 * max(1.0, abs(prev_num)))
                     if num > prev_num + eps:
-                        area["gauge_arrows"][i] = "▲"
+                        area["metrics_arrows"][i] = "▲"
                     elif num < prev_num - eps:
-                        area["gauge_arrows"][i] = "▼"
+                        area["metrics_arrows"][i] = "▼"
                 hist.append(num)
                 if len(hist) > 4:
                     hist.pop(0)
-            area["gauge_last_values"] = vals
+            area["metrics_last_values"] = vals
             interval = read_refresh_interval(mode, role, self.area_theme(area))
             if interval is not None:
-                area["gauge_next_reads_at"] = schedule_next(area["gauge_next_reads_at"], now, interval)
-        area["gauge_tick"] += 1
-        if mode == "gauges" and area["gauge_next_feed_at"] > 0.0 and now >= area["gauge_next_feed_at"]:
-            area["gauge_feed"].pop(0)
-            area["gauge_feed"].append(
-                self.new_area_text_entry("text", width, {"text": area["feed_text"], "theme_override": self.area_theme(area)}, role)
-            )
-            interval = feed_scroll_interval(mode)
-            if interval is not None:
-                area["gauge_next_feed_at"] = schedule_next(area["gauge_next_feed_at"], now, interval)
+                area["metrics_next_reads_at"] = schedule_next(area["metrics_next_reads_at"], now, interval)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         del role
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
-        if mode == "gauges":
-            self.repaint_gauges(area, rows, y, x, width)
-        elif mode == "sparkline":
+        if mode == "sparkline":
             self.repaint_sparkline(area, rows, y, x, width)
         elif mode == "readouts":
             self.repaint_readouts(area, rows, y, x, width)
