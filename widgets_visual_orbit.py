@@ -28,6 +28,7 @@ class OrbitWidget:
     REFERENCE_RADIUS_NORM = 0.34
     REFERENCE_SPEED = 50
     BASE_REFERENCE_ANGULAR_RATE = 1.15
+    MIN_EFFECTIVE_SPEED = 20
     SOFTENING_RADIUS_ABS = 1.2
     SPEED_JITTER = 0.10
     INITIAL_RADIUS_MIN_NORM = 0.12
@@ -110,7 +111,12 @@ class OrbitWidget:
 
     def time_scale(self, speed: int) -> float:
         reference_rate = max(0.001, gauge_radians_per_second(self.REFERENCE_SPEED, widget="orbit"))
-        return gauge_radians_per_second(speed, widget="orbit") / reference_rate
+        min_rate = gauge_radians_per_second(self.MIN_EFFECTIVE_SPEED, widget="orbit")
+        max_rate = gauge_radians_per_second(100, widget="orbit") * 3.0
+        clamped_speed = max(1.0, min(100.0, float(speed)))
+        progress = (clamped_speed - 1.0) / 99.0
+        effective_rate = min_rate + (progress * (max_rate - min_rate))
+        return effective_rate / reference_rate
 
     def build_cell(
         self,
@@ -282,14 +288,14 @@ class OrbitWidget:
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int) -> None:
         self.ensure(area, rows, width)
-        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "green"
-        multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-normal")
+        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "multi-bright"
+        multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-bright")
         palette = [
             self.colour_attr_from_spec(self.curses, spec, default=spec, bold=True)
             for spec in multi_specs
         ]
         if not palette:
-            palette = [self.colour_attr_from_spec(self.curses, "green", default="green", bold=True)]
+            palette = [self.colour_attr_from_spec(self.curses, "bright-cyan", default="bright-cyan", bold=True)]
 
         blank_attr = self.curses.color_pair(1)
         for row in range(rows):

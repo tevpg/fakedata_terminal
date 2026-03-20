@@ -93,7 +93,9 @@ widgets:
   orbit:
     enabled: true
     supports: [speed, density, color, direction]
-    defaults: {}
+    defaults:
+      color: multi-bright
+      density: 10
     timing:
       # Shared scheduler cadence for force-integrated orbital motion.
       # density controls seeded glyph count.
