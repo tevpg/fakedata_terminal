@@ -398,7 +398,7 @@ Important detail:
 Planning note:
 
 - remove the concept of a configured default layout
-- a default layout is only useful for the special case of running `fakedata_terminal` with no arguments
+- a default layout is only useful for the special case of running `python3 -m fakedata_terminal` with no arguments
 - that no-args case should be handled by a short usage/inventory message instead of implicit layout selection
 
 ## Modifier Precedence by Area
@@ -446,18 +446,18 @@ Structural rule:
 
 ### No-args behavior
 
-Running `fakedata_terminal` with no arguments should print a short orientation message rather than trying to infer a default layout or default screen.
+Running `python3 -m fakedata_terminal` with no arguments should print a short orientation message rather than trying to infer a default layout or default screen.
 
 Target output:
 
 ```text
-fakedata_terminal creates text screens of fake data displays for cinema backgrounds
+python3 -m fakedata_terminal creates text screens of fake data displays for cinema backgrounds
 
-fakedata_terminal --screens to see prebuilt screens
-fakedata_terminal --widgets to see available widgets
-fakedata_terminal --layouts to see available layouts
-fakedata_terminal --list to list inventory of choices
-fakedata_terminal --help for help
+python3 -m fakedata_terminal --screens to see prebuilt screens
+python3 -m fakedata_terminal --widgets to see available widgets
+python3 -m fakedata_terminal --layouts to see available layouts
+python3 -m fakedata_terminal --list to list inventory of choices
+python3 -m fakedata_terminal --help for help
 ```
 
 ## CLI Naming Review

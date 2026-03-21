@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import io
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 import yaml
 
 from cli_config import prepare_runtime_config
+import fakedata_terminal
 from fakedata_terminal import _export_screen_definition
 
 
@@ -23,15 +27,6 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         capture_output=True,
     )
-
-
-def extract_exported_yaml(report: str) -> str:
-    marker = "\n\nscreens:\n"
-    _, separator, tail = report.partition(marker)
-    if not separator:
-        raise AssertionError("export report did not contain a YAML screens block")
-    yaml_body, _, _ = tail.partition("\n\nHere is the command line command")
-    return f"screens:\n{yaml_body}\n"
 
 
 class StartupValidationTests(unittest.TestCase):
@@ -241,9 +236,7 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        self.assertIn("The YAML below will recreate the current screen exactly.", exported)
-        self.assertIn("Here is the command line command that will recreate the most recent scene as it was at exit:", exported)
-        parsed = yaml.safe_load(extract_exported_yaml(exported))
+        parsed = yaml.safe_load(exported["yaml"])
         screens = parsed["screens"]
         self.assertEqual(len(screens), 1)
         screen_body = next(iter(screens.values()))
@@ -269,7 +262,7 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        parsed = yaml.safe_load(extract_exported_yaml(exported))
+        parsed = yaml.safe_load(exported["yaml"])
         screen_body = next(iter(parsed["screens"].values()))
         self.assertEqual(screen_body["regions"]["P1"]["density"], 50)
         self.assertEqual(screen_body["regions"]["P2"]["density"], 50)
@@ -296,12 +289,12 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        parsed = yaml.safe_load(extract_exported_yaml(exported))
+        parsed = yaml.safe_load(exported["yaml"])
         self.assertEqual(len(parsed["screens"]), 1)
-        self.assertIn("python3 -m fakedata_terminal \\", exported)
-        self.assertIn("--screen-layout 2x2 \\", exported)
-        self.assertIn("--region-widget P1=text", exported)
-        self.assertIn("--region-widget P4=matrix", exported)
+        self.assertIn("python3 -m fakedata_terminal \\", exported["command"])
+        self.assertIn("--screen-layout 2x2 \\", exported["command"])
+        self.assertIn("--region-widget P1=text", exported["command"])
+        self.assertIn("--region-widget P4=matrix", exported["command"])
 
     def test_exported_screen_report_marks_cli_limitations(self) -> None:
         runtime = prepare_runtime_config(
@@ -325,8 +318,8 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        self.assertIn("Here is the closest command line command", exported)
-        self.assertIn("P1 cycle.widgets", exported)
+        self.assertIn("Closest command line recreation only", exported["command"])
+        self.assertIn("P1 cycle.widgets", exported["command"])
 
     def test_exported_screen_report_omits_default_cycle_widgets(self) -> None:
         runtime = prepare_runtime_config(
@@ -348,12 +341,12 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        parsed = yaml.safe_load(extract_exported_yaml(exported))
+        parsed = yaml.safe_load(exported["yaml"])
         screen_body = next(iter(parsed["screens"].values()))
         self.assertNotIn("cycle", screen_body["regions"]["P1"])
-        self.assertIn("default cycle list", exported)
-        self.assertNotIn("P1 cycle.widgets", exported)
-        self.assertIn("--region-widget P1=cycle", exported)
+        self.assertIn("default cycle list", exported["command"])
+        self.assertNotIn("P1 cycle.widgets", exported["command"])
+        self.assertIn("--region-widget P1=cycle", exported["command"])
 
     def test_exported_screen_report_shortens_data_image_paths_in_cli(self) -> None:
         exported = _export_screen_definition(
@@ -382,8 +375,73 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: 55,
         )
         self.assertIsNotNone(exported)
-        self.assertIn("--region-image P1=geom_33_torus.png", exported)
-        self.assertNotIn("--region-image P1=data/geom_33_torus.png", exported)
+        self.assertIn("--region-image P1=geom_33_torus.png", exported["command"])
+        self.assertNotIn("--region-image P1=data/geom_33_torus.png", exported["command"])
+
+    def test_save_screen_flags_default_to_stdout_when_present_without_file(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=text",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=gauge",
+                "--region-widget", "P4=matrix",
+                "--save-screen-yaml",
+                "--save-screen-command",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        self.assertEqual(runtime["save_screen_yaml"], "-")
+        self.assertEqual(runtime["save_screen_command"], "-")
+
+    def test_save_screen_flags_accept_output_paths(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=text",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=gauge",
+                "--region-widget", "P4=matrix",
+                "--save-screen-yaml", "saved.yaml",
+                "--save-screen-command", "saved.sh",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        self.assertEqual(runtime["save_screen_yaml"], "saved.yaml")
+        self.assertEqual(runtime["save_screen_command"], "saved.sh")
+
+    def test_run_only_writes_requested_exit_artifacts(self) -> None:
+        export_payload = {
+            "yaml": "screens:\n  sample:\n    layout: 2x2\n",
+            "command": "python3 -m fakedata_terminal --screen-layout 2x2\n",
+        }
+        with tempfile.NamedTemporaryFile("r+", suffix=".yaml", delete=False) as yaml_handle:
+            yaml_path = yaml_handle.name
+        try:
+            with mock.patch.object(fakedata_terminal.curses, "wrapper", return_value=export_payload):
+                stdout_buffer = io.StringIO()
+                with redirect_stdout(stdout_buffer):
+                    result = fakedata_terminal.run(
+                        [
+                            "--screen-layout", "2x2",
+                            "--region-widget", "P1=text",
+                            "--region-widget", "P2=blank",
+                            "--region-widget", "P3=gauge",
+                            "--region-widget", "P4=matrix",
+                            "--save-screen-yaml", yaml_path,
+                        ]
+                    )
+            self.assertEqual(result, 0)
+            self.assertNotIn("screens:\n  sample", stdout_buffer.getvalue())
+            self.assertNotIn("python3 -m fakedata_terminal --screen-layout 2x2", stdout_buffer.getvalue())
+            self.assertIn("terminated.", stdout_buffer.getvalue())
+            self.assertEqual(Path(yaml_path).read_text(encoding="utf-8"), export_payload["yaml"])
+        finally:
+            Path(yaml_path).unlink(missing_ok=True)
 
     def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
         runtime = prepare_runtime_config(

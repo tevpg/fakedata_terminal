@@ -1,5 +1,5 @@
 # Starter config sketch for a layout/region/screen driven version of
-# fakedata-terminal.py.
+# python3 -m fakedata_terminal.
 #
 # Design rules captured here:
 # - layouts define panel geometry

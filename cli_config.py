@@ -51,6 +51,7 @@ except ImportError:
 
 
 DEFAULT_THEME = "science"
+CANONICAL_PROG = "python3 -m fakedata_terminal"
 THEME_CHOICES = [
     "hacker", "science", "medicine", "pharmacy", "finance",
     "space", "military", "navigation", "spaceteam",
@@ -72,6 +73,7 @@ def _layout_choices(config_paths: tuple[str, ...] | None = None) -> list[str]:
 
 def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog=CANONICAL_PROG,
         description=(
             "FakeData Terminal — cinematic terminal data display. "
             "Load the packaged config, then local overlays, then apply CLI overrides. "
@@ -165,6 +167,12 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
     parser.add_argument(
         "--exit", type=float, default=None, metavar="N",
         help="Exit automatically after approximately N seconds.")
+    parser.add_argument(
+        "--save-screen-yaml", dest="save_screen_yaml", nargs="?", const="-", default=None, metavar="FILE",
+        help="On exit, save the resolved screen YAML. Prints to stdout if FILE is omitted; appends to FILE if provided.")
+    parser.add_argument(
+        "--save-screen-command", dest="save_screen_command", nargs="?", const="-", default=None, metavar="FILE",
+        help="On exit, save the CLI command that recreates the resolved screen. Prints to stdout if FILE is omitted; appends to FILE if provided.")
     return parser
 
 
@@ -177,14 +185,14 @@ def _print_layouts(config_paths: tuple[str, ...] | None = None) -> None:
     print(format_layout_diagrams(config_paths))
 
 
-def _print_no_args_message() -> None:
-    print("fakedata_terminal creates text screens of fake data displays for cinema backgrounds")
+def _print_no_args_message(script_name: str) -> None:
+    print(f"{script_name} creates text screens of fake data displays for cinema backgrounds")
     print()
-    print("fakedata_terminal --screens to see prebuilt screens")
-    print("fakedata_terminal --widgets to see available widgets")
-    print("fakedata_terminal --layouts to see available layouts")
-    print("fakedata_terminal --list to list inventory of choices")
-    print("fakedata_terminal --help for help")
+    print(f"{script_name} --screens to see prebuilt screens")
+    print(f"{script_name} --widgets to see available widgets")
+    print(f"{script_name} --layouts to see available layouts")
+    print(f"{script_name} --list to list inventory of choices")
+    print(f"{script_name} --help for help")
 
 def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     return widget_names(config_paths)
@@ -999,6 +1007,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
     config_paths = _resolve_config_paths(raw_argv)
     set_widget_config_paths(config_paths)
     parser = _build_parser(config_paths)
+    script_name = parser.prog
 
     args = parser.parse_args(raw_argv)
 
@@ -1016,7 +1025,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         raise SystemExit(0)
 
     if not raw_argv:
-        _print_no_args_message()
+        _print_no_args_message(script_name)
         raise SystemExit(0)
 
     glitch_explicit = any(a == "--screen-glitch" or a.startswith("--screen-glitch=") for a in raw_argv)
@@ -1191,6 +1200,8 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "screen_showcase": widget_showcase,
         "glitch_interval": runtime_glitch if not (args.widgets or args.screens) else max(0.0, args.screen_glitch if glitch_explicit and args.screen_glitch is not None else 0.0),
         "exit_after": args.exit,
+        "save_screen_yaml": args.save_screen_yaml,
+        "save_screen_command": args.save_screen_command,
         "image_paths": image_sources,
         "configured_defaults": configured_defaults,
         "default_colour": runtime_default_colour,

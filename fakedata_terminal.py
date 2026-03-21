@@ -233,7 +233,7 @@ def _uses_default_cycle_widgets(area: dict) -> bool:
     return bool(area.get("cycle_widgets")) and sources.get("cycle") == "widget_default"
 
 
-def _build_cli_recreation_command(config_screen: dict, effective_regions: list[dict]) -> tuple[str, list[str]]:
+def _build_cli_recreation_command(config_screen: dict, effective_regions: list[dict]) -> tuple[str, list[str], list[str]]:
     command_parts = [
         "python3",
         "-m",
@@ -288,41 +288,27 @@ def _build_cli_recreation_command(config_screen: dict, effective_regions: list[d
     return _format_shell_command(command_parts), sorted(set(unsupported)), default_cycle_regions
 
 
-def _build_export_report(screen_name: str, yaml_text: str, cli_command: str, cli_limitations: list[str],
-                         default_cycle_regions: list[str]) -> str:
-    parts = [
-        (
-            "The YAML below will recreate the current screen exactly. "
-            "If you want to keep it, add it to `data/screens.yaml` or your own local YAML file, "
-            "consider renaming the screen, and then run it later with `--screen <screenname>`. "
-            "If you save it in a separate file, add `--config /path/to/that.yaml` when you run it."
-        ),
-        "",
-        yaml_text.rstrip("\n"),
-        "",
-    ]
+def _build_cli_export_text(cli_command: str, cli_limitations: list[str], default_cycle_regions: list[str]) -> str:
+    parts: list[str] = []
     if default_cycle_regions:
         regions = ", ".join(default_cycle_regions)
-        parts.extend([
-            f"Note: cycle widgets for {regions} are using the default cycle list, so that list is omitted from both the YAML and the CLI export.",
-            "",
-        ])
+        parts.append(
+            f"# Note: cycle widgets for {regions} are using the default cycle list, so that list is omitted here."
+        )
     if cli_limitations:
-        parts.extend([
-            (
-                "Here is the closest command line command for the most recent scene as it was at exit. "
-                "It recreates the layout, widgets, and CLI-expressible modifiers, but the current CLI cannot encode: "
-                + ", ".join(cli_limitations)
-                + "."
-            ),
-            cli_command,
-        ])
-    else:
-        parts.extend([
-            "Here is the command line command that will recreate the most recent scene as it was at exit:",
-            cli_command,
-        ])
+        parts.append(
+            "# Closest command line recreation only; the current CLI cannot encode: "
+            + ", ".join(cli_limitations)
+            + "."
+        )
+    parts.append(cli_command)
     return "\n".join(parts) + "\n"
+
+
+def _append_text_file(path: str, content: str) -> None:
+    with open(path, "a", encoding="utf-8") as handle:
+        if content:
+            handle.write(content if content.endswith("\n") else f"{content}\n")
 
 
 def _escape_export_text_modifier(value):
@@ -387,7 +373,7 @@ def _pick_factored_scene_value(scene_key: str, region_key: str, region_values: l
 
 
 def _export_screen_definition(config_screen: dict, area_states: dict[str, dict], current_base_speed: int,
-                              current_speed_for_area) -> str | None:
+                              current_speed_for_area) -> dict[str, str] | None:
     if not config_screen:
         return None
 
@@ -539,9 +525,14 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
 
     export_doc = {"screens": {screen_name: screen_body}}
     dumped = yaml.safe_dump(export_doc, sort_keys=False, allow_unicode=False)
-    annotated = _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
+    yaml_text = _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
     cli_command, cli_limitations, default_cycle_regions = _build_cli_recreation_command(config_screen, effective_regions)
-    return _build_export_report(screen_name, annotated, cli_command, cli_limitations, default_cycle_regions)
+    cli_text = _build_cli_export_text(cli_command, cli_limitations, default_cycle_regions)
+    return {
+        "screen_name": screen_name,
+        "yaml": yaml_text,
+        "command": cli_text,
+    }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -1368,13 +1359,15 @@ def run(argv=None) -> int:
     _screen_showcase_state = config["screen_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
     EXIT_AFTER = config["exit_after"]
+    save_screen_yaml = config["save_screen_yaml"]
+    save_screen_command = config["save_screen_command"]
 
     GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
 
     while True:
-        exported_scene_yaml = None
+        exported_screen = None
         try:
-            exported_scene_yaml = curses.wrapper(main)
+            exported_screen = curses.wrapper(main)
             break
         except KeyboardInterrupt:
             break
@@ -1395,8 +1388,15 @@ def run(argv=None) -> int:
                 raise
             time.sleep(0.05)
     print(f"\n[{SCRIPT_NAME}] terminated.")
-    if exported_scene_yaml:
-        print(exported_scene_yaml, end="" if exported_scene_yaml.endswith("\n") else "\n")
+    if exported_screen:
+        if save_screen_yaml == "-":
+            print(exported_screen["yaml"], end="" if exported_screen["yaml"].endswith("\n") else "\n")
+        elif save_screen_yaml:
+            _append_text_file(save_screen_yaml, exported_screen["yaml"])
+        if save_screen_command == "-":
+            print(exported_screen["command"], end="" if exported_screen["command"].endswith("\n") else "\n")
+        elif save_screen_command:
+            _append_text_file(save_screen_command, exported_screen["command"])
     return 0
 
 

@@ -29,13 +29,13 @@ On Windows, the app attempts to install `windows-curses` automatically if it is 
 
 ## Running
 
-This repository does not include packaging metadata, so the most direct entrypoint is the source file:
+This repository does not include packaging metadata, so the most direct stable entrypoint is the module:
 
 ```bash
-python3 fakedata_terminal.py --list
-python3 fakedata_terminal.py --screen science
-python3 fakedata_terminal.py --layouts
-python3 fakedata_terminal.py --screen-layout 2x2 --default-widget tunnel
+python3 -m fakedata_terminal --list
+python3 -m fakedata_terminal --screen science
+python3 -m fakedata_terminal --layouts
+python3 -m fakedata_terminal --screen-layout 2x2 --default-widget tunnel
 ```
 
 If you want image widgets, install the extra dependencies first:
@@ -50,13 +50,13 @@ python3 -m pip install PyYAML Pillow
 List available screens, layouts, and widgets:
 
 ```bash
-python3 fakedata_terminal.py --list
+python3 -m fakedata_terminal --list
 ```
 
 Show layout diagrams:
 
 ```bash
-python3 fakedata_terminal.py --layouts
+python3 -m fakedata_terminal --layouts
 ```
 
 `--layouts` renders geometry-driven ASCII previews. Panels with the same configured width or height consume the same number of preview columns or rows.
@@ -64,21 +64,21 @@ python3 fakedata_terminal.py --layouts
 Run a preset screen:
 
 ```bash
-python3 fakedata_terminal.py --screen science
-python3 fakedata_terminal.py --screen clocks
+python3 -m fakedata_terminal --screen science
+python3 -m fakedata_terminal --screen clocks
 ```
 
 Browse the widget showcase:
 
 ```bash
-python3 fakedata_terminal.py --widgets
-python3 fakedata_terminal.py --screens
+python3 -m fakedata_terminal --widgets
+python3 -m fakedata_terminal --screens
 ```
 
 Build a screen manually:
 
 ```bash
-  python3 fakedata_terminal.py \
+  python3 -m fakedata_terminal \
   --screen-layout 2x2 \
   --region-widget P1=life \
   --region-widget P2=gauge \
@@ -89,7 +89,7 @@ Build a screen manually:
 Override per-region behavior:
 
 ```bash
-  python3 fakedata_terminal.py \
+  python3 -m fakedata_terminal \
   --screen test1 \
   --region-widget P4=matrix \
   --region-speed P4=80 \
@@ -100,7 +100,7 @@ Override per-region behavior:
 Run an image panel:
 
 ```bash
-  python3 fakedata_terminal.py \
+  python3 -m fakedata_terminal \
   --screen-layout 3x2 \
   --region-widget P3+P4=image \
   --region-widget P5=gauge \
@@ -111,7 +111,7 @@ Run an image panel:
 Set defaults for unassigned panels:
 
 ```bash
-python3 fakedata_terminal.py \
+python3 -m fakedata_terminal \
   --screen-layout 3x3 \
   --default-widget cycle \
   --default-colour cyan \
@@ -124,7 +124,7 @@ If no arguments are provided, the program prints a short orientation message ins
 Enable periodic glitch effects:
 
 ```bash
-python3 fakedata_terminal.py --screen science --screen-glitch 5
+python3 -m fakedata_terminal --screen science --screen-glitch 5
 ```
 
 `glitch` can also be set in config at `defaults.glitch` or `screens.<name>.glitch`. An explicit `--screen-glitch` overrides config.
@@ -207,12 +207,12 @@ Supported widget-default keys are:
 These pieces fit together in a specific order:
 
 - `Panel`: a single rectangular tile in a layout, usually named `P1`, `P2`, and so on.
-- `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 fakedata_terminal.py --layouts` to inspect the available layouts and region names.
+- `Layout`: the panel geometry for the whole screen. Layouts define panel positions and optional named region aliases. Use `python3 -m fakedata_terminal --layouts` to inspect the available layouts and region names.
 - `Region`: a rectangular area made of one or more contiguous panels. A region is referenced either by its component panel ids such as `P2` or `P1+P2+P3`, or by an alias defined in the layout such as `L`, `R`, `C`, or `L2`. Each region is assigned exactly one widget.
-- `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `gauge`, `image`, `sweep`, or `cycle`. Use `python3 fakedata_terminal.py --list` to see the available widget names.
+- `Widget`: the renderer/behavior assigned to a region, such as `text`, `matrix`, `gauge`, `image`, `sweep`, or `cycle`. Use `python3 -m fakedata_terminal --list` to see the available widget names.
 - `Region attributes`: options attached to one region assignment, such as `speed`, `text`, `theme`, `colour`, `image`, and `cycle`. `color` is also accepted as an alias.
 - `Widget defaults`: fallback attributes for all uses of a widget type, defined under top-level `widgets:`.
-- `Screen`: a named screen configuration. A screen picks one layout, assigns widgets to regions in that layout, and can also supply screen-wide theme/speed/text plus per-region attributes. Use `python3 fakedata_terminal.py --screen NAME` to run one, `python3 fakedata_terminal.py --list` to list them, `python3 fakedata_terminal.py --screens` to browse just the configured screen pages, and `python3 fakedata_terminal.py --widgets` to browse the widget showcase.
+- `Screen`: a named screen configuration. A screen picks one layout, assigns widgets to regions in that layout, and can also supply screen-wide theme/speed/text plus per-region attributes. Use `python3 -m fakedata_terminal --screen NAME` to run one, `python3 -m fakedata_terminal --list` to list them, `python3 -m fakedata_terminal --screens` to browse just the configured screen pages, and `python3 -m fakedata_terminal --widgets` to browse the widget showcase.
 
 In short:
 
@@ -255,7 +255,7 @@ Within the merged config, area attributes resolve in this order:
 
 ## Notes
 
-- Running `python3 fakedata_terminal.py` with no arguments prints the short orientation message and exits.
+- Running `python3 -m fakedata_terminal` with no arguments prints the short orientation message and exits.
 - Image mode fails fast if `Pillow` or `jp2a` is unavailable.
 - Startup validation runs before rendering and catches unsupported widgets, invalid resolved modifier/widget combinations, duplicate `cycle.widgets` entries, unreadable images, and missing image dependencies.
 - `--config PATH` is repeatable and can add site, user, or project-specific overlays.
