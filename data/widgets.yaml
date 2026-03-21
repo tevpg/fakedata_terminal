@@ -323,6 +323,16 @@ widgets:
         sidebar_interval_seconds: 0.45
         pharmacy_sidebar_interval_seconds: 0.80
 
+  title_card:
+    enabled: true
+    supports: [text, color]
+    defaults:
+      color: bright-green
+    timing:
+      cadence_factor: 0.0
+    behavior:
+      static: true
+
   image:
     enabled: true
     supports: [speed, image]

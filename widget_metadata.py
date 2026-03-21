@@ -27,7 +27,7 @@ KNOWN_MODIFIERS = {"speed", "density", "theme", "text", "color", "direction", "i
 PUBLIC_WIDGETS = {
     "text", "text_wide", "text_scant", "text_spew", "image", "life",
     "bars", "crash", "gauge", "matrix", "orbit", "rotate", "scope", "blocks", "spiral", "sweep", "tunnel", "whorl",
-    "sparkline", "readouts", "blank", "cycle",
+    "sparkline", "readouts", "blank", "cycle", "title_card",
 }
 ALL_WIDGETS = PUBLIC_WIDGETS
 

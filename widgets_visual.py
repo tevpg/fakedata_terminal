@@ -18,6 +18,7 @@ try:
     from .widgets_visual_scope import ScopeWidget
     from .widgets_visual_swirl import SpiralWidget
     from .widgets_visual_sweep import SweepWidget
+    from .widgets_visual_title_card import TitleCardWidget
     from .widgets_visual_tunnel import TunnelWidget
     from .vocab import _build_pools
 except ImportError:
@@ -33,12 +34,13 @@ except ImportError:
     from widgets_visual_scope import ScopeWidget
     from widgets_visual_swirl import SpiralWidget
     from widgets_visual_sweep import SweepWidget
+    from widgets_visual_title_card import TitleCardWidget
     from widgets_visual_tunnel import TunnelWidget
     from vocab import _build_pools
 
 
 class VisualWidgets:
-    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "orbit", "whorl", "rotate", "spiral", "sweep", "tunnel", "scope"}
+    VISUAL_MODES = {"bars", "crash", "gauge", "matrix", "blocks", "orbit", "whorl", "rotate", "spiral", "sweep", "title_card", "tunnel", "scope"}
 
     def __init__(
         self,
@@ -124,6 +126,12 @@ class VisualWidgets:
             resolved_direction_motion=self.resolved_direction_motion,
         )
         self.sweep_widget = SweepWidget(curses_module=curses_module, stdscr=stdscr, sweep_symbols=sweep_symbols)
+        self.title_card_widget = TitleCardWidget(
+            curses_module=curses_module,
+            stdscr=stdscr,
+            colour_attr_from_spec=colour_attr_from_spec,
+            normalize_colour_spec=normalize_colour_spec,
+        )
         self.tunnel_widget = TunnelWidget(
             curses_module=curses_module,
             normalize_colour_spec=normalize_colour_spec,
@@ -415,6 +423,12 @@ class VisualWidgets:
         del role
         self.sweep_widget.render(area, nrows, y, x, width)
 
+    def update_title_card(self, area: dict, rows: int, width: int):
+        self.title_card_widget.update(area, rows, width)
+
+    def repaint_title_card(self, area: dict, nrows: int, y: int, x: int, width: int):
+        self.title_card_widget.render(area, nrows, y, x, width)
+
     def update_tunnel(self, area: dict, rows: int, width: int, now: float):
         self.tunnel_widget.update(area, rows, width, now)
 
@@ -448,6 +462,8 @@ class VisualWidgets:
             self.ensure_sweep(area, rows, width)
         elif mode == "tunnel":
             self.ensure_tunnel(area, rows, width)
+        elif mode == "title_card":
+            pass
         elif mode == "scope" and not area["scope_warmed"]:
             for _ in range(max(24, width + 24)):
                 self.update_scope(area, width, now)
@@ -482,6 +498,8 @@ class VisualWidgets:
             self.update_blocks(area, rows, width)
         elif mode == "sweep":
             self.update_sweep(area, rows, width, role)
+        elif mode == "title_card":
+            self.update_title_card(area, rows, width)
         elif mode == "tunnel":
             self.update_tunnel(area, rows, width, now)
         elif mode == "scope":
@@ -509,6 +527,8 @@ class VisualWidgets:
             self.repaint_blocks(area, rows, y, x, width)
         elif mode == "sweep":
             self.repaint_sweep(area, rows, y, x, width, role)
+        elif mode == "title_card":
+            self.repaint_title_card(area, rows, y, x, width)
         elif mode == "tunnel":
             self.repaint_tunnel(area, rows, y, x, width)
         elif mode == "scope":

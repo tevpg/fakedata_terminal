@@ -152,6 +152,7 @@ class StartupValidationTests(unittest.TestCase):
         self.assertIn("orbit", result.stdout)
         self.assertIn("rotate", result.stdout)
         self.assertIn("spiral", result.stdout)
+        self.assertIn("title_card", result.stdout)
 
     def test_crash_widget_resolves_with_metadata_default_colour(self) -> None:
         runtime = prepare_runtime_config(
@@ -323,6 +324,43 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(areas["P1"]["mode"], "spiral")
         self.assertEqual(areas["P1"]["direction"], "backward")
         self.assertEqual(areas["P1"]["colour"], "bright-blue")
+
+    def test_title_card_widget_resolves_with_text_and_colour(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=title_card",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-text", "P1=ALERT",
+                "--region-colour", "P1=multi",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["mode"], "title_card")
+        self.assertEqual(areas["P1"]["text"], "ALERT")
+        self.assertEqual(areas["P1"]["colour"], "multi-bright")
+
+    def test_title_card_widget_defaults_to_bright_green(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=title_card",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-text", "P1=ALERT",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["colour"], "bright-green")
 
     def test_layouts_succeeds(self) -> None:
         result = run_cli("--layouts")

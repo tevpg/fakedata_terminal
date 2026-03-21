@@ -2,6 +2,7 @@
 
 import argparse
 import glob
+import importlib.util
 import math
 import os
 import re
@@ -189,6 +190,8 @@ def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[
 
 
 def _widget_unavailable_reason(widget: str, image_paths: list[str], image_module, image_checker) -> str | None:
+    if widget == "title_card" and importlib.util.find_spec("pyfiglet") is None:
+        return "pyfiglet not installed"
     if widget != "image":
         return None
     if not image_paths:
@@ -210,6 +213,8 @@ def _validate_resolved_screen(runtime_screen: dict, parser, *, image_module, ima
             parser.error(f"resolved screen references unsupported widget '{widget}' in area '{area.get('name', '?')}'")
         if widget and not widget_enabled(widget, config_paths):
             parser.error(f"resolved screen references disabled widget '{widget}' in area '{area.get('name', '?')}'")
+        if widget == "title_card" and importlib.util.find_spec("pyfiglet") is None:
+            parser.error("title_card widgets require pyfiglet to be available before rendering starts")
 
         if not area.get("allow_inert_modifiers"):
             supported = set(widget_supports(widget, config_paths))
@@ -413,6 +418,12 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
             "Stacked telemetry readout lines.",
             "",
             *modifier_lines,
+        ],
+        "title_card": [
+            "Centered fitted title text in a large block font.",
+            "",
+            *modifier_lines,
+            "bare multi uses the bright palette for per-glyph colour selection.",
         ],
         "orbit": [
             "Physics-based glyph orbits around the region centre.",
