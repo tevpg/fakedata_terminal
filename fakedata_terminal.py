@@ -43,7 +43,10 @@ except ImportError:
 
 SCRIPT_NAME = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else os.path.basename(__file__)
 CONFIG_SCREEN = None
+IGNORE_KEYBOARD = False
 _screen_showcase_state = {"active": False, "screens": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
+ESC_EXIT_COUNT = 3
+ESC_EXIT_WINDOW_SECONDS = 1.0
 
 try:
     from .cli_config import prepare_runtime_config
@@ -537,7 +540,7 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(stdscr):
-    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCREEN, _screen_showcase_state, EXIT_AFTER
+    global MAIN_MODE, SIDEBAR_MODE, THEME_ARG, CONFIG_SCREEN, _screen_showcase_state, EXIT_AFTER, IGNORE_KEYBOARD
     try:
         curses.curs_set(0)
     except curses.error:
@@ -1133,6 +1136,7 @@ def main(stdscr):
     _glitch_r0 = _glitch_c0 = _glitch_rh = _glitch_cw = 0
     _paused = False
     _paused_at = 0.0
+    esc_sequence_times: list[float] = []
     _exit_at = start_now + EXIT_AFTER if EXIT_AFTER is not None else float("inf")
     _last_loop_now = start_now
 
@@ -1273,6 +1277,21 @@ def main(stdscr):
         stdscr.refresh()
 
         key = stdscr.getch()
+        if IGNORE_KEYBOARD:
+            if key == 27:
+                esc_sequence_times.append(time.monotonic())
+                cutoff = esc_sequence_times[-1] - ESC_EXIT_WINDOW_SECONDS
+                esc_sequence_times = [timestamp for timestamp in esc_sequence_times if timestamp >= cutoff]
+                if len(esc_sequence_times) >= ESC_EXIT_COUNT:
+                    if CONFIG_SCREEN and not _demo_state["active"] and not _screen_showcase_state["active"]:
+                        return _export_screen_definition(
+                            CONFIG_SCREEN,
+                            area_states,
+                            current_base_speed,
+                            _current_speed_for_area,
+                        )
+                    break
+            continue
         if key in (ord('q'), ord('Q'), 27):
             if CONFIG_SCREEN and not _demo_state["active"] and not _screen_showcase_state["active"]:
                 return _export_screen_definition(
@@ -1336,6 +1355,7 @@ def run(argv=None) -> int:
     global IMAGE_PATHS, SPEED_ARG, MAIN_SPEED_ARG, SIDEBAR_SPEED_ARG
     global LIFE_MAX_ITERATIONS, INJECT_TEXT, MAIN_MODE, _ALL_THEMES
     global THEME_ARG, SIDEBAR_MODE, _demo_state, GLITCH_INTERVAL, CONFIG_SCREEN, _screen_showcase_state, EXIT_AFTER
+    global IGNORE_KEYBOARD
 
     config = prepare_runtime_config(
         argv=argv,
@@ -1359,10 +1379,15 @@ def run(argv=None) -> int:
     _screen_showcase_state = config["screen_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
     EXIT_AFTER = config["exit_after"]
+    IGNORE_KEYBOARD = config["ignore_keyboard"]
     save_screen_yaml = config["save_screen_yaml"]
     save_screen_command = config["save_screen_command"]
 
     GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
+
+    if IGNORE_KEYBOARD:
+        print("\n\nPerformance mode: press/hold Esc to exit\n\n", end="", flush=True)
+        time.sleep(2.0)
 
     while True:
         exported_screen = None

@@ -168,6 +168,10 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
         "--exit", type=float, default=None, metavar="N",
         help="Exit automatically after approximately N seconds.")
     parser.add_argument(
+        "--ignore-keyboard", "--performance", dest="ignore_keyboard", action="store_true",
+        help=("Ignore runtime keyboard controls. Ctrl-C still exits, and pressing Esc three times "
+              "within one second also exits."))
+    parser.add_argument(
         "--save-screen-yaml", dest="save_screen_yaml", nargs="?", const="-", default=None, metavar="FILE",
         help="On exit, save the resolved screen YAML. Prints to stdout if FILE is omitted; appends to FILE if provided.")
     parser.add_argument(
@@ -1200,6 +1204,7 @@ def prepare_runtime_config(argv, image_module, image_checker, demo_scenes):
         "screen_showcase": widget_showcase,
         "glitch_interval": runtime_glitch if not (args.widgets or args.screens) else max(0.0, args.screen_glitch if glitch_explicit and args.screen_glitch is not None else 0.0),
         "exit_after": args.exit,
+        "ignore_keyboard": args.ignore_keyboard,
         "save_screen_yaml": args.save_screen_yaml,
         "save_screen_command": args.save_screen_command,
         "image_paths": image_sources,

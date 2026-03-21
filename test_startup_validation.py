@@ -414,6 +414,38 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(runtime["save_screen_yaml"], "saved.yaml")
         self.assertEqual(runtime["save_screen_command"], "saved.sh")
 
+    def test_ignore_keyboard_flag_enables_runtime_keyboard_lock(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=text",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=gauge",
+                "--region-widget", "P4=matrix",
+                "--ignore-keyboard",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        self.assertTrue(runtime["ignore_keyboard"])
+
+    def test_performance_flag_alias_enables_runtime_keyboard_lock(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=text",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=gauge",
+                "--region-widget", "P4=matrix",
+                "--performance",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        self.assertTrue(runtime["ignore_keyboard"])
+
     def test_run_only_writes_requested_exit_artifacts(self) -> None:
         export_payload = {
             "yaml": "screens:\n  sample:\n    layout: 2x2\n",
@@ -442,6 +474,25 @@ class StartupValidationTests(unittest.TestCase):
             self.assertEqual(Path(yaml_path).read_text(encoding="utf-8"), export_payload["yaml"])
         finally:
             Path(yaml_path).unlink(missing_ok=True)
+
+    def test_run_shows_performance_mode_warning_before_startup(self) -> None:
+        with mock.patch.object(fakedata_terminal.time, "sleep") as mock_sleep:
+            with mock.patch.object(fakedata_terminal.curses, "wrapper", return_value=None):
+                stdout_buffer = io.StringIO()
+                with redirect_stdout(stdout_buffer):
+                    result = fakedata_terminal.run(
+                        [
+                            "--screen-layout", "2x2",
+                            "--region-widget", "P1=text",
+                            "--region-widget", "P2=blank",
+                            "--region-widget", "P3=gauge",
+                            "--region-widget", "P4=matrix",
+                            "--performance",
+                        ]
+                    )
+        self.assertEqual(result, 0)
+        self.assertIn("\n\nPerformance mode: press/hold Esc to exit\n\n", stdout_buffer.getvalue())
+        mock_sleep.assert_any_call(2.0)
 
     def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
         runtime = prepare_runtime_config(

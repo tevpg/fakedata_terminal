@@ -136,6 +136,7 @@ During runtime:
 - `q` or `Ctrl-C` quits
 - `Space` pauses
 - `+` and `-` adjust speed live
+- `--ignore-keyboard` disables runtime key controls for filming use; `Ctrl-C` still exits, and pressing `Esc` three times within one second also exits
 
 ## Configuration Model
 
