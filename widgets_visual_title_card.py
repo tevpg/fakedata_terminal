@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 
 try:
@@ -15,7 +16,7 @@ except ImportError:
     from runtime_support import multi_palette_specs
 
 
-PYFIGLET_FONTS = ("banner", "big", "standard", "small")
+PYFIGLET_FONTS = ("big", "standard", "small")
 
 
 class TitleCardWidget:
@@ -31,7 +32,7 @@ class TitleCardWidget:
             return None, None
         if clamped <= 50:
             progress = (clamped - 2) / 48.0
-            max_on = 24.0
+            max_on = 14.5
             min_on = 0.5
             on_seconds = max_on * ((min_on / max_on) ** max(0.0, min(1.0, progress)))
             return on_seconds, 0.5
@@ -84,6 +85,87 @@ class TitleCardWidget:
             return 0, 0
         return len(lines), max((len(line) for line in lines), default=0)
 
+    @staticmethod
+    def _chunk_long_word(word: str, max_chars: int) -> list[str]:
+        if max_chars <= 0:
+            return [word]
+        return [word[index:index + max_chars] for index in range(0, len(word), max_chars)] or [""]
+
+    def _balanced_wrap_words(self, words: list[str], max_chars: int) -> list[str]:
+        if not words:
+            return [""]
+        max_chars = max(1, max_chars)
+        expanded: list[str] = []
+        for word in words:
+            if len(word) <= max_chars:
+                expanded.append(word)
+            else:
+                expanded.extend(self._chunk_long_word(word, max_chars))
+        words = expanded
+        count = len(words)
+        costs = [0.0] * (count + 1)
+        breaks = [count] * count
+        costs[count] = 0.0
+        for start in range(count - 1, -1, -1):
+            line_len = 0
+            best_cost = math.inf
+            best_end = start + 1
+            for end in range(start, count):
+                piece = words[end]
+                line_len += len(piece) if end == start else len(piece) + 1
+                if line_len > max_chars:
+                    break
+                remaining = count - (end + 1)
+                slack = max_chars - line_len
+                raggedness = 0.0 if remaining == 0 else float(slack * slack)
+                total_cost = raggedness + costs[end + 1]
+                if total_cost < best_cost:
+                    best_cost = total_cost
+                    best_end = end + 1
+            costs[start] = best_cost
+            breaks[start] = best_end
+        lines: list[str] = []
+        index = 0
+        while index < count:
+            next_index = breaks[index]
+            lines.append(" ".join(words[index:next_index]))
+            index = next_index
+        return lines
+
+    def _plain_text_lines(self, text: str, width: int, *, truncate: bool) -> list[str]:
+        paragraphs = text.splitlines() or [text]
+        lines: list[str] = []
+        max_chars = max(1, width)
+        for paragraph_index, paragraph in enumerate(paragraphs):
+            words = paragraph.split()
+            if not words:
+                lines.append("")
+            else:
+                lines.extend(self._balanced_wrap_words(words, max_chars))
+            if paragraph_index != len(paragraphs) - 1:
+                lines.append("")
+        if truncate:
+            return [line[:max_chars] for line in lines]
+        return lines
+
+    def _estimated_chars_per_line(self, font_name: str, width: int) -> int:
+        sample = "MMMMMMMM"
+        sample_lines = self._render_pyfiglet_lines(sample, font_name)
+        _rows, sample_width = self._rendered_size(sample_lines)
+        avg_width = max(1.0, sample_width / max(1, len(sample)))
+        return max(1, int(width / avg_width))
+
+    def _render_wrapped_pyfiglet(self, text: str, font_name: str, width: int) -> list[str]:
+        max_chars = self._estimated_chars_per_line(font_name, width)
+        source_lines = self._plain_text_lines(text, max_chars, truncate=False)
+        rendered: list[str] = []
+        for line_index, source_line in enumerate(source_lines):
+            figlet_lines = self._render_pyfiglet_lines(source_line or " ", font_name)
+            rendered.extend(figlet_lines)
+            if line_index != len(source_lines) - 1:
+                rendered.append("")
+        return [line.rstrip() for line in rendered]
+
     def _render_pyfiglet_lines(self, text: str, font_name: str) -> list[str]:
         if pyfiglet is None:
             return []
@@ -95,7 +177,7 @@ class TitleCardWidget:
         fitting: list[tuple[int, int, int, list[str]]] = []
         for font_name in PYFIGLET_FONTS:
             try:
-                candidate = self._render_pyfiglet_lines(text, font_name)
+                candidate = self._render_wrapped_pyfiglet(text, font_name, width)
             except Exception:
                 continue
             render_rows, render_width = self._rendered_size(candidate)
@@ -106,12 +188,18 @@ class TitleCardWidget:
             return fitting[0][3]
         for font_name in reversed(PYFIGLET_FONTS):
             try:
-                candidate = self._render_pyfiglet_lines(text, font_name)
-                if candidate:
+                candidate = self._render_wrapped_pyfiglet(text, font_name, width)
+                render_rows, render_width = self._rendered_size(candidate)
+                if candidate and render_rows <= rows and render_width <= width:
                     return candidate
             except Exception:
                 continue
-        return []
+        plain_lines = self._plain_text_lines(text, width, truncate=False)
+        render_rows, render_width = self._rendered_size(plain_lines)
+        if render_rows <= rows and render_width <= width:
+            return plain_lines
+        truncated = self._plain_text_lines(text, width, truncate=True)
+        return truncated[:rows]
 
     def _palette(self, colour_spec: str) -> list[int]:
         multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-bright")
