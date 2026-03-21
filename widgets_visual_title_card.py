@@ -15,7 +15,7 @@ except ImportError:
     from runtime_support import multi_palette_specs
 
 
-PYFIGLET_FONTS = ("block", "banner", "lean", "standard", "small")
+PYFIGLET_FONTS = ("banner", "big", "standard", "small")
 
 
 class TitleCardWidget:
@@ -25,8 +25,47 @@ class TitleCardWidget:
         self.colour_attr_from_spec = colour_attr_from_spec
         self.normalize_colour_spec = normalize_colour_spec
 
-    def update(self, area: dict, rows: int, width: int) -> None:
-        del area, rows, width
+    def blink_durations(self, speed: int) -> tuple[float | None, float | None]:
+        clamped = max(1, min(100, int(speed)))
+        if clamped <= 1:
+            return None, None
+        if clamped <= 50:
+            progress = (clamped - 2) / 48.0
+            max_on = 24.0
+            min_on = 0.5
+            on_seconds = max_on * ((min_on / max_on) ** max(0.0, min(1.0, progress)))
+            return on_seconds, 0.5
+        progress = (clamped - 51) / 49.0
+        duration = 0.5 + ((0.05 - 0.5) * max(0.0, min(1.0, progress)))
+        return duration, duration
+
+    def update(self, area: dict, now: float, speed: int) -> None:
+        on_seconds, off_seconds = self.blink_durations(speed)
+        if on_seconds is None or off_seconds is None:
+            area[self.state_key("lit")] = True
+            area[self.state_key("next_toggle")] = None
+            return
+        lit = area.get(self.state_key("lit"))
+        next_toggle = area.get(self.state_key("next_toggle"))
+        if lit is None or next_toggle is None:
+            area[self.state_key("lit")] = True
+            area[self.state_key("next_toggle")] = now + on_seconds
+            return
+        lit = bool(lit)
+        next_toggle = float(next_toggle)
+        transitioned_on = False
+        while now >= next_toggle:
+            lit = not lit
+            if lit:
+                next_toggle += on_seconds
+                transitioned_on = True
+            else:
+                next_toggle += off_seconds
+        area[self.state_key("lit")] = lit
+        area[self.state_key("next_toggle")] = next_toggle
+        if transitioned_on:
+            area.pop(self.state_key("render_sig"), None)
+            area.pop(self.state_key("attrs"), None)
 
     @staticmethod
     def state_key(suffix: str) -> str:
@@ -116,6 +155,9 @@ class TitleCardWidget:
                 self.stdscr.addnstr(y + row, x, blank, width, blank_attr)
             except self.curses.error:
                 pass
+
+        if not area.get(self.state_key("lit"), True):
+            return
 
         text = self._resolved_text(area)
         if not text:

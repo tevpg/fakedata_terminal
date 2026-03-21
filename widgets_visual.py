@@ -423,8 +423,8 @@ class VisualWidgets:
         del role
         self.sweep_widget.render(area, nrows, y, x, width)
 
-    def update_title_card(self, area: dict, rows: int, width: int):
-        self.title_card_widget.update(area, rows, width)
+    def update_title_card(self, area: dict, now: float, speed: int):
+        self.title_card_widget.update(area, now, speed)
 
     def repaint_title_card(self, area: dict, nrows: int, y: int, x: int, width: int):
         self.title_card_widget.render(area, nrows, y, x, width)
@@ -499,7 +499,7 @@ class VisualWidgets:
         elif mode == "sweep":
             self.update_sweep(area, rows, width, role)
         elif mode == "title_card":
-            self.update_title_card(area, rows, width)
+            self.update_title_card(area, now, speed)
         elif mode == "tunnel":
             self.update_tunnel(area, rows, width, now)
         elif mode == "scope":

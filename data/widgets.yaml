@@ -325,13 +325,11 @@ widgets:
 
   title_card:
     enabled: true
-    supports: [text, color]
+    supports: [speed, text, color]
     defaults:
       color: bright-green
     timing:
-      cadence_factor: 0.0
-    behavior:
-      static: true
+      cadence_factor: 1.0
 
   image:
     enabled: true

@@ -362,6 +362,24 @@ class StartupValidationTests(unittest.TestCase):
         areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
         self.assertEqual(areas["P1"]["colour"], "bright-green")
 
+    def test_title_card_widget_resolves_with_speed(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=title_card",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-text", "P1=ALERT",
+                "--region-speed", "P1=50",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["speed"], 50)
+
     def test_layouts_succeeds(self) -> None:
         result = run_cli("--layouts")
         self.assertEqual(result.returncode, 0)
