@@ -25,6 +25,15 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def extract_exported_yaml(report: str) -> str:
+    marker = "\n\nscreens:\n"
+    _, separator, tail = report.partition(marker)
+    if not separator:
+        raise AssertionError("export report did not contain a YAML screens block")
+    yaml_body, _, _ = tail.partition("\n\nHere is the command line command")
+    return f"screens:\n{yaml_body}\n"
+
+
 class StartupValidationTests(unittest.TestCase):
     def test_speed_precedence_widget_defaults_region_and_cli(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
@@ -232,7 +241,9 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        parsed = yaml.safe_load(exported)
+        self.assertIn("The YAML below will recreate the current screen exactly.", exported)
+        self.assertIn("Here is the command line command that will recreate the most recent scene as it was at exit:", exported)
+        parsed = yaml.safe_load(extract_exported_yaml(exported))
         screens = parsed["screens"]
         self.assertEqual(len(screens), 1)
         screen_body = next(iter(screens.values()))
@@ -258,12 +269,121 @@ class StartupValidationTests(unittest.TestCase):
             current_speed_for_area=lambda _state, _role: runtime["speed"],
         )
         self.assertIsNotNone(exported)
-        parsed = yaml.safe_load(exported)
+        parsed = yaml.safe_load(extract_exported_yaml(exported))
         screen_body = next(iter(parsed["screens"].values()))
         self.assertEqual(screen_body["regions"]["P1"]["density"], 50)
         self.assertEqual(screen_body["regions"]["P2"]["density"], 50)
         self.assertEqual(screen_body["regions"]["P3"]["density"], 50)
         self.assertNotIn("density", screen_body["regions"]["P4"])
+
+    def test_exported_screen_report_includes_replay_command(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=text",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=gauge",
+                "--region-widget", "P4=matrix",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        exported = _export_screen_definition(
+            runtime["config_screen"],
+            area_states={},
+            current_base_speed=runtime["speed"],
+            current_speed_for_area=lambda _state, _role: runtime["speed"],
+        )
+        self.assertIsNotNone(exported)
+        parsed = yaml.safe_load(extract_exported_yaml(exported))
+        self.assertEqual(len(parsed["screens"]), 1)
+        self.assertIn("python3 -m fakedata_terminal \\", exported)
+        self.assertIn("--screen-layout 2x2 \\", exported)
+        self.assertIn("--region-widget P1=text", exported)
+        self.assertIn("--region-widget P4=matrix", exported)
+
+    def test_exported_screen_report_marks_cli_limitations(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=cycle",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        runtime["config_screen"]["areas"][0]["cycle_widgets"] = ["text", "matrix"]
+        runtime["config_screen"]["areas"][0].setdefault("modifier_sources", {})["cycle"] = "region"
+        exported = _export_screen_definition(
+            runtime["config_screen"],
+            area_states={},
+            current_base_speed=runtime["speed"],
+            current_speed_for_area=lambda _state, _role: runtime["speed"],
+        )
+        self.assertIsNotNone(exported)
+        self.assertIn("Here is the closest command line command", exported)
+        self.assertIn("P1 cycle.widgets", exported)
+
+    def test_exported_screen_report_omits_default_cycle_widgets(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=cycle",
+                "--region-widget", "P2=blank",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        exported = _export_screen_definition(
+            runtime["config_screen"],
+            area_states={},
+            current_base_speed=runtime["speed"],
+            current_speed_for_area=lambda _state, _role: runtime["speed"],
+        )
+        self.assertIsNotNone(exported)
+        parsed = yaml.safe_load(extract_exported_yaml(exported))
+        screen_body = next(iter(parsed["screens"].values()))
+        self.assertNotIn("cycle", screen_body["regions"]["P1"])
+        self.assertIn("default cycle list", exported)
+        self.assertNotIn("P1 cycle.widgets", exported)
+        self.assertIn("--region-widget P1=cycle", exported)
+
+    def test_exported_screen_report_shortens_data_image_paths_in_cli(self) -> None:
+        exported = _export_screen_definition(
+            {
+                "layout": "2x2",
+                "glitch": 0.0,
+                "theme": "science",
+                "text": "",
+                "speed": 55,
+                "direction": "forward",
+                "areas": [
+                    {
+                        "name": "P1",
+                        "panels": ["P1"],
+                        "x": 0.0,
+                        "y": 0.0,
+                        "mode": "image",
+                        "theme": "science",
+                        "direction": "forward",
+                        "image_paths": [str(ROOT_DIR / "data" / "geom_33_torus.png")],
+                    },
+                ],
+            },
+            area_states={},
+            current_base_speed=55,
+            current_speed_for_area=lambda _state, _role: 55,
+        )
+        self.assertIsNotNone(exported)
+        self.assertIn("--region-image P1=geom_33_torus.png", exported)
+        self.assertNotIn("--region-image P1=data/geom_33_torus.png", exported)
 
     def test_orbit_widget_resolves_with_direction_and_colour(self) -> None:
         runtime = prepare_runtime_config(

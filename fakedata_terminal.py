@@ -4,6 +4,7 @@
 import math
 import os
 import random
+import shlex
 import shutil
 import subprocess
 import sys
@@ -209,6 +210,121 @@ def _annotate_exported_yaml(yaml_text: str, *, shortened_data_images: bool) -> s
     return yaml_text
 
 
+def _format_shell_command(parts: list[str]) -> str:
+    if not parts:
+        return ""
+    if len(parts) <= 2:
+        return " ".join(shlex.quote(part) for part in parts)
+
+    head = " ".join(shlex.quote(part) for part in parts[:3])
+    lines = [f"{head} \\" if len(parts) > 3 else head]
+    idx = 3
+    while idx < len(parts):
+        chunk = parts[idx:idx + 2]
+        rendered = " ".join(shlex.quote(part) for part in chunk)
+        suffix = " \\" if idx + 2 < len(parts) else ""
+        lines.append(f"  {rendered}{suffix}")
+        idx += 2
+    return "\n".join(lines)
+
+
+def _uses_default_cycle_widgets(area: dict) -> bool:
+    sources = area.get("modifier_sources") or {}
+    return bool(area.get("cycle_widgets")) and sources.get("cycle") == "widget_default"
+
+
+def _build_cli_recreation_command(config_screen: dict, effective_regions: list[dict]) -> tuple[str, list[str]]:
+    command_parts = [
+        "python3",
+        "-m",
+        "fakedata_terminal",
+        "--screen-layout",
+        str(config_screen["layout"]),
+        "--screen-theme",
+        str(config_screen.get("theme", "science")),
+        "--screen-glitch",
+        str(max(0.0, float(config_screen.get("glitch", 0.0)))),
+    ]
+    unsupported: list[str] = []
+    default_cycle_regions: list[str] = []
+
+    for entry in effective_regions:
+        area = entry["area"]
+        region_key = "+".join(area["panels"])
+        widget = str(area["mode"])
+        supports = set(widget_supports(widget))
+
+        command_parts.extend(["--region-widget", f"{region_key}={widget}"])
+
+        if _uses_default_cycle_widgets(area):
+            default_cycle_regions.append(region_key)
+        elif area.get("cycle_widgets"):
+            unsupported.append(f"{region_key} cycle.widgets")
+        if area.get("label") is not None:
+            unsupported.append(f"{region_key} label")
+        if area.get("unavailable_message") is not None:
+            unsupported.append(f"{region_key} unavailable_message")
+        if area.get("static_lines") is not None:
+            unsupported.append(f"{region_key} static_lines")
+        if area.get("static_align") is not None:
+            unsupported.append(f"{region_key} static_align")
+
+        if "speed" in supports and entry["speed"] is not None:
+            command_parts.extend(["--region-speed", f"{region_key}={entry['speed']}"])
+        if "density" in supports and entry["density"] is not None:
+            command_parts.extend(["--region-density", f"{region_key}={entry['density']}"])
+        if "text" in supports and entry["text"]:
+            command_parts.extend(["--region-text", f"{region_key}={entry['text']}"])
+        if "theme" in supports and entry["theme"] is not None and entry["theme"] != config_screen.get("theme"):
+            command_parts.extend(["--region-theme", f"{region_key}={entry['theme']}"])
+        if "direction" in supports and entry["direction"] is not None:
+            command_parts.extend(["--region-direction", f"{region_key}={entry['direction']}"])
+        if "color" in supports and entry["colour"] is not None:
+            command_parts.extend(["--region-colour", f"{region_key}={entry['colour']}"])
+        if "image" in supports:
+            for path in area.get("image_paths") or []:
+                command_parts.extend(["--region-image", f"{region_key}={_shorten_export_image_path(path)}"])
+
+    return _format_shell_command(command_parts), sorted(set(unsupported)), default_cycle_regions
+
+
+def _build_export_report(screen_name: str, yaml_text: str, cli_command: str, cli_limitations: list[str],
+                         default_cycle_regions: list[str]) -> str:
+    parts = [
+        (
+            "The YAML below will recreate the current screen exactly. "
+            "If you want to keep it, add it to `data/screens.yaml` or your own local YAML file, "
+            "consider renaming the screen, and then run it later with `--screen <screenname>`. "
+            "If you save it in a separate file, add `--config /path/to/that.yaml` when you run it."
+        ),
+        "",
+        yaml_text.rstrip("\n"),
+        "",
+    ]
+    if default_cycle_regions:
+        regions = ", ".join(default_cycle_regions)
+        parts.extend([
+            f"Note: cycle widgets for {regions} are using the default cycle list, so that list is omitted from both the YAML and the CLI export.",
+            "",
+        ])
+    if cli_limitations:
+        parts.extend([
+            (
+                "Here is the closest command line command for the most recent scene as it was at exit. "
+                "It recreates the layout, widgets, and CLI-expressible modifiers, but the current CLI cannot encode: "
+                + ", ".join(cli_limitations)
+                + "."
+            ),
+            cli_command,
+        ])
+    else:
+        parts.extend([
+            "Here is the command line command that will recreate the most recent scene as it was at exit:",
+            cli_command,
+        ])
+    return "\n".join(parts) + "\n"
+
+
 def _escape_export_text_modifier(value):
     if not isinstance(value, str) or "\n" not in value:
         return value
@@ -407,7 +523,7 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
             region_body["image"] = {"paths": exported_paths}
 
         cycle_widgets = area.get("cycle_widgets") or []
-        if cycle_widgets:
+        if cycle_widgets and not _uses_default_cycle_widgets(area):
             region_body["cycle"] = {"widgets": cycle_widgets[:]}
 
         if area.get("label") is not None:
@@ -423,7 +539,9 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
 
     export_doc = {"screens": {screen_name: screen_body}}
     dumped = yaml.safe_dump(export_doc, sort_keys=False, allow_unicode=False)
-    return _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
+    annotated = _annotate_exported_yaml(dumped, shortened_data_images=shortened_data_images)
+    cli_command, cli_limitations, default_cycle_regions = _build_cli_recreation_command(config_screen, effective_regions)
+    return _build_export_report(screen_name, annotated, cli_command, cli_limitations, default_cycle_regions)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 

@@ -246,6 +246,12 @@ screens:
     regions:
       P1:
         widget: cycle
+        cycle:
+          widgets:
+          - whorl
+          - orbit
+          - rotate
+          - spiral
       P2:
         widget: cycle
       P3:
