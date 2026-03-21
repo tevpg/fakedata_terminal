@@ -94,6 +94,7 @@ def _build_parser(config_paths: tuple[str, ...] | None = None) -> argparse.Argum
             "--region-image L2=geom_07_diamond_lattice.png --region-image L2=geom_33_torus.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        allow_abbrev=False,
     )
     parser.add_argument(
         "--list", action="store_true",
