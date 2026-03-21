@@ -701,6 +701,8 @@ def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[s
             right_cfg = {"widget": widget}
             if widget == "image":
                 right_cfg["image"] = {"paths": image_paths[:]}
+            elif widget in {"blank", "title_card"}:
+                right_cfg["text"] = "Your message here"
         runtime = resolve_runtime_layout(
             "2x2",
             {
