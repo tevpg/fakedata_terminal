@@ -309,9 +309,37 @@ def _build_cli_export_text(cli_command: str, cli_limitations: list[str], default
 
 
 def _append_text_file(path: str, content: str) -> None:
+    needs_separator = False
+    ends_with_newline = False
+    try:
+        needs_separator = os.path.exists(path) and os.path.getsize(path) > 0
+        if needs_separator:
+            with open(path, "rb") as handle:
+                handle.seek(-1, os.SEEK_END)
+                ends_with_newline = handle.read(1) == b"\n"
+    except OSError:
+        needs_separator = False
+        ends_with_newline = False
     with open(path, "a", encoding="utf-8") as handle:
+        if needs_separator:
+            separator = "\n" if ends_with_newline else "\n\n"
+            if content.startswith("\n"):
+                separator = ""
+            handle.write(separator)
         if content:
             handle.write(content if content.endswith("\n") else f"{content}\n")
+
+
+def _file_already_ends_with_block(path: str, content: str) -> bool:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            existing = handle.read()
+    except OSError:
+        return False
+    trimmed_existing = existing.rstrip()
+    if not trimmed_existing:
+        return False
+    return trimmed_existing.endswith(content.rstrip())
 
 
 def _escape_export_text_modifier(value):
@@ -1006,6 +1034,112 @@ def main(stdscr):
         nonlocal _speed_overlay_until
         _speed_overlay_until = now + 1.0
 
+    def _draw_blocking_message(message: str) -> None:
+        banner = f"[{message}]"
+        draw_w = min(len(banner), max(0, cols - 1))
+        if draw_w <= 0 or rows <= 0:
+            return
+        try:
+            stdscr.addnstr(
+                rows - 1,
+                max(0, (cols - draw_w) // 2),
+                banner[:draw_w],
+                draw_w,
+                curses.color_pair(4) | curses.A_BOLD,
+            )
+        except curses.error:
+            pass
+
+    def _pause_for_confirmation(message: str, seconds: float = 2.0) -> None:
+        _draw_blocking_message(message)
+        stdscr.refresh()
+        time.sleep(seconds)
+
+    def _prompt_for_yaml_save_path(current_path: str | None) -> str | None:
+        prompt = "Append YAML to file"
+        default_hint = f" [{current_path}]" if current_path else ""
+        cwd_line = f"cwd: {os.getcwd()}"
+        input_prefix = "> "
+        prompt_row = max(0, rows - 2)
+        input_row = max(0, rows - 1)
+        max_input = max(1, cols - len(input_prefix) - 1)
+        buffer = []
+        try:
+            stdscr.nodelay(False)
+            try:
+                curses.curs_set(1)
+            except curses.error:
+                pass
+            while True:
+                stdscr.move(prompt_row, 0)
+                stdscr.clrtoeol()
+                prompt_text = f"{prompt}{default_hint} ({cwd_line}, Esc cancels)"
+                stdscr.addnstr(prompt_row, 0, prompt_text, max(0, cols - 1), curses.A_BOLD)
+                stdscr.move(input_row, 0)
+                stdscr.clrtoeol()
+                entered = "".join(buffer)[-max_input:]
+                stdscr.addnstr(input_row, 0, input_prefix + entered, max(0, cols - 1), curses.A_BOLD)
+                stdscr.move(input_row, min(len(input_prefix) + len(entered), max(0, cols - 1)))
+                stdscr.refresh()
+                key = stdscr.getch()
+                if key in (10, 13, curses.KEY_ENTER):
+                    text = "".join(buffer).strip()
+                    if text:
+                        return os.path.expanduser(text)
+                    return current_path
+                if key == 27:
+                    return None
+                if key in (curses.KEY_BACKSPACE, 127, 8):
+                    if buffer:
+                        buffer.pop()
+                    continue
+                if 32 <= key <= 126 and len(buffer) < max_input:
+                    buffer.append(chr(key))
+        finally:
+            stdscr.nodelay(True)
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            try:
+                stdscr.move(prompt_row, 0)
+                stdscr.clrtoeol()
+                stdscr.move(input_row, 0)
+                stdscr.clrtoeol()
+            except curses.error:
+                pass
+
+    def _save_current_screen_yaml() -> None:
+        nonlocal last_yaml_save_path
+        if not CONFIG_SCREEN or _demo_state["active"] or _screen_showcase_state["active"]:
+            _pause_for_confirmation("save only available for configured screens", 1.5)
+            return
+        export_payload = _export_screen_definition(
+            CONFIG_SCREEN,
+            area_states,
+            current_base_speed,
+            _current_speed_for_area,
+        )
+        if not export_payload:
+            _pause_for_confirmation("nothing to save", 1.5)
+            return
+        target_path = _prompt_for_yaml_save_path(last_yaml_save_path)
+        if not target_path:
+            _pause_for_confirmation("save cancelled", 1.0)
+            return
+        if _file_already_ends_with_block(target_path, export_payload["yaml"]):
+            last_yaml_save_path = target_path
+            _pause_for_confirmation("No change since last save", 2.0)
+            return
+        try:
+            _append_text_file(target_path, export_payload["yaml"])
+        except OSError as exc:
+            message = exc.strerror or str(exc)
+            _pause_for_confirmation(f"save failed: {message}", 2.0)
+            return
+        last_yaml_save_path = target_path
+        _pause_for_confirmation(f"saved yaml -> {target_path}", 2.0)
+
     def _adjust_runtime_speeds(delta: int, now: float) -> None:
         speeds = [int(area.get("current_speed") or 0) for area in area_states.values()]
         speeds = [speed for speed in speeds if speed > 0]
@@ -1137,6 +1271,7 @@ def main(stdscr):
     _paused = False
     _paused_at = 0.0
     esc_sequence_times: list[float] = []
+    last_yaml_save_path = None
     _exit_at = start_now + EXIT_AFTER if EXIT_AFTER is not None else float("inf")
     _last_loop_now = start_now
 
@@ -1292,6 +1427,9 @@ def main(stdscr):
                         )
                     break
             continue
+        if key == ord('s'):
+            _save_current_screen_yaml()
+            continue
         if key in (ord('q'), ord('Q'), 27):
             if CONFIG_SCREEN and not _demo_state["active"] and not _screen_showcase_state["active"]:
                 return _export_screen_definition(
@@ -1414,13 +1552,12 @@ def run(argv=None) -> int:
             time.sleep(0.05)
     print(f"\n[{SCRIPT_NAME}] terminated.")
     if exported_screen:
+        print(exported_screen["command"], end="" if exported_screen["command"].endswith("\n") else "\n")
         if save_screen_yaml == "-":
             print(exported_screen["yaml"], end="" if exported_screen["yaml"].endswith("\n") else "\n")
         elif save_screen_yaml:
             _append_text_file(save_screen_yaml, exported_screen["yaml"])
-        if save_screen_command == "-":
-            print(exported_screen["command"], end="" if exported_screen["command"].endswith("\n") else "\n")
-        elif save_screen_command:
+        if save_screen_command and save_screen_command != "-":
             _append_text_file(save_screen_command, exported_screen["command"])
     return 0
 

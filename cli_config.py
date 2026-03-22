@@ -197,6 +197,8 @@ def _print_no_args_message(script_name: str) -> None:
     print(f"{script_name} --layouts to see available layouts")
     print(f"{script_name} --list to list inventory of choices")
     print(f"{script_name} --help for help")
+    print()
+    print("During runtime: s appends the current screen YAML to a file")
 
 def _showcase_widget_names(config_paths: tuple[str, ...] | None = None) -> list[str]:
     return widget_names(config_paths)

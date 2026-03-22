@@ -469,11 +469,44 @@ class StartupValidationTests(unittest.TestCase):
                     )
             self.assertEqual(result, 0)
             self.assertNotIn("screens:\n  sample", stdout_buffer.getvalue())
-            self.assertNotIn("python3 -m fakedata_terminal --screen-layout 2x2", stdout_buffer.getvalue())
+            self.assertIn("python3 -m fakedata_terminal --screen-layout 2x2", stdout_buffer.getvalue())
             self.assertIn("terminated.", stdout_buffer.getvalue())
             self.assertEqual(Path(yaml_path).read_text(encoding="utf-8"), export_payload["yaml"])
         finally:
             Path(yaml_path).unlink(missing_ok=True)
+
+    def test_append_text_file_separates_saved_yaml_blocks(self) -> None:
+        with tempfile.NamedTemporaryFile("r+", suffix=".yaml", delete=False) as handle:
+            path = Path(handle.name)
+        try:
+            fakedata_terminal._append_text_file(str(path), "screens:\n  first:\n    layout: 2x2\n")
+            fakedata_terminal._append_text_file(str(path), "screens:\n  second:\n    layout: 3x2\n")
+            self.assertEqual(
+                path.read_text(encoding="utf-8"),
+                "screens:\n  first:\n    layout: 2x2\n\nscreens:\n  second:\n    layout: 3x2\n",
+            )
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_file_already_ends_with_block_detects_duplicate_yaml(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write("screens:\n  first:\n    layout: 2x2\n\nscreens:\n  second:\n    layout: 3x2\n")
+            path = Path(handle.name)
+        try:
+            self.assertTrue(
+                fakedata_terminal._file_already_ends_with_block(
+                    str(path),
+                    "screens:\n  second:\n    layout: 3x2\n",
+                )
+            )
+            self.assertFalse(
+                fakedata_terminal._file_already_ends_with_block(
+                    str(path),
+                    "screens:\n  third:\n    layout: 4x2\n",
+                )
+            )
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_run_shows_performance_mode_warning_before_startup(self) -> None:
         with mock.patch.object(fakedata_terminal.time, "sleep") as mock_sleep:

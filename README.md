@@ -136,6 +136,7 @@ During runtime:
 - `q` or `Ctrl-C` quits
 - `Space` pauses
 - `+` and `-` adjust speed live
+- `s` prompts for a YAML file and appends the current resolved screen; `Enter` reuses the most recent path, and `Esc` cancels
 - `--ignore-keyboard` disables runtime key controls for filming use; `Ctrl-C` still exits, and pressing `Esc` three times within one second also exits
 
 ## Configuration Model
