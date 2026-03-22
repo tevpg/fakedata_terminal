@@ -358,12 +358,20 @@ widgets:
 
   blank:
     enabled: true
-    supports: [text, color]
+    supports: [speed, text, color, direction]
     defaults: {}
     timing:
-      cadence_factor: 0.0
+      cadence_factor: 1.0
     behavior:
-      static: true
+      static: false
+      direction_random:
+        # Matches the gauge/scope/tunnel random-direction model.
+        backward_probability: 0.40
+        none_probability: 0.10
+        forward_probability: 0.50
+        backward_duration_range_seconds: [0.5, 3.0]
+        none_duration_range_seconds: [0.5, 3.0]
+        forward_duration_range_seconds: [0.5, 3.0]
 
   cycle:
     enabled: true

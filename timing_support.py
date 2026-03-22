@@ -62,6 +62,18 @@ def widget_cadence_factor(widget: str) -> float:
 
 
 def widget_interval(widget: str, speed: int) -> float:
+    if widget == "blank":
+        # Multi-colour blank uses a much slower semantic scale than the shared
+        # scheduler: roughly 15s at speed 1, 0.1s at speed 50, and very fast
+        # flicker near speed 100.
+        speed = clamp_speed(speed)
+        if speed <= 1:
+            return 15.0
+        if speed >= 100:
+            return 0.02
+        progress = (speed - 1) / 99.0
+        shaped = progress ** 0.39605
+        return 15.0 * ((0.02 / 15.0) ** shaped)
     factor = widget_cadence_factor(widget)
     if factor <= 0.0:
         return math.inf

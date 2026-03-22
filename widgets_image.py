@@ -9,8 +9,10 @@ import textwrap
 
 try:
     from .runtime_support import density_scale, multi_palette_specs
+    from .timing_support import resolve_direction_motion
 except ImportError:
     from runtime_support import density_scale, multi_palette_specs
+    from timing_support import resolve_direction_motion
 
 
 class ImageWidgets:
@@ -321,27 +323,9 @@ class ImageWidgets:
 
     def repaint_static_lines(self, area: dict, rows: int, y: int, x: int, width: int):
         blank = " " * width
-        lines = area.get("static_lines") or []
+        lines, align = self.static_render_lines(area, rows, width)
         colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
         base_attr = self.colour_attr_from_spec(self.curses, colour_spec, default="white")
-        text_only = False
-        overlay = self.overlay_text(area)
-        if not lines and overlay:
-            lines = overlay.splitlines() or [overlay]
-            text_only = True
-        wrapped_lines = []
-        wrap_width = max(1, width)
-        for source_line in lines:
-            if not source_line:
-                wrapped_lines.append("")
-                continue
-            wrapped_lines.extend(textwrap.wrap(
-                source_line,
-                width=wrap_width,
-                break_long_words=True,
-                break_on_hyphens=False,
-            ) or [""])
-        lines = wrapped_lines
         multi_mode = colour_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}
         line_attrs: list[int] = []
         if multi_mode:
@@ -358,9 +342,6 @@ class ImageWidgets:
                     for _ in lines
                 ] if palette_attrs else []
             line_attrs = area.get("static_line_attrs") or []
-        align = area.get("static_align") or "top"
-        if text_only and align == "top":
-            align = "center"
         top = max(0, (rows - len(lines)) // 2) if align == "center" else (1 if rows > 2 else 0)
         for r in range(rows):
             safe_w = self.safe_row_width(y, r, x, width)
@@ -383,6 +364,116 @@ class ImageWidgets:
             except self.curses.error:
                 pass
 
+    def static_render_lines(self, area: dict, rows: int, width: int) -> tuple[list[str], str]:
+        lines = area.get("static_lines") or []
+        text_only = False
+        overlay = self.overlay_text(area)
+        if not lines and overlay:
+            lines = overlay.splitlines() or [overlay]
+            text_only = True
+        wrapped_lines = []
+        wrap_width = max(1, width)
+        for source_line in lines:
+            if not source_line:
+                wrapped_lines.append("")
+                continue
+            wrapped_lines.extend(textwrap.wrap(
+                source_line,
+                width=wrap_width,
+                break_long_words=True,
+                break_on_hyphens=False,
+            ) or [""])
+        align = area.get("static_align") or "top"
+        if text_only and align == "top":
+            align = "center"
+        return wrapped_lines, align
+
+    def ensure_blank_colour_state(self, area: dict, rows: int, width: int, palette_attrs: list[int]) -> list[str]:
+        lines, align = self.static_render_lines(area, rows, width)
+        sig = (rows, width, align, tuple(lines), tuple(palette_attrs))
+        if area.get("blank_colour_sig") == sig:
+            return lines
+        area["blank_colour_sig"] = sig
+        line_colours: list[list[int | None]] = []
+        for source_line in lines:
+            padded = source_line[:width].ljust(width)
+            line_colours.append([
+                random.choice(palette_attrs) if ch != " " and palette_attrs else None
+                for ch in padded
+            ])
+        area["blank_line_colours"] = line_colours
+        return lines
+
+    def update_blank(self, area: dict, rows: int, width: int, now: float) -> None:
+        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
+        multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-bright")
+        if colour_spec not in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"} or not multi_specs:
+            area["blank_colour_sig"] = None
+            area["blank_line_colours"] = []
+            return
+        palette_attrs = [
+            self.colour_attr_from_spec(self.curses, spec, default=spec, bold=True)
+            for spec in multi_specs
+        ]
+        lines = self.ensure_blank_colour_state(area, rows, width, palette_attrs)
+        if not lines:
+            return
+        motion = resolve_direction_motion(area, "blank", now)
+        if motion == 0:
+            return
+        for idx, source_line in enumerate(lines):
+            padded = source_line[:width].ljust(width)
+            positions = [pos for pos, ch in enumerate(padded) if ch != " "]
+            if len(positions) <= 1:
+                continue
+            colours = area["blank_line_colours"][idx]
+            values = [colours[pos] for pos in positions]
+            if motion > 0:
+                values = [values[-1], *values[:-1]]
+            else:
+                values = [*values[1:], values[0]]
+            for pos, attr in zip(positions, values):
+                colours[pos] = attr
+
+    def repaint_blank_multicolour(self, area: dict, rows: int, y: int, x: int, width: int) -> None:
+        blank = " " * width
+        colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
+        multi_specs = multi_palette_specs(colour_spec, bare_multi="multi-bright")
+        palette_attrs = [
+            self.colour_attr_from_spec(self.curses, spec, default=spec, bold=True)
+            for spec in multi_specs
+        ]
+        lines, align = self.static_render_lines(area, rows, width)
+        self.ensure_blank_colour_state(area, rows, width, palette_attrs)
+        top = max(0, (rows - len(lines)) // 2) if align == "center" else (1 if rows > 2 else 0)
+        line_colours = area.get("blank_line_colours") or []
+        for r in range(rows):
+            safe_w = self.safe_row_width(y, r, x, width)
+            if safe_w <= 0:
+                continue
+            try:
+                self.stdscr.addnstr(y + r, x, blank, safe_w, self.curses.color_pair(1))
+                line_idx = r - top
+                if 0 <= line_idx < len(lines):
+                    source_line = lines[line_idx][:safe_w]
+                    if align == "center":
+                        start = max(0, (safe_w - len(source_line)) // 2)
+                        padded = (" " * start + source_line).ljust(safe_w)
+                    else:
+                        padded = source_line.ljust(safe_w)
+                    colours = line_colours[line_idx] if line_idx < len(line_colours) else []
+                    for col, ch in enumerate(padded):
+                        attr = self.curses.color_pair(1)
+                        if ch != " ":
+                            src_col = col if align != "center" else col - max(0, (safe_w - len(source_line)) // 2)
+                            if 0 <= src_col < len(colours) and colours[src_col] is not None:
+                                attr = colours[src_col]
+                            if source_line.endswith(":") and src_col == len(source_line) - 1:
+                                attr |= self.curses.A_BOLD
+                        self.stdscr.addch(y + r, x + col, ch, attr)
+            except self.curses.error:
+                pass
+
     def handles_mode(self, mode: str) -> bool:
         return mode in self.IMAGE_MODES
 
@@ -395,12 +486,15 @@ class ImageWidgets:
             self.ensure_life(area, rows, width)
 
     def update(self, area: dict, rows: int, width: int, role: str, now: float | None = None, dt: float = 0.0) -> None:
-        del role, now, dt
+        del role, dt
+        now = 0.0 if now is None else now
         mode = area["mode"] if area["mode"] != "cycle" else area.get("cycle_current") or "text"
         if mode == "image":
             self.update_image(area, rows, width)
         elif mode == "life":
             self.update_life(area, rows, width)
+        elif mode == "blank":
+            self.update_blank(area, rows, width, now)
 
     def render(self, area: dict, rows: int, y: int, x: int, width: int, role: str) -> None:
         del role
@@ -410,7 +504,11 @@ class ImageWidgets:
         elif mode == "life":
             self.repaint_life(area, rows, y, x, width)
         elif mode == "blank":
-            if area.get("static_lines") or area.get("text_override") or self.inject_text_getter():
+            colour_spec = self.normalize_colour_spec(area.get("colour_override")) or "white"
+            multi_mode = colour_spec in {"multi", "multi-all", "multi-dim", "multi-normal", "multi-bright"}
+            if multi_mode and (area.get("static_lines") or area.get("text_override") or self.inject_text_getter()):
+                self.repaint_blank_multicolour(area, rows, y, x, width)
+            elif area.get("static_lines") or area.get("text_override") or self.inject_text_getter():
                 self.repaint_static_lines(area, rows, y, x, width)
             elif area.get("unavailable_message"):
                 self.repaint_unavailable(area, rows, y, x, width)

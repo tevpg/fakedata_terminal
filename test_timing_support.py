@@ -29,7 +29,9 @@ class TimingSupportTests(unittest.TestCase):
         self.assertGreater(slow, fast)
 
     def test_widget_interval_for_blank_is_infinite(self) -> None:
-        self.assertTrue(math.isinf(widget_interval("blank", 50)))
+        self.assertAlmostEqual(widget_interval("blank", 1), 15.0)
+        self.assertAlmostEqual(widget_interval("blank", 50), 0.1, places=2)
+        self.assertLess(widget_interval("blank", 100), 0.03)
 
     def test_schedule_next_catches_up_after_far_miss(self) -> None:
         interval = 0.5

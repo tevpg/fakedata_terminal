@@ -571,6 +571,8 @@ def make_area_state(theme_name: str | None, default_theme: str, get_bar_config) 
         "unavailable_message": None,
         "static_lines": [],
         "static_align": "top",
+        "blank_colour_sig": None,
+        "blank_line_colours": [],
     }
 
 

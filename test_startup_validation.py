@@ -215,6 +215,28 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(areas["P1"]["mode"], "rotate")
         self.assertEqual(areas["P1"]["density"], 72)
 
+    def test_blank_widget_resolves_with_speed_direction_and_colour(self) -> None:
+        runtime = prepare_runtime_config(
+            [
+                "--screen-layout", "2x2",
+                "--region-widget", "P1=blank",
+                "--region-widget", "P2=text",
+                "--region-widget", "P3=text",
+                "--region-widget", "P4=gauge",
+                "--region-speed", "P1=50",
+                "--region-direction", "P1=random",
+                "--region-colour", "P1=multi",
+            ],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        areas = {area["name"]: area for area in runtime["config_screen"]["areas"]}
+        self.assertEqual(areas["P1"]["mode"], "blank")
+        self.assertEqual(areas["P1"]["speed"], 50)
+        self.assertEqual(areas["P1"]["direction"], "random")
+        self.assertEqual(areas["P1"]["colour"], "multi")
+
     def test_exported_screen_yaml_includes_density(self) -> None:
         runtime = prepare_runtime_config(
             [
