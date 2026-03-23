@@ -86,6 +86,19 @@ class TitleCardWidget:
         return len(lines), max((len(line) for line in lines), default=0)
 
     @staticmethod
+    def _trim_rendered_lines(lines: list[str]) -> list[str]:
+        if not lines:
+            return []
+        trimmed = [line.rstrip() for line in lines]
+        nonblank = [line for line in trimmed if line.strip()]
+        if not nonblank:
+            return ["" for _ in trimmed]
+        shared_indent = min(len(line) - len(line.lstrip(" ")) for line in nonblank)
+        if shared_indent <= 0:
+            return trimmed
+        return [line[shared_indent:] if len(line) >= shared_indent else "" for line in trimmed]
+
+    @staticmethod
     def _chunk_long_word(word: str, max_chars: int) -> list[str]:
         if max_chars <= 0:
             return [word]
@@ -164,16 +177,29 @@ class TitleCardWidget:
             rendered.extend(figlet_lines)
             if line_index != len(source_lines) - 1:
                 rendered.append("")
-        return [line.rstrip() for line in rendered]
+        return self._trim_rendered_lines(rendered)
 
     def _render_pyfiglet_lines(self, text: str, font_name: str) -> list[str]:
         if pyfiglet is None:
             return []
-        figlet = pyfiglet.Figlet(font=font_name, justify="center")
+        figlet = pyfiglet.Figlet(font=font_name, justify="left")
         rendered = figlet.renderText(text).rstrip("\n")
-        return rendered.splitlines()
+        return self._trim_rendered_lines(rendered.splitlines())
 
     def _best_rendered_lines(self, text: str, rows: int, width: int) -> list[str]:
+        direct_fitting: list[tuple[int, int, int, list[str]]] = []
+        for font_name in PYFIGLET_FONTS:
+            try:
+                candidate = self._render_pyfiglet_lines(text, font_name)
+            except Exception:
+                continue
+            render_rows, render_width = self._rendered_size(candidate)
+            if candidate and render_rows <= rows and render_width <= width:
+                direct_fitting.append((render_rows * render_width, render_rows, render_width, candidate))
+        if direct_fitting:
+            direct_fitting.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+            return direct_fitting[0][3]
+
         fitting: list[tuple[int, int, int, list[str]]] = []
         for font_name in PYFIGLET_FONTS:
             try:
