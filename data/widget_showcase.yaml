@@ -7,26 +7,22 @@ widget_showcase:
       speed: 50
       direction: forward
       note: >
-        Bare multi uses the bright palette here. Visible characters are assigned
-        colours and the colours rotate to the right.
+        Bare 'blank' widget is an empty panel. It can optionally show a text message.
     - widget: blank
-      title: blank drift backward
-      text: "COLOUR DRIFT"
-      colour: multi-all
-      speed: 35
-      direction: backward
+      title: blank
+      text: ""
       note: >
         Multi-all gives the widest palette spread. Colours rotate left across
         the text instead of right.
     - widget: blank
-      title: blank drift random
-      text: "COLOUR DRIFT"
-      colour: multi-dim
-      speed: 70
-      direction: random
+      title: blank with message text
+      text: "Your message here\nWhich can be multi-line"
+      colour: multi
+      speed: 60
+      direction: forward
       note: >
-        Random direction reuses the same motion-probability model as gauge,
-        switching between forward, backward, and pauses over time.
+        A text message can go over multple lines and can have a colour.  If the colour is
+        multi*, then 'direction' and 'speed' will affect text animation of the text.
     - widget: gauge
       title: gauge random direction
       text: "PHASE DRIFT"
