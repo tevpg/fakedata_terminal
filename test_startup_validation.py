@@ -58,6 +58,7 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(showcase["states"]["blank"]["text_values"], ["", "STATUS HOLD", "Stand by"])
         self.assertEqual(showcase["states"]["gauge"]["colour_values"], ["cyan", "yellow", "multi"])
         self.assertEqual(showcase["states"]["gauge"]["direction"], "random")
+        self.assertTrue(showcase["states"]["image"]["image_paths"][0].endswith("/data/geom_33_torus.png"))
 
     def test_speed_precedence_widget_defaults_region_and_cli(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:

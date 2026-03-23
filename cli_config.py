@@ -5,6 +5,7 @@ import glob
 import importlib.util
 import math
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -615,6 +616,19 @@ def _showcase_modifier_defaults(widget: str, showcase_defaults: dict[str, object
     }
 
 
+def _showcase_normalize_image_paths(paths: list[object]) -> list[str]:
+    normalized = []
+    package_data_dir = Path(__file__).resolve().parent / "data"
+    for raw_path in paths:
+        candidate = os.path.abspath(os.path.expanduser(str(raw_path)))
+        if not os.path.isfile(candidate):
+            fallback = package_data_dir / Path(candidate).name
+            if fallback.is_file():
+                candidate = str(fallback.resolve())
+        normalized.append(candidate)
+    return normalized
+
+
 def _showcase_page_state(page_cfg: dict[str, object], showcase_defaults: dict[str, object],
                          config_paths: tuple[str, ...]) -> dict[str, object]:
     widget = str(page_cfg["widget"])
@@ -623,9 +637,9 @@ def _showcase_page_state(page_cfg: dict[str, object], showcase_defaults: dict[st
     colour_values = _coerce_showcase_values(page_cfg.get("color", page_cfg.get("colour")), normalize_colour=True)
     page_theme = page_cfg.get("theme")
     page_direction = _direction_value(page_cfg.get("direction"))
-    image_paths = list(defaults["image_paths"])
+    image_paths = _showcase_normalize_image_paths(list(defaults["image_paths"]))
     if isinstance(page_cfg.get("image"), dict):
-        image_paths = list(page_cfg["image"].get("paths") or [])
+        image_paths = _showcase_normalize_image_paths(list(page_cfg["image"].get("paths") or []))
     cycle_widgets = list(defaults["cycle_widgets"])
     if isinstance(page_cfg.get("cycle"), dict):
         cycle_widgets = [str(item) for item in page_cfg["cycle"].get("widgets") or []]
