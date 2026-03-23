@@ -2,13 +2,12 @@ widget_showcase:
   pages:
     - widget: blank
       note: >
-        Empty panels become more useful once you add text or colour motion.
       speed: 50
       direction: forward
       text:
         - ""
-        - "STATUS HOLD"
-        - "Stand by"
+        - "Sample text"
+        - "Sample\nmulti-line\ntext"
       colour:
         - multi
         - cyan

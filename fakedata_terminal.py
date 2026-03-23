@@ -1001,6 +1001,8 @@ def main(stdscr):
     def _draw_showcase_header():
         if not _screen_showcase_state["active"] or not CONFIG_SCREEN:
             return
+        if _screen_showcase_state.get("mode") == "widgets":
+            return
         header_lines = CONFIG_SCREEN.get("showcase_header_lines") or []
         if not header_lines:
             return
@@ -1020,9 +1022,8 @@ def main(stdscr):
         if not _screen_showcase_state["active"] or rows < 1:
             return
         if _screen_showcase_state.get("mode") == "widgets":
-            label = "[PgUp/PgDn] widget  [Left/Right] speed  [Up/Down] density  [T/C/D/V] modifiers  [Q] exit"
-        else:
-            label = f"[Left/h] back  [Right/l] forward  [+/-] faster/slower  [Q] exit   Speed: {current_base_speed}"
+            return
+        label = f"[Left/h] back  [Right/l] forward  [+/-] faster/slower  [Q] exit   Speed: {current_base_speed}"
         try:
             stdscr.addnstr(
                 rows - 1,

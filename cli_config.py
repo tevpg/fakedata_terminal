@@ -672,6 +672,8 @@ def _showcase_display_value(value: object, modifier: str) -> str:
             return "n/a"
         joined = ", ".join(widgets[:3])
         return f"{joined} ..." if len(widgets) > 3 else joined
+    if modifier == "text" and value not in (None, [], {}):
+        return str(value).replace("\n", "\\n")
     if value in (None, "", [], {}):
         return "n/a"
     return str(value)
@@ -726,11 +728,13 @@ def _showcase_left_panel_lines(page_cfg: dict[str, object], state: dict[str, obj
         f"Page: {idx}/{total}",
         "",
         description,
-        "",
-        f"Available modifiers: {', '.join(attrs) if attrs else '(none)'}",
     ]
     if note:
-        lines.extend(["", "Note", "----", *note.splitlines()])
+        lines.extend(["", *note.splitlines()])
+    lines.extend([
+        "",
+        f"Available modifiers: {', '.join(attrs) if attrs else '(none)'}",
+    ])
     lines.extend([
         "",
         "Current settings",
@@ -741,8 +745,6 @@ def _showcase_left_panel_lines(page_cfg: dict[str, object], state: dict[str, obj
         _showcase_dashboard_line("Text", state.get("text"), defaults.get("text"), active="text" in supports),
         _showcase_dashboard_line("Colour", state.get("color"), defaults.get("color"), active="color" in supports),
         _showcase_dashboard_line("Direction", state.get("direction"), defaults.get("direction"), active="direction" in supports),
-        _showcase_dashboard_line("Image", state.get("image_paths"), defaults.get("image_paths"), active="image" in supports),
-        _showcase_dashboard_line("Cycle", state.get("cycle_widgets"), defaults.get("cycle_widgets"), active="cycle" in supports),
     ])
     if unavailable:
         lines.extend(["", f"Status: {unavailable}"])
@@ -757,7 +759,7 @@ def _showcase_right_region(widget: str, state: dict[str, object]) -> dict:
         right_cfg["speed"] = int(state.get("speed") or 50)
     if "density" in supports:
         right_cfg["density"] = int(state.get("density") or 50)
-    if "text" in supports and state.get("text") not in (None, ""):
+    if "text" in supports and state.get("text") is not None:
         right_cfg["text"] = state["text"]
     if "theme" in supports and state.get("theme"):
         right_cfg["theme"] = state["theme"]
@@ -769,7 +771,7 @@ def _showcase_right_region(widget: str, state: dict[str, object]) -> dict:
         right_cfg["image"] = {"paths": list(state.get("image_paths") or [])}
     if widget == "cycle":
         right_cfg["cycle"] = {"widgets": list(state.get("cycle_widgets") or [])}
-    if widget in {"blank", "title_card"} and "text" not in right_cfg:
+    if widget in {"blank", "title_card"} and state.get("text") is None and "text" not in right_cfg:
         right_cfg["text"] = "Your message here"
     return right_cfg
 
