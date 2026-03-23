@@ -673,20 +673,24 @@ def _showcase_display_value(value: object, modifier: str) -> str:
         joined = ", ".join(widgets[:3])
         return f"{joined} ..." if len(widgets) > 3 else joined
     if modifier == "text" and value not in (None, [], {}):
-        return str(value).replace("\n", "\\n")
+        text_value = str(value).replace("\n", "\\n")
+        return f"\"{text_value}\""
     if value in (None, "", [], {}):
         return "n/a"
     return str(value)
 
 
 def _showcase_dashboard_line(label: str, current_value: object, default_value: object, *, active: bool) -> str:
+    value_column = 12
+    prefix = f"{label}:"
+    padded_prefix = f"{prefix:<{value_column}}"
     if not active:
-        return f"{label}: n/a"
+        return f"{padded_prefix}n/a"
     current_text = _showcase_display_value(current_value, label.lower())
     default_text = _showcase_display_value(default_value, label.lower())
     if default_text == "n/a":
-        return f"{label}: {current_text}"
-    return f"{label}: {current_text} (default {default_text})"
+        return f"{padded_prefix}{current_text}"
+    return f"{padded_prefix}{current_text} (default: {default_text})"
 
 
 def _showcase_controls_lines(widget: str, *, supports: set[str]) -> list[str]:
