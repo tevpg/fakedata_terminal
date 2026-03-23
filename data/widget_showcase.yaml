@@ -1,0 +1,239 @@
+widget_showcase:
+  pages:
+    - widget: blank
+      note: >
+        Empty panels become more useful once you add text or colour motion.
+      speed: 50
+      direction: forward
+      text:
+        - ""
+        - "STATUS HOLD"
+        - "Stand by"
+      colour:
+        - multi
+        - cyan
+        - bright-white
+    - widget: title_card
+      note: >
+        Title cards are for short bold labels rather than animation-heavy content.
+      speed: 50
+      text:
+        - "MISSION"
+        - "ALERT"
+        - "WELCOME"
+      colour:
+        - bright-white
+        - cyan
+        - multi
+    - widget: text
+      note: >
+        Dense text benefits from theme shifts and clear direction changes.
+      speed: 58
+      theme: science
+      direction: forward
+      text:
+        - "SIGNAL LOCK"
+        - "PHASE DRIFT"
+        - "ACQUIRE TARGET"
+    - widget: text_scant
+      note: >
+        Sparse text leaves room for the words to read cleanly at a distance.
+      speed: 42
+      theme: hacker
+      direction: backward
+      text:
+        - "watching"
+        - "seeking"
+        - "tracking"
+    - widget: text_wide
+      note: >
+        Wide text reads like a banner and works well with slower motion.
+      speed: 40
+      theme: navigation
+      direction: forward
+      text:
+        - "WAYPOINT"
+        - "DOCKING"
+        - "TRANSFER"
+    - widget: text_spew
+      note: >
+        This variant is useful when you want the console to feel overloaded.
+      speed: 78
+      theme: military
+      text:
+        - "burst mode"
+        - "link unstable"
+        - "retrying"
+    - widget: bars
+      note: >
+        Bars take text samples but primarily read as a motion-heavy meter bank.
+      speed: 60
+      theme: finance
+      text:
+        - "LOAD"
+        - "FLOW"
+        - "GAIN"
+    - widget: gauge
+      note: >
+        Gauge supports the broadest set of live showcase controls.
+      speed: 72
+      density: 38
+      direction: random
+      text:
+        - "PHASE"
+        - "VECTOR"
+        - "LOCK"
+      colour:
+        - cyan
+        - yellow
+        - multi
+    - widget: scope
+      note: >
+        Theme changes are especially visible here because they reshape the signal profile.
+      speed: 55
+      theme: medicine
+      direction: forward
+      text:
+        - "Lead I"
+        - "Channel B"
+        - "Carrier"
+    - widget: sparkline
+      note: >
+        Sparkline is compact, so small speed changes are easier to read than big ones.
+      speed: 52
+      theme: finance
+      direction: forward
+      text:
+        - "trend"
+        - "pulse"
+        - "load"
+    - widget: readouts
+      note: >
+        Readouts emphasize text and palette more than animation.
+      theme: space
+      text:
+        - "core temp"
+        - "fuel mix"
+        - "dock ready"
+      colour:
+        - green
+        - cyan
+        - bright-white
+    - widget: crash
+      note: >
+        Crash works best as a brief disruption or alarm insert.
+      speed: 82
+      theme: military
+      colour:
+        - multi-all
+        - bright-red
+        - yellow
+    - widget: matrix
+      note: >
+        Density changes are the main control worth exploring here.
+      speed: 54
+      density: 45
+    - widget: orbit
+      note: >
+        Orbit shows the combined effect of colour, density, speed, and direction.
+      speed: 62
+      density: 28
+      direction: backward
+      colour:
+        - multi-bright
+        - cyan
+        - bright-magenta
+    - widget: rotate
+      note: >
+        Rotate feels more rigid than orbit, so direction changes read clearly.
+      speed: 60
+      density: 36
+      direction: random
+      colour:
+        - multi-all
+        - yellow
+        - bright-cyan
+    - widget: whorl
+      note: >
+        Whorl concentrates the most visual energy near the center of the panel.
+      speed: 64
+      density: 42
+      direction: random
+      colour:
+        - multi-all
+        - orange
+        - bright-white
+    - widget: spiral
+      note: >
+        Spiral reads best when density is moderate enough to preserve the motion path.
+      speed: 58
+      density: 30
+      direction: forward
+      colour:
+        - multi-all
+        - bright-yellow
+        - cyan
+    - widget: tunnel
+      note: >
+        Tunnel combines colour and text well when you want a moving destination cue.
+      speed: 68
+      direction: forward
+      text:
+        - "approach"
+        - "transit"
+        - "egress"
+      colour:
+        - cyan
+        - bright-white
+        - multi
+    - widget: blocks
+      note: >
+        Blocks is useful for testing mixed modifier support on an abstract widget.
+      speed: 57
+      density: 48
+      direction: forward
+      text:
+        - "GRID"
+        - "LOAD"
+        - "SHIFT"
+      colour:
+        - multi
+        - orange
+        - bright-green
+    - widget: sweep
+      note: >
+        Sweep mainly responds to speed and density, so keep the panel uncluttered.
+      speed: 50
+      density: 34
+    - widget: life
+      note: >
+        Life changes character quickly with density, especially around the middle range.
+      speed: 46
+      density: 44
+      colour:
+        - green
+        - bright-green
+        - multi
+    - widget: image
+      note: >
+        Image is inspection-only in the showcase for now; the image list is shown in the dashboard.
+      speed: 50
+      image:
+        paths:
+          - data/geom_33_torus.png
+          - data/geom_14_octagon_web.png
+          - data/pineapple2.jpg
+    - widget: cycle
+      note: >
+        Cycle is also inspection-only for now; use the dashboard to inspect the configured list.
+      speed: 55
+      theme: science
+      colour:
+        - multi
+        - cyan
+        - bright-white
+      cycle:
+        widgets:
+          - text
+          - gauge
+          - orbit

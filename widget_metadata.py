@@ -169,6 +169,11 @@ def widget_behavior(widget: str, config_paths: tuple[str, ...] | list[str] | Non
     return behavior if isinstance(behavior, dict) else {}
 
 
+def widget_description(widget: str, config_paths: tuple[str, ...] | list[str] | None = None) -> str:
+    description = widget_metadata(widget, config_paths).get("description")
+    return str(description).strip() if description is not None else ""
+
+
 def validate_widget_metadata(config_paths: tuple[str, ...] | list[str] | None = None) -> list[str]:
     issues: list[str] = []
     catalog = load_widget_metadata(config_paths)
@@ -204,6 +209,9 @@ def validate_widget_metadata(config_paths: tuple[str, ...] | list[str] | None = 
         defaults = entry.get("defaults")
         if defaults is not None and not isinstance(defaults, dict):
             issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget}.defaults must be a mapping")
+        description = entry.get("description")
+        if description is not None and not isinstance(description, str):
+            issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget}.description must be a string")
         timing = entry.get("timing")
         if timing is not None and not isinstance(timing, dict):
             issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget}.timing must be a mapping")
@@ -225,5 +233,8 @@ def validate_widget_metadata(config_paths: tuple[str, ...] | list[str] | None = 
         defaults = entry.get("defaults")
         if defaults is not None and not isinstance(defaults, dict):
             issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget_name}.defaults must be a mapping")
+        description = entry.get("description")
+        if description is not None and not isinstance(description, str):
+            issues.append(f"{WIDGET_METADATA_PATH.name}: widgets.{widget_name}.description must be a string")
 
     return issues

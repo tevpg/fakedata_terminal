@@ -36,9 +36,11 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 LAYOUT_CONFIG_PATH = PACKAGE_DIR / "data" / "layouts.yaml"
 SCREEN_CONFIG_PATH = PACKAGE_DIR / "data" / "screens.yaml"
 WIDGET_CONFIG_PATH = PACKAGE_DIR / "data" / "widgets.yaml"
+WIDGET_SHOWCASE_CONFIG_PATH = PACKAGE_DIR / "data" / "widget_showcase.yaml"
 PACKAGE_CONFIG_PATHS = (
     LAYOUT_CONFIG_PATH,
     WIDGET_CONFIG_PATH,
+    WIDGET_SHOWCASE_CONFIG_PATH,
     SCREEN_CONFIG_PATH,
 )
 USER_CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fakedata-terminal" / "screens.yaml"
@@ -47,7 +49,7 @@ PROJECT_CONFIG_NAMES = (
     ".fakedata-terminal.yml",
 )
 
-TOP_LEVEL_KEYS = {"defaults", "layouts", "screens", "widgets"}
+TOP_LEVEL_KEYS = {"defaults", "layouts", "screens", "widget_showcase", "widgets"}
 DEFAULT_KEYS = {"theme", "speed", "image", "widget", "colour", "color", "glitch", "direction", "timing"}
 LAYOUT_KEYS = {"panels", "regions"}
 PANEL_KEYS = {"x", "y", "w", "h"}
@@ -56,6 +58,10 @@ REGION_KEYS = {"widget", "speed", "density", "text", "theme", "image", "paths", 
 IMAGE_KEYS = {"paths", "path", "glob"}
 CYCLE_KEYS = {"widgets"}
 WIDGET_DEFAULT_KEYS = REGION_KEYS - {"widget"}
+WIDGET_SHOWCASE_KEYS = {"pages"}
+WIDGET_SHOWCASE_PAGE_KEYS = {
+    "widget", "note", "speed", "density", "theme", "text", "colour", "color", "direction", "image", "cycle",
+}
 CANONICAL_DIRECTION_CHOICES = {"forward", "backward", "random", "none"}
 _DIRECTION_ALIASES = {
     "forward": "forward",
@@ -331,6 +337,21 @@ def widget_defaults_catalog(config_paths: tuple[str, ...] | None = None) -> dict
         for widget_name in public_widget_names()
         if widget_metadata_defaults(widget_name, config_paths)
     }
+
+
+def widget_showcase_pages(config_paths: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
+    catalog = load_scene_catalog(config_paths)
+    showcase = catalog.get("widget_showcase", {})
+    if not isinstance(showcase, dict):
+        return []
+    pages = showcase.get("pages", [])
+    if not isinstance(pages, list):
+        return []
+    normalized_pages = []
+    for page_cfg in pages:
+        if isinstance(page_cfg, dict):
+            normalized_pages.append(page_cfg)
+    return normalized_pages
 
 
 def default_image_paths(config_paths: tuple[str, ...] | None = None) -> list[str]:
@@ -621,6 +642,75 @@ def validate_scene_catalog(config_paths: tuple[str, ...] | None = None) -> list[
                     elif isinstance(image_spec, dict):
                         _unknown_keys(image_spec, IMAGE_KEYS, f"screens.{scene_name}.regions.{region_name}.image", issues)
 
+    widget_showcase = catalog.get("widget_showcase", {})
+    if widget_showcase is not None:
+        if not isinstance(widget_showcase, dict):
+            issues.append(f"{config_label}: widget_showcase must be a mapping")
+        else:
+            _unknown_keys(widget_showcase, WIDGET_SHOWCASE_KEYS, "widget_showcase", issues)
+            pages = widget_showcase.get("pages", [])
+            if not isinstance(pages, list):
+                issues.append(f"{config_label}: widget_showcase.pages must be a list")
+            else:
+                for idx, page_cfg in enumerate(pages):
+                    context = f"widget_showcase.pages[{idx}]"
+                    if not isinstance(page_cfg, dict):
+                        issues.append(f"{context} must be a mapping")
+                        continue
+                    _unknown_keys(page_cfg, WIDGET_SHOWCASE_PAGE_KEYS, context, issues)
+                    widget = str(page_cfg.get("widget") or "")
+                    if not widget:
+                        issues.append(f"{context}.widget must be set")
+                        continue
+                    if not _supported_widget(widget):
+                        issues.append(f"{context}.widget uses unsupported widget '{widget}'")
+                        continue
+                    if not widget_enabled(widget, config_paths):
+                        issues.append(f"{context}.widget references disabled widget '{widget}'")
+                    _speed_issues(page_cfg.get("speed"), f"{context}.speed", issues)
+                    if page_cfg.get("density") is not None:
+                        _density_issues(page_cfg.get("density"), f"{context}.density", issues)
+                    theme = page_cfg.get("theme")
+                    if theme is not None and str(theme) not in {
+                        "hacker", "science", "medicine", "pharmacy", "finance", "space", "military", "navigation", "spaceteam",
+                    }:
+                        issues.append(f"{context}.theme must be a recognized theme")
+                    direction = page_cfg.get("direction")
+                    if direction is not None and _direction_value(direction) is None:
+                        issues.append(f"{context}.direction must be one of: forward, backward, random, none")
+                    note = page_cfg.get("note")
+                    if note is not None and not isinstance(note, str):
+                        issues.append(f"{context}.note must be a string")
+                    text = page_cfg.get("text")
+                    if text is not None and not isinstance(text, (str, list)):
+                        issues.append(f"{context}.text must be a string or list of strings")
+                    elif isinstance(text, list) and any(not isinstance(item, str) for item in text):
+                        issues.append(f"{context}.text must be a string or list of strings")
+                    page_color = page_cfg.get("color", page_cfg.get("colour"))
+                    if page_color is not None and not isinstance(page_color, (str, list)):
+                        issues.append(f"{context}.colour must be a string or list of strings")
+                    elif isinstance(page_color, list):
+                        if any(not isinstance(item, str) for item in page_color):
+                            issues.append(f"{context}.colour must be a string or list of strings")
+                        elif any(_color_value(item) is None for item in page_color):
+                            issues.append(f"{context}.colour contains an unrecognized colour name")
+                    elif page_color is not None and _color_value(page_color) is None:
+                        issues.append(f"{context}.colour must be a recognized colour name")
+                    image_spec = page_cfg.get("image")
+                    if image_spec is not None and not isinstance(image_spec, dict):
+                        issues.append(f"{context}.image must be a mapping")
+                    elif isinstance(image_spec, dict):
+                        _unknown_keys(image_spec, IMAGE_KEYS, f"{context}.image", issues)
+                    cycle_spec = page_cfg.get("cycle")
+                    if cycle_spec is not None and not isinstance(cycle_spec, dict):
+                        issues.append(f"{context}.cycle must be a mapping")
+                    elif isinstance(cycle_spec, dict):
+                        _unknown_keys(cycle_spec, CYCLE_KEYS, f"{context}.cycle", issues)
+                        cycle_widgets = cycle_spec.get("widgets")
+                        if cycle_widgets is not None and not isinstance(cycle_widgets, list):
+                            issues.append(f"{context}.cycle.widgets must be a list")
+                    _validate_supported_modifiers(widget, page_cfg, context, issues, config_paths)
+
     widgets = catalog.get("widgets", {})
     if widgets is not None:
         if not isinstance(widgets, dict):
@@ -889,6 +979,8 @@ def _resolve_area_modifiers(widget: str, region_cfg: Any, widget_cfg: dict[str, 
         else:
             color = default_color
             color_source = "default" if color is not None else None
+    if widget == "title_card" and color == "multi":
+        color = "multi-bright"
 
     direction = _region_direction(region_cfg)
     if direction is not None:
@@ -1078,6 +1170,16 @@ def _normalize_catalog_paths(catalog: dict[str, Any], source_path: Path) -> dict
                 if any(key in region_cfg for key in ("paths", "path", "glob")):
                     _normalize_image_mapping(region_cfg, base_dir)
                 _normalize_image_mapping(region_cfg.get("image"), base_dir)
+    widget_showcase = catalog.get("widget_showcase")
+    if isinstance(widget_showcase, dict):
+        pages = widget_showcase.get("pages")
+        if isinstance(pages, list):
+            for page_cfg in pages:
+                if not isinstance(page_cfg, dict):
+                    continue
+                if any(key in page_cfg for key in ("paths", "path", "glob")):
+                    _normalize_image_mapping(page_cfg, base_dir)
+                _normalize_image_mapping(page_cfg.get("image"), base_dir)
     return catalog
 
 
