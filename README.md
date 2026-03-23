@@ -12,7 +12,7 @@ FakeData Terminal renders animated, fake telemetry screens in the terminal. It c
 
 - Renders multi-panel terminal screens using `curses`
 - Drives text widgets from named theme pools such as `science`, `hacker`, `medicine`, and `finance`
-- Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and screen presets from [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml)
+- Loads packaged layouts from [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml), screen presets from [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml), and widget showcase pages from [`data/widget_showcase.yaml`](/home/tags/fakedata_terminal/data/widget_showcase.yaml)
 - Supports widget types including `text`, `gauge`, `matrix`, `bars`, `crash`, `orbit`, `rotate`, `whorl`, `spiral`, `life`, `scope`, `sparkline`, `readouts`, `sweep`, `tunnel`, and `image`
 - Lets you start from a preset screen or build a screen explicitly with `--screen-layout`, `--region-widget`, and supported default/region overrides
 - Supports widget-level fallback defaults in YAML via the top-level `widgets:` section
@@ -149,11 +149,11 @@ The runtime is config-first:
 - Config precedence is: packaged config, then local overlays, then CLI flags
 - Widget defaults can supply fallback `speed`, `text`, `colour`, `theme`, `image`, and `cycle` settings per widget type. `color` is also accepted as an alias.
 
-The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml). Validation, overlay merging, and runtime adaptation are handled in [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
+The packaged base config lives in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml), [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml), and [`data/widget_showcase.yaml`](/home/tags/fakedata_terminal/data/widget_showcase.yaml). Validation, overlay merging, and runtime adaptation are handled in [`scene_config.py`](/home/tags/fakedata_terminal/scene_config.py) and [`cli_config.py`](/home/tags/fakedata_terminal/cli_config.py).
 
 Automatic config search order:
 
-- packaged base: [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml)
+- packaged base: [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml), [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml), and [`data/widget_showcase.yaml`](/home/tags/fakedata_terminal/data/widget_showcase.yaml)
 - user overlay: `~/.config/fakedata-terminal/screens.yaml` (or `$XDG_CONFIG_HOME/fakedata-terminal/screens.yaml`)
 - project overlay: `./.fakedata-terminal.yaml` or `./.fakedata-terminal.yml`
 
@@ -229,7 +229,7 @@ There are two layers of precedence to keep in mind.
 
 Config file merge order:
 
-- packaged base config in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml) and [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml)
+- packaged base config in [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml), [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml), and [`data/widget_showcase.yaml`](/home/tags/fakedata_terminal/data/widget_showcase.yaml)
 - user config in `~/.config/fakedata-terminal/screens.yaml`
 - project config in `./.fakedata-terminal.yaml` or `./.fakedata-terminal.yml`
 - extra `--config PATH` files, in the order given
@@ -252,6 +252,7 @@ Within the merged config, area attributes resolve in this order:
 - [`vocab.py`](/home/tags/fakedata_terminal/vocab.py): theme data generators
 - [`data/layouts.yaml`](/home/tags/fakedata_terminal/data/layouts.yaml): packaged layout geometry and region aliases
 - [`data/screens.yaml`](/home/tags/fakedata_terminal/data/screens.yaml): packaged defaults and screen presets
+- [`data/widget_showcase.yaml`](/home/tags/fakedata_terminal/data/widget_showcase.yaml): packaged widget showcase pages
 - [`data/widgets.yaml`](/home/tags/fakedata_terminal/data/widgets.yaml): widget metadata, defaults, and timing/behavior tunables
 - [`data/`](/home/tags/fakedata_terminal/data): image assets used by image panels
 

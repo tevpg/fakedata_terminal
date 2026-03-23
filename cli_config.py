@@ -26,9 +26,10 @@ try:
         resolve_config_screen,
         resolve_runtime_layout,
         validate_scene_catalog,
+        widget_showcase_pages,
         widget_names,
     )
-    from .widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_enabled, widget_supports
+    from .widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_defaults, widget_enabled, widget_supports
 except ImportError:
     from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label, normalize_colour_spec
     from scene_config import (
@@ -45,9 +46,10 @@ except ImportError:
         resolve_config_screen,
         resolve_runtime_layout,
         validate_scene_catalog,
+        widget_showcase_pages,
         widget_names,
     )
-    from widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_enabled, widget_supports
+    from widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_defaults, widget_enabled, widget_supports
 
 
 DEFAULT_THEME = "science"
@@ -511,6 +513,129 @@ def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str
     return lines
 
 
+def _page_setting_lines(page_cfg: dict, attrs: list[str], image_paths: list[str], *,
+                        showcase_theme: str, showcase_speed: int, showcase_text: str) -> list[str]:
+    labels = {
+        "speed": "speed",
+        "density": "density",
+        "theme": "theme",
+        "text": "text",
+        "colour": "colour",
+        "direction": "direction",
+        "image": "image.paths",
+        "cycle": "cycle.widgets",
+    }
+    lines = ["Current settings:"]
+    widget = str(page_cfg.get("widget") or "")
+    widget_cfg_defaults = widget_defaults(widget)
+    for attr in attrs:
+        key = "colour" if attr == "colour" else attr
+        is_default = False
+        if key == "image":
+            image_spec = page_cfg.get("image")
+            paths = []
+            if isinstance(image_spec, dict):
+                paths = image_spec.get("paths") or []
+                if not paths and image_spec.get("path") is not None:
+                    paths = [image_spec["path"]]
+            if not paths and image_paths:
+                paths = image_paths
+                is_default = True
+            value = f"{len(paths)} path(s)" if paths else "(none)"
+            suffix = " (default)" if is_default else ""
+            lines.append(f"  {labels[key]}: {value}{suffix}")
+            continue
+        if key == "cycle":
+            cycle_spec = page_cfg.get("cycle")
+            widgets = cycle_spec.get("widgets") if isinstance(cycle_spec, dict) else None
+            if not widgets:
+                default_cycle = widget_cfg_defaults.get("cycle")
+                if isinstance(default_cycle, dict):
+                    widgets = default_cycle.get("widgets")
+                    is_default = widgets is not None
+            value = ", ".join(str(name) for name in widgets) if widgets else "(none)"
+            suffix = " (default)" if is_default else ""
+            lines.append(f"  {labels[key]}: {value}{suffix}")
+            continue
+        if key == "speed":
+            value = page_cfg.get("speed")
+            if value is None:
+                value = widget_cfg_defaults.get("speed", showcase_speed)
+                is_default = True
+        elif key == "theme":
+            value = page_cfg.get("theme")
+            if value is None:
+                value = widget_cfg_defaults.get("theme", showcase_theme)
+                is_default = True
+        elif key == "text":
+            value = page_cfg.get("text")
+            if value is None:
+                value = widget_cfg_defaults.get("text", showcase_text)
+                is_default = True
+        elif key == "colour":
+            value = page_cfg.get("colour", page_cfg.get("color"))
+            if value is None:
+                value = widget_cfg_defaults.get("colour", widget_cfg_defaults.get("color"))
+                is_default = True
+        elif key == "direction":
+            value = page_cfg.get("direction")
+            if value is None:
+                value = widget_cfg_defaults.get("direction", "forward")
+                is_default = True
+        elif key == "density":
+            value = page_cfg.get("density")
+            if value is None:
+                value = widget_cfg_defaults.get("density")
+                is_default = True
+        else:
+            value = page_cfg.get(key)
+        if value == "":
+            rendered = "(empty)"
+        elif value is None:
+            rendered = "(none)"
+        else:
+            rendered = str(value).replace("\n", "\\n")
+        suffix = " (default)" if is_default else ""
+        lines.append(f"  {labels[key]}: {rendered}{suffix}")
+    return lines
+
+
+def _widget_showcase_page_description(page_cfg: dict, unavailable: str | None, image_paths: list[str], *,
+                                      showcase_theme: str, showcase_speed: int, showcase_text: str) -> list[str]:
+    widget = str(page_cfg.get("widget") or "")
+    attrs = _widget_attribute_names(widget)
+    base_lines = _widget_showcase_description(widget, attrs, unavailable)
+    current_lines = _page_setting_lines(
+        page_cfg,
+        attrs,
+        image_paths,
+        showcase_theme=showcase_theme,
+        showcase_speed=showcase_speed,
+        showcase_text=showcase_text,
+    )
+    note = page_cfg.get("note")
+    if note:
+        current_lines.extend(["", *str(note).splitlines()])
+    return [widget, "", *base_lines[2:], "", *current_lines]
+
+
+def _default_widget_showcase_page(widget: str, image_paths: list[str]) -> dict:
+    page_cfg: dict[str, object] = {"widget": widget}
+    if widget == "image":
+        page_cfg["image"] = {"paths": image_paths[:]}
+    elif widget in {"blank", "title_card"}:
+        page_cfg["text"] = "Your message here"
+    return page_cfg
+
+
+def _apply_widget_showcase_headers(screens: list[dict]) -> None:
+    total = len(screens)
+    for idx, screen in enumerate(screens, start=1):
+        title = str(screen.get("showcase_title") or screen.get("showcase_widget") or "widget")
+        widget = str(screen.get("showcase_widget") or title)
+        screen["showcase_header_lines"] = [f"{title} ({idx}/{total})", f"widget: {widget}"]
+
+
 def _pad_showcase_description(lines: list[str], header_lines: int) -> list[str]:
     # Showcase headers are drawn directly onto the screen, so reserve that space
     # in the left-hand static panel to avoid painting underneath the header box.
@@ -688,36 +813,146 @@ def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:
     }
 
 
-def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[str], parser,
-                          image_module, image_checker,
-                          config_paths: tuple[str, ...]) -> list[dict]:
-    widgets = _showcase_widget_names(config_paths)
-    if not widgets:
-        parser.error("--widgets found no widgets to show")
+def _showcase_right_region(widget: str, page_cfg: dict, image_paths: list[str]) -> dict:
+    right_cfg = {"widget": widget}
+    for key in ("speed", "density", "text", "theme", "direction"):
+        if page_cfg.get(key) is not None:
+            right_cfg[key] = page_cfg[key]
+    colour_value = page_cfg.get("colour", page_cfg.get("color"))
+    if colour_value is not None:
+        right_cfg["colour"] = colour_value
+    image_spec = page_cfg.get("image")
+    if isinstance(image_spec, dict):
+        right_cfg["image"] = dict(image_spec)
+    elif widget == "image" and image_paths:
+        right_cfg["image"] = {"paths": image_paths[:]}
+    elif widget == "image":
+        right_cfg["image"] = {"paths": image_paths[:]}
+    cycle_spec = page_cfg.get("cycle")
+    if isinstance(cycle_spec, dict):
+        right_cfg["cycle"] = dict(cycle_spec)
+    if widget in {"blank", "title_card"} and "text" not in right_cfg:
+        right_cfg["text"] = "Your message here"
+    return right_cfg
 
+
+def _build_widget_showcase_from_pages(theme: str, speed: int, text: str, image_paths: list[str], parser,
+                                      image_module, image_checker,
+                                      config_paths: tuple[str, ...]) -> list[dict]:
+    pages = widget_showcase_pages(config_paths)
     screens = []
-    for widget in widgets:
-        attrs = _widget_attribute_names(widget)
+    for idx, page_cfg in enumerate(pages):
+        widget = str(page_cfg.get("widget") or "")
         unavailable = _widget_unavailable_reason(widget, image_paths, image_module, image_checker)
-        header_lines = [f"widget: {widget}"]
+        title = str(page_cfg.get("title") or widget)
+        header_lines = [f"widget: {title}"]
+        if title != widget:
+            header_lines.append(f"type: {widget}")
         left_cfg = _static_blank_region(
             _pad_showcase_description(
-                _widget_showcase_description(widget, attrs, unavailable),
+                _widget_showcase_page_description(
+                    page_cfg,
+                    unavailable,
+                    image_paths,
+                    showcase_theme=str(page_cfg.get("theme") or theme),
+                    showcase_speed=int(page_cfg.get("speed") or speed),
+                    showcase_text=str(page_cfg.get("text") or text),
+                ),
                 len(header_lines),
             ),
             align="left",
         )
         if widget == "cycle" or unavailable:
             right_cfg = _static_blank_region(
-                _widget_showcase_description(widget, attrs, unavailable),
+                _widget_showcase_page_description(
+                    page_cfg,
+                    unavailable,
+                    image_paths,
+                    showcase_theme=str(page_cfg.get("theme") or theme),
+                    showcase_speed=int(page_cfg.get("speed") or speed),
+                    showcase_text=str(page_cfg.get("text") or text),
+                ),
                 align="center",
             )
         else:
-            right_cfg = {"widget": widget}
-            if widget == "image":
-                right_cfg["image"] = {"paths": image_paths[:]}
-            elif widget in {"blank", "title_card"}:
-                right_cfg["text"] = "Your message here"
+            right_cfg = _showcase_right_region(widget, page_cfg, image_paths)
+        runtime = resolve_runtime_layout(
+            "2x2",
+            {
+                "L": left_cfg,
+                "R": right_cfg,
+            },
+            parser,
+            scene_name=f"<widgets:{widget}:{idx}>",
+            theme=str(page_cfg.get("theme") or theme),
+            speed=int(page_cfg.get("speed") or speed),
+            text=str(page_cfg.get("text") or text),
+            config_paths=config_paths,
+        )
+        runtime["showcase_title"] = title
+        runtime["showcase_widget"] = widget
+        screens.append(runtime)
+    return screens
+
+
+def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[str], parser,
+                          image_module, image_checker,
+                          config_paths: tuple[str, ...]) -> list[dict]:
+    configured_pages = _build_widget_showcase_from_pages(
+        theme,
+        speed,
+        text,
+        image_paths,
+        parser,
+        image_module,
+        image_checker,
+        config_paths,
+    )
+    widgets = _showcase_widget_names(config_paths)
+    if not widgets:
+        parser.error("--widgets found no widgets to show")
+    covered_widgets = {
+        str(page_cfg.get("widget") or "")
+        for page_cfg in widget_showcase_pages(config_paths)
+        if page_cfg.get("widget")
+    }
+
+    screens = configured_pages[:]
+    for widget in widgets:
+        if widget in covered_widgets:
+            continue
+        page_cfg = _default_widget_showcase_page(widget, image_paths)
+        attrs = _widget_attribute_names(widget)
+        unavailable = _widget_unavailable_reason(widget, image_paths, image_module, image_checker)
+        header_lines = [widget]
+        left_cfg = _static_blank_region(
+            _pad_showcase_description(
+                _widget_showcase_page_description(
+                    page_cfg,
+                    unavailable,
+                    image_paths,
+                    showcase_theme=theme,
+                    showcase_speed=speed,
+                    showcase_text=text,
+                ),
+                len(header_lines),
+            ),
+            align="left",
+        )
+        if widget == "cycle" or unavailable:
+            right_cfg = _static_blank_region(
+                _widget_showcase_page_description(
+                    page_cfg,
+                    unavailable,
+                    image_paths,
+                    showcase_theme=theme,
+                    showcase_speed=speed,
+                    showcase_text=text,
+                ),
+                align="center",
+            )
+        else:
+            right_cfg = _showcase_right_region(widget, page_cfg, image_paths)
         runtime = resolve_runtime_layout(
             "2x2",
             {
@@ -731,8 +966,10 @@ def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[s
             text=text,
             config_paths=config_paths,
         )
-        runtime["showcase_header_lines"] = header_lines
+        runtime["showcase_title"] = header_lines[0]
+        runtime["showcase_widget"] = widget
         screens.append(runtime)
+    _apply_widget_showcase_headers(screens)
     return screens
 
 

@@ -1,0 +1,46 @@
+widget_showcase:
+  pages:
+    - widget: blank
+      title: blank drift forward
+      text: "COLOUR DRIFT"
+      colour: multi
+      speed: 50
+      direction: forward
+      note: >
+        Bare multi uses the bright palette here. Visible characters are assigned
+        colours and the colours rotate to the right.
+    - widget: blank
+      title: blank drift backward
+      text: "COLOUR DRIFT"
+      colour: multi-all
+      speed: 35
+      direction: backward
+      note: >
+        Multi-all gives the widest palette spread. Colours rotate left across
+        the text instead of right.
+    - widget: blank
+      title: blank drift random
+      text: "COLOUR DRIFT"
+      colour: multi-dim
+      speed: 70
+      direction: random
+      note: >
+        Random direction reuses the same motion-probability model as gauge,
+        switching between forward, backward, and pauses over time.
+    - widget: gauge
+      title: gauge random direction
+      text: "PHASE DRIFT"
+      colour: cyan
+      speed: 70
+      direction: random
+      note: >
+        A fast gauge example with random directional motion.
+    - widget: orbit
+      title: orbit dense multi-all
+      colour: multi-all
+      density: 70
+      speed: 65
+      direction: backward
+      note: >
+        Dense orbit field showing combined density, colour, speed, and direction
+        modifiers together.

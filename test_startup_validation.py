@@ -237,6 +237,72 @@ class StartupValidationTests(unittest.TestCase):
         self.assertEqual(areas["P1"]["direction"], "random")
         self.assertEqual(areas["P1"]["colour"], "multi")
 
+    def test_widget_showcase_pages_drive_widgets_showcase_order_and_copy(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(
+                "widget_showcase:\n"
+                "  pages:\n"
+                "    - widget: blank\n"
+                "      title: blank drift\n"
+                "      text: COLOUR DRIFT\n"
+                "      colour: multi-all\n"
+                "      speed: 50\n"
+                "      direction: backward\n"
+                "      note: Backward colour rotation demo.\n"
+                "    - widget: gauge\n"
+                "      text: PHASE DRIFT\n"
+                "      colour: cyan\n"
+                "      speed: 70\n"
+                "      direction: random\n"
+            )
+            config_path = Path(handle.name)
+        try:
+            runtime = prepare_runtime_config(
+                ["--config", str(config_path), "--widgets"],
+                image_module=None,
+                image_checker=lambda: False,
+                demo_scenes=[],
+            )
+        finally:
+            config_path.unlink(missing_ok=True)
+        showcase = runtime["screen_showcase"]
+        self.assertTrue(showcase["active"])
+        self.assertGreaterEqual(len(showcase["screens"]), 2)
+        first = showcase["screens"][0]
+        second = showcase["screens"][1]
+        self.assertRegex(first["showcase_header_lines"][0], r"^blank drift \(1/\d+\)$")
+        self.assertEqual(first["showcase_header_lines"][1], "widget: blank")
+        self.assertRegex(second["showcase_header_lines"][0], r"^gauge \(2/\d+\)$")
+        self.assertEqual(second["showcase_header_lines"][1], "widget: gauge")
+        first_areas = {area["name"]: area for area in first["areas"]}
+        second_areas = {area["name"]: area for area in second["areas"]}
+        self.assertEqual(first_areas["R"]["mode"], "blank")
+        self.assertEqual(first_areas["R"]["colour"], "multi-all")
+        self.assertEqual(first_areas["R"]["direction"], "backward")
+        self.assertEqual(first_areas["R"]["speed"], 50)
+        self.assertEqual(second_areas["R"]["mode"], "gauge")
+        self.assertEqual(second_areas["R"]["speed"], 70)
+        self.assertIn("Current settings:", first_areas["L"]["static_lines"])
+        self.assertIn("  speed: 50", first_areas["L"]["static_lines"])
+        self.assertIn("Backward colour rotation demo.", first_areas["L"]["static_lines"])
+
+    def test_default_widget_showcase_page_includes_current_settings(self) -> None:
+        runtime = prepare_runtime_config(
+            ["--widgets"],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        showcase = runtime["screen_showcase"]
+        fallback_screen = next(
+            screen
+            for screen in showcase["screens"]
+            if len(screen["showcase_header_lines"]) > 1 and screen["showcase_header_lines"][1] == "widget: text"
+        )
+        areas = {area["name"]: area for area in fallback_screen["areas"]}
+        self.assertIn("Current settings:", areas["L"]["static_lines"])
+        self.assertIn("  speed: 55 (default)", areas["L"]["static_lines"])
+
     def test_exported_screen_yaml_includes_density(self) -> None:
         runtime = prepare_runtime_config(
             [
