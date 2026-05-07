@@ -361,6 +361,18 @@ class ImageWidgets:
                     if source_line.endswith(":"):
                         attr |= self.curses.A_BOLD
                     self.stdscr.addnstr(y + r, x, line, safe_w, attr)
+                    na_idx = source_line.find("n/a")
+                    if na_idx >= 0:
+                        token_x = x + (start if align == "center" else 0) + na_idx
+                        token_w = max(0, min(3, safe_w - (token_x - x)))
+                        if token_w > 0:
+                            self.stdscr.addnstr(
+                                y + r,
+                                token_x,
+                                "n/a"[:token_w],
+                                token_w,
+                                self.curses.color_pair(14),
+                            )
             except self.curses.error:
                 pass
 

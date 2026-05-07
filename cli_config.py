@@ -5,6 +5,7 @@ import glob
 import importlib.util
 import math
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -27,8 +28,16 @@ try:
         resolve_runtime_layout,
         validate_scene_catalog,
         widget_names,
+        widget_showcase_pages,
     )
-    from .widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_enabled, widget_supports
+    from .widget_metadata import (
+        set_widget_config_paths,
+        validate_widget_metadata,
+        widget_defaults,
+        widget_description,
+        widget_enabled,
+        widget_supports,
+    )
 except ImportError:
     from runtime_support import COLOUR_CATALOG_COLUMNS, COLOUR_CHOICES, ansi_colour_label, normalize_colour_spec
     from scene_config import (
@@ -46,8 +55,16 @@ except ImportError:
         resolve_runtime_layout,
         validate_scene_catalog,
         widget_names,
+        widget_showcase_pages,
     )
-    from widget_metadata import set_widget_config_paths, validate_widget_metadata, widget_enabled, widget_supports
+    from widget_metadata import (
+        set_widget_config_paths,
+        validate_widget_metadata,
+        widget_defaults,
+        widget_description,
+        widget_enabled,
+        widget_supports,
+    )
 
 
 DEFAULT_THEME = "science"
@@ -370,151 +387,9 @@ def _widget_modifier_lines(widget: str, attrs: list[str]) -> list[str]:
     ]
 
 
-def _widget_showcase_description(widget: str, attrs: list[str], unavailable: str | None) -> list[str]:
-    modifier_lines = _widget_modifier_lines(widget, attrs)
-    descriptions = {
-        "bars": [
-            "Animated vertical bars.",
-            "",
-            *modifier_lines,
-        ],
-        "blank": [
-            "Empty region with optional static text.",
-            "",
-            *modifier_lines,
-        ],
-        "blocks": [
-            "Random block-field activity.",
-            "",
-            *modifier_lines,
-        ],
-        "crash": [
-            "Violent flicker-and-corruption failure display.",
-            "",
-            *modifier_lines,
-            "theme seeds the text fragments.",
-            "colour defaults to multi-all in the renderer.",
-        ],
-        "gauge": [
-            "Large digital gauge display.",
-            "",
-            *modifier_lines,
-        ],
-        "cycle": [
-            "Rotates a region through a configured widget list.",
-            "",
-            *modifier_lines,
-            "cycle.widgets is an ordered widget list.",
-        ],
-        "image": [
-            "ASCII image renderer.",
-            "",
-            *modifier_lines,
-            "image.paths is an ordered image list.",
-            "dependencies: Pillow and jp2a.",
-        ],
-        "life": [
-            "Conway-style cellular automaton.",
-            "",
-            *modifier_lines,
-        ],
-        "matrix": [
-            "Falling glyph rain.",
-            "",
-            *modifier_lines,
-        ],
-        "scope": [
-            "Sweeping signal trace.",
-            "",
-            *modifier_lines,
-            "theme selects the synthetic signal profile.",
-        ],
-        "readouts": [
-            "Stacked telemetry readout lines.",
-            "",
-            *modifier_lines,
-        ],
-        "title_card": [
-            "Centered fitted title text in a large block font.",
-            "",
-            *modifier_lines,
-            "bare multi uses the bright palette for per-glyph colour selection.",
-        ],
-        "orbit": [
-            "Physics-based glyph orbits around the region centre.",
-            "",
-            *modifier_lines,
-            "direction controls orbital handedness or pause.",
-        ],
-        "whorl": [
-            "Glyph field rotating faster near the centre.",
-            "",
-            *modifier_lines,
-            "direction controls rotation direction or pause.",
-        ],
-        "rotate": [
-            "Preloaded glyph field rotating around the region center.",
-            "",
-            *modifier_lines,
-            "direction controls rotation direction or pause.",
-        ],
-        "spiral": [
-            "Glyph field spiraling inward while it rotates.",
-            "",
-            *modifier_lines,
-            "direction controls spin direction or pause.",
-        ],
-        "sparkline": [
-            "Scrolling mini-chart.",
-            "",
-            *modifier_lines,
-            "theme selects the synthetic signal profile.",
-        ],
-        "sweep": [
-            "Single scan beam across the region.",
-            "",
-            *modifier_lines,
-            "direction follows the host region shape.",
-        ],
-        "text": [
-            "Dense scrolling text panel.",
-            "",
-            *modifier_lines,
-            "direction controls forward, backward, or paused scrolling.",
-        ],
-        "text_scant": [
-            "Sparse text panel.",
-            "",
-            *modifier_lines,
-            "direction controls forward, backward, or paused scrolling.",
-        ],
-        "text_spew": [
-            "Fast noisy text output.",
-            "",
-            *modifier_lines,
-        ],
-        "text_wide": [
-            "Wide text panel with larger blocks.",
-            "",
-            *modifier_lines,
-            "direction controls forward, backward, or paused scrolling.",
-        ],
-        "tunnel": [
-            "Moving wireframe tunnel.",
-            "",
-            *modifier_lines,
-        ],
-    }
-    lines = [widget, ""] + descriptions.get(widget, modifier_lines)
-    if unavailable:
-        lines.extend(["", f"status: {unavailable}"])
-    return lines
-
-
-def _pad_showcase_description(lines: list[str], header_lines: int) -> list[str]:
-    # Showcase headers are drawn directly onto the screen, so reserve that space
-    # in the left-hand static panel to avoid painting underneath the header box.
-    return ([""] * (header_lines + 2)) + lines
+class _ShowcaseBuildParser:
+    def error(self, message: str) -> None:
+        raise ValueError(message)
 
 
 def _format_catalog_columns(config_paths: tuple[str, ...], *, colourize: bool = False) -> list[str]:
@@ -688,52 +563,269 @@ def _static_blank_region(lines: list[str], *, align: str = "center") -> dict:
     }
 
 
-def _build_widget_screens(theme: str, speed: int, text: str, image_paths: list[str], parser,
-                          image_module, image_checker,
-                          config_paths: tuple[str, ...]) -> list[dict]:
-    widgets = _showcase_widget_names(config_paths)
-    if not widgets:
-        parser.error("--widgets found no widgets to show")
+def _showcase_base_defaults(theme: str, speed: int, text: str, image_paths: list[str]) -> dict[str, object]:
+    return {
+        "speed": int(speed),
+        "density": 50,
+        "theme": str(theme),
+        "text": str(text),
+        "color": None,
+        "direction": "forward",
+        "image_paths": image_paths[:],
+        "cycle_widgets": [],
+    }
 
-    screens = []
-    for widget in widgets:
-        attrs = _widget_attribute_names(widget)
-        unavailable = _widget_unavailable_reason(widget, image_paths, image_module, image_checker)
-        header_lines = [f"widget: {widget}"]
-        left_cfg = _static_blank_region(
-            _pad_showcase_description(
-                _widget_showcase_description(widget, attrs, unavailable),
-                len(header_lines),
-            ),
-            align="left",
-        )
-        if widget == "cycle" or unavailable:
-            right_cfg = _static_blank_region(
-                _widget_showcase_description(widget, attrs, unavailable),
-                align="center",
-            )
-        else:
-            right_cfg = {"widget": widget}
-            if widget == "image":
-                right_cfg["image"] = {"paths": image_paths[:]}
-            elif widget in {"blank", "title_card"}:
-                right_cfg["text"] = "Your message here"
-        runtime = resolve_runtime_layout(
-            "2x2",
-            {
-                "L": left_cfg,
-                "R": right_cfg,
-            },
-            parser,
-            scene_name=f"<widgets:{widget}>",
-            theme=theme,
-            speed=speed,
-            text=text,
-            config_paths=config_paths,
-        )
-        runtime["showcase_header_lines"] = header_lines
-        screens.append(runtime)
-    return screens
+
+def _coerce_showcase_values(value: object, *, normalize_colour: bool = False, keep_empty: bool = False) -> list[str]:
+    if isinstance(value, list):
+        values = [str(item) for item in value if keep_empty or str(item) != ""]
+    elif value is None:
+        values = []
+    else:
+        values = [str(value)]
+    if normalize_colour:
+        return [normalize_colour_spec(item) for item in values]
+    return values
+
+
+def _showcase_modifier_defaults(widget: str, showcase_defaults: dict[str, object],
+                                config_paths: tuple[str, ...]) -> dict[str, object]:
+    metadata_defaults = widget_defaults(widget, config_paths)
+    color_value = metadata_defaults.get("color")
+    if color_value is None:
+        color_value = metadata_defaults.get("colour", showcase_defaults.get("color"))
+    image_default = metadata_defaults.get("image")
+    image_paths = []
+    if isinstance(image_default, dict):
+        image_paths = list(image_default.get("paths") or [])
+    elif widget == "image":
+        image_paths = list(showcase_defaults.get("image_paths") or [])
+    cycle_default = metadata_defaults.get("cycle")
+    cycle_widgets = []
+    if isinstance(cycle_default, dict):
+        cycle_widgets = [str(item) for item in cycle_default.get("widgets") or []]
+    return {
+        "speed": int(metadata_defaults.get("speed", showcase_defaults["speed"])),
+        "density": int(metadata_defaults.get("density", showcase_defaults["density"])),
+        "theme": str(metadata_defaults.get("theme", showcase_defaults["theme"])),
+        "text": str(metadata_defaults.get("text", showcase_defaults["text"])),
+        "color": color_value,
+        "direction": _direction_value(metadata_defaults.get("direction")) or str(showcase_defaults["direction"]),
+        "image_paths": image_paths,
+        "cycle_widgets": cycle_widgets,
+    }
+
+
+def _showcase_normalize_image_paths(paths: list[object]) -> list[str]:
+    normalized = []
+    package_data_dir = Path(__file__).resolve().parent / "data"
+    for raw_path in paths:
+        candidate = os.path.abspath(os.path.expanduser(str(raw_path)))
+        if not os.path.isfile(candidate):
+            fallback = package_data_dir / Path(candidate).name
+            if fallback.is_file():
+                candidate = str(fallback.resolve())
+        normalized.append(candidate)
+    return normalized
+
+
+def _showcase_page_state(page_cfg: dict[str, object], showcase_defaults: dict[str, object],
+                         config_paths: tuple[str, ...]) -> dict[str, object]:
+    widget = str(page_cfg["widget"])
+    defaults = _showcase_modifier_defaults(widget, showcase_defaults, config_paths)
+    text_values = _coerce_showcase_values(page_cfg.get("text"), keep_empty=True)
+    colour_values = _coerce_showcase_values(page_cfg.get("color", page_cfg.get("colour")), normalize_colour=True)
+    page_theme = page_cfg.get("theme")
+    page_direction = _direction_value(page_cfg.get("direction"))
+    image_paths = _showcase_normalize_image_paths(list(defaults["image_paths"]))
+    if isinstance(page_cfg.get("image"), dict):
+        image_paths = _showcase_normalize_image_paths(list(page_cfg["image"].get("paths") or []))
+    cycle_widgets = list(defaults["cycle_widgets"])
+    if isinstance(page_cfg.get("cycle"), dict):
+        cycle_widgets = [str(item) for item in page_cfg["cycle"].get("widgets") or []]
+    return {
+        "speed": int(page_cfg.get("speed", defaults["speed"])),
+        "density": int(page_cfg.get("density", defaults["density"])),
+        "theme": str(page_theme if page_theme is not None else defaults["theme"]),
+        "text": text_values[0] if text_values else str(defaults["text"]),
+        "text_values": text_values,
+        "color": colour_values[0] if colour_values else defaults["color"],
+        "colour_values": colour_values,
+        "direction": page_direction or str(defaults["direction"]),
+        "image_paths": image_paths,
+        "cycle_widgets": cycle_widgets,
+        "defaults": defaults,
+    }
+
+
+def _showcase_display_value(value: object, modifier: str) -> str:
+    if modifier == "image":
+        paths = list(value or [])
+        if not paths:
+            return "n/a"
+        names = [os.path.basename(str(path)) for path in paths[:2]]
+        suffix = " ..." if len(paths) > 2 else ""
+        return ", ".join(names) + suffix
+    if modifier == "cycle":
+        widgets = [str(item) for item in value or []]
+        if not widgets:
+            return "n/a"
+        joined = ", ".join(widgets[:3])
+        return f"{joined} ..." if len(widgets) > 3 else joined
+    if modifier == "text" and value not in (None, [], {}):
+        text_value = str(value).replace("\n", "\\n")
+        return f"\"{text_value}\""
+    if value in (None, "", [], {}):
+        return "n/a"
+    return str(value)
+
+
+def _showcase_dashboard_line(label: str, current_value: object, default_value: object, *, active: bool) -> str:
+    value_column = 12
+    prefix = f"{label}:"
+    padded_prefix = f"{prefix:<{value_column}}"
+    if not active:
+        return f"{padded_prefix}n/a"
+    current_text = _showcase_display_value(current_value, label.lower())
+    default_text = _showcase_display_value(default_value, label.lower())
+    if default_text == "n/a":
+        return f"{padded_prefix}{current_text}"
+    return f"{padded_prefix}{current_text} (default: {default_text})"
+
+
+def _showcase_controls_lines(widget: str, *, supports: set[str]) -> list[str]:
+    lines = [
+        "Controls",
+        "--------",
+        "PgUp/PgDn: prev/next widget",
+        "Left/Right: speed",
+        "Q or Esc: exit",
+    ]
+    if "density" in supports:
+        lines.append("Up/Down: density")
+    if "text" in supports:
+        lines.append("T: next text sample")
+    if "color" in supports:
+        lines.append("C: next colour sample")
+    if "direction" in supports:
+        lines.append("D: next direction")
+    if "theme" in supports:
+        lines.append("V: next theme")
+    if widget == "cycle":
+        lines.append("Cycle list shown for inspection only")
+    if widget == "image":
+        lines.append("Image list shown for inspection only")
+    return lines
+
+
+def _showcase_left_panel_lines(page_cfg: dict[str, object], state: dict[str, object], *,
+                               idx: int, total: int, unavailable: str | None,
+                               config_paths: tuple[str, ...]) -> list[str]:
+    widget = str(page_cfg["widget"])
+    supports = set(widget_supports(widget, config_paths))
+    attrs = _widget_attribute_names(widget)
+    description = widget_description(widget, config_paths) or "No description yet."
+    note = str(page_cfg.get("note") or "").strip()
+    defaults = state["defaults"] if isinstance(state.get("defaults"), dict) else {}
+    lines = [
+        f"Widget: {widget}",
+        f"Page: {idx}/{total}",
+        "",
+        description,
+    ]
+    if note:
+        lines.extend(["", *note.splitlines()])
+    lines.extend([
+        "",
+        f"Available modifiers: {', '.join(attrs) if attrs else '(none)'}",
+    ])
+    lines.extend([
+        "",
+        "Current settings",
+        "----------------",
+        _showcase_dashboard_line("Speed", state.get("speed"), defaults.get("speed"), active="speed" in supports),
+        _showcase_dashboard_line("Density", state.get("density"), defaults.get("density"), active="density" in supports),
+        _showcase_dashboard_line("Theme", state.get("theme"), defaults.get("theme"), active="theme" in supports),
+        _showcase_dashboard_line("Text", state.get("text"), defaults.get("text"), active="text" in supports),
+        _showcase_dashboard_line("Colour", state.get("color"), defaults.get("color"), active="color" in supports),
+        _showcase_dashboard_line("Direction", state.get("direction"), defaults.get("direction"), active="direction" in supports),
+    ])
+    if unavailable:
+        lines.extend(["", f"Status: {unavailable}"])
+    lines.extend(["", *_showcase_controls_lines(widget, supports=supports)])
+    return lines
+
+
+def _showcase_right_region(widget: str, state: dict[str, object]) -> dict:
+    supports = set(widget_supports(widget))
+    right_cfg: dict[str, object] = {"widget": widget}
+    if "speed" in supports:
+        right_cfg["speed"] = int(state.get("speed") or 50)
+    if "density" in supports:
+        right_cfg["density"] = int(state.get("density") or 50)
+    if "text" in supports and state.get("text") is not None:
+        right_cfg["text"] = state["text"]
+    if "theme" in supports and state.get("theme"):
+        right_cfg["theme"] = state["theme"]
+    if "direction" in supports and state.get("direction"):
+        right_cfg["direction"] = state["direction"]
+    if "color" in supports and state.get("color") is not None:
+        right_cfg["colour"] = state["color"]
+    if widget == "image":
+        right_cfg["image"] = {"paths": list(state.get("image_paths") or [])}
+    if widget == "cycle":
+        right_cfg["cycle"] = {"widgets": list(state.get("cycle_widgets") or [])}
+    if widget in {"blank", "title_card"} and state.get("text") is None and "text" not in right_cfg:
+        right_cfg["text"] = "Your message here"
+    return right_cfg
+
+
+def build_widget_showcase_screen(showcase: dict[str, object], idx: int, *, image_module, image_checker, parser=None) -> dict:
+    pages = showcase.get("pages") or []
+    if not isinstance(pages, list) or not pages:
+        raise ValueError("widget showcase has no pages")
+    states = showcase.get("states") or {}
+    if not isinstance(states, dict):
+        raise ValueError("widget showcase states must be a mapping")
+    total = len(pages)
+    page_cfg = pages[idx % total]
+    if not isinstance(page_cfg, dict):
+        raise ValueError("widget showcase page must be a mapping")
+    widget = str(page_cfg["widget"])
+    state = states.get(widget)
+    if not isinstance(state, dict):
+        raise ValueError(f"widget showcase state missing for '{widget}'")
+    build_parser = parser or _ShowcaseBuildParser()
+    showcase_paths = tuple(showcase.get("config_paths") or ())
+    unavailable = _widget_unavailable_reason(widget, list(showcase.get("image_paths") or []), image_module, image_checker)
+    left_lines = _showcase_left_panel_lines(
+        page_cfg,
+        state,
+        idx=(idx % total) + 1,
+        total=total,
+        unavailable=unavailable,
+        config_paths=showcase_paths,
+    )
+    left_cfg = _static_blank_region(left_lines, align="left")
+    if widget == "cycle" or unavailable:
+        right_cfg = _static_blank_region(left_lines, align="center")
+    else:
+        right_cfg = _showcase_right_region(widget, state)
+    runtime = resolve_runtime_layout(
+        "2x2",
+        {"L": left_cfg, "R": right_cfg},
+        build_parser,
+        scene_name=f"<widgets:{widget}>",
+        theme=str(state.get("theme") or showcase.get("theme") or DEFAULT_THEME),
+        speed=int(state.get("speed") or showcase.get("speed") or 50),
+        text=str(state.get("text") or showcase.get("text") or ""),
+        direction=str(state.get("direction") or "forward"),
+        config_paths=showcase_paths,
+    )
+    runtime["showcase_header_lines"] = [f"{widget} ({(idx % total) + 1}/{total})"]
+    runtime["showcase_widget"] = widget
+    runtime["showcase_title"] = widget
+    return runtime
 
 
 def _build_screen_screens(parser, config_paths: tuple[str, ...]) -> list[dict]:
@@ -749,17 +841,47 @@ def _build_widget_showcase(theme: str, speed: int, text: str, image_paths: list[
                            image_module, image_checker,
                            config_paths: tuple[str, ...] | None = None) -> dict:
     resolved_paths = config_paths or ()
-    screens = _build_widget_screens(theme, speed, text, image_paths, parser, image_module, image_checker, resolved_paths)
-    initial = screens[0]
-    return {
+    pages = widget_showcase_pages(resolved_paths)
+    configured_widgets = {str(page_cfg.get("widget") or "") for page_cfg in pages if isinstance(page_cfg, dict)}
+    for widget in _showcase_widget_names(resolved_paths):
+        if widget not in configured_widgets:
+            pages.append({"widget": widget})
+    if not pages:
+        parser.error("--widgets found no widgets to show")
+    showcase_defaults = _showcase_base_defaults(theme, speed, text, image_paths)
+    states = {
+        str(page_cfg["widget"]): _showcase_page_state(page_cfg, showcase_defaults, resolved_paths)
+        for page_cfg in pages
+        if isinstance(page_cfg, dict) and page_cfg.get("widget")
+    }
+    showcase = {
         "active": True,
-        "screens": screens,
+        "mode": "widgets",
+        "pages": pages,
+        "states": states,
+        "screens": [],
         "idx": 0,
         "next": float("inf"),
         "pair_duration": 10.0,
         "done": False,
-        "initial": initial,
+        "theme": theme,
+        "speed": speed,
+        "text": text,
+        "image_paths": image_paths[:],
+        "config_paths": resolved_paths,
     }
+    showcase["screens"] = [
+        build_widget_showcase_screen(
+            showcase,
+            page_idx,
+            image_module=image_module,
+            image_checker=image_checker,
+            parser=parser,
+        )
+        for page_idx in range(len(pages))
+    ]
+    showcase["initial"] = showcase["screens"][0]
+    return showcase
 
 
 def _build_screen_showcase(parser, config_paths: tuple[str, ...] | None = None) -> dict:

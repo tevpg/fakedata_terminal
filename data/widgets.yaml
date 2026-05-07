@@ -33,6 +33,7 @@ defaults:
 widgets:
   text:
     enabled: true
+    description: Dense scrolling text panel for terminal-style chatter.
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
@@ -50,6 +51,7 @@ widgets:
 
   text_scant:
     enabled: true
+    description: Sparse scrolling text panel with more open space between lines.
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
@@ -67,6 +69,7 @@ widgets:
 
   text_spew:
     enabled: true
+    description: Fast noisy text output for bursty console effects.
     supports: [speed, theme, text]
     defaults: {}
     timing:
@@ -75,6 +78,7 @@ widgets:
 
   bars:
     enabled: true
+    description: Animated vertical bars that drift like a live meter bank.
     supports: [speed, theme, text]
     defaults: {}
     timing:
@@ -83,6 +87,7 @@ widgets:
 
   crash:
     enabled: true
+    description: Violent flicker-and-corruption display for failure or alarm moments.
     supports: [speed, theme, color]
     defaults:
       color: multi-all
@@ -92,6 +97,7 @@ widgets:
 
   orbit:
     enabled: true
+    description: Glyphs orbit around the center in a force-driven field.
     supports: [speed, density, color, direction]
     defaults:
       color: multi-bright
@@ -114,6 +120,7 @@ widgets:
 
   rotate:
     enabled: true
+    description: A seeded glyph field rotates around the region center.
     supports: [speed, density, color, direction]
     defaults:
       color: multi-all
@@ -135,6 +142,7 @@ widgets:
 
   whorl:
     enabled: true
+    description: A rotating glyph field spins faster near the center than the edges.
     supports: [speed, density, color, direction]
     defaults:
       color: multi-all
@@ -157,6 +165,7 @@ widgets:
 
   spiral:
     enabled: true
+    description: A glyph field spirals while rotating toward the center.
     supports: [speed, density, color, direction]
     defaults:
       color: multi-all
@@ -179,6 +188,7 @@ widgets:
 
   gauge:
     enabled: true
+    description: Large gauge-style instrumentation with dial motion and text.
     supports: [speed, density, color, text, direction]
     defaults: {}
     timing:
@@ -200,6 +210,7 @@ widgets:
 
   scope:
     enabled: true
+    description: Sweeping waveform trace that reads like a live scope display.
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
@@ -217,6 +228,7 @@ widgets:
 
   sparkline:
     enabled: true
+    description: Small scrolling chart for compact signal or trend displays.
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
@@ -235,6 +247,7 @@ widgets:
 
   tunnel:
     enabled: true
+    description: Moving wireframe tunnel that suggests forward motion through space.
     supports: [speed, color, text, direction]
     defaults: {}
     timing:
@@ -252,6 +265,7 @@ widgets:
 
   text_wide:
     enabled: true
+    description: Wide text panel with chunkier blocks and broader spacing.
     supports: [speed, theme, text, direction]
     defaults: {}
     timing:
@@ -284,6 +298,7 @@ widgets:
 
   matrix:
     enabled: true
+    description: Falling glyph rain with controllable speed and density.
     supports: [speed, density]
     defaults: {}
     timing:
@@ -293,6 +308,7 @@ widgets:
 
   blocks:
     enabled: true
+    description: Randomized block-field activity for abstract visual texture.
     supports: [speed, density, color, direction, text]
     defaults: {}
     timing:
@@ -302,6 +318,7 @@ widgets:
 
   sweep:
     enabled: true
+    description: A single scanning beam that sweeps across the host region.
     supports: [speed, density]
     defaults: {}
     timing:
@@ -311,6 +328,7 @@ widgets:
 
   readouts:
     enabled: true
+    description: Stacked telemetry-style readout lines for compact dashboard panels.
     supports: [theme, text, color]
     defaults: {}
     timing:
@@ -325,6 +343,7 @@ widgets:
 
   title_card:
     enabled: true
+    description: Centered fitted title text rendered as a bold display card.
     supports: [speed, text, color]
     defaults:
       color: bright-green
@@ -333,6 +352,7 @@ widgets:
 
   image:
     enabled: true
+    description: ASCII image renderer backed by image files.
     supports: [speed, image]
     defaults: {}
     timing:
@@ -345,6 +365,7 @@ widgets:
 
   life:
     enabled: true
+    description: Conway-style cellular automaton with adjustable activity density.
     supports: [speed, density, color]
     defaults: {}
     timing:
@@ -358,6 +379,7 @@ widgets:
 
   blank:
     enabled: true
+    description: Empty panel that can optionally show a text message.
     supports: [speed, text, color, direction]
     defaults: {}
     timing:
@@ -375,6 +397,7 @@ widgets:
 
   cycle:
     enabled: true
+    description: Rotates a region through an ordered list of other widgets.
     supports: [speed, theme, color, cycle]
     defaults:
       cycle:

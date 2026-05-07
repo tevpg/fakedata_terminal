@@ -49,7 +49,7 @@ ESC_EXIT_COUNT = 3
 ESC_EXIT_WINDOW_SECONDS = 1.0
 
 try:
-    from .cli_config import prepare_runtime_config
+    from .cli_config import build_widget_showcase_screen, prepare_runtime_config
     from .layout_support import (
         config_area_specs as build_config_area_specs,
         cycle_widget_names as list_cycle_widget_names,
@@ -95,7 +95,7 @@ try:
         HEX_WORD, _build_pools, get_bar_config, get_gauge_config, random_line, random_rcol_line,
     )
 except ImportError:
-    from cli_config import prepare_runtime_config
+    from cli_config import build_widget_showcase_screen, prepare_runtime_config
     from layout_support import (
         config_area_specs as build_config_area_specs,
         cycle_widget_names as list_cycle_widget_names,
@@ -499,7 +499,7 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
         screen_body["theme"] = factored_screen_theme
     if factored_screen_speed is not _UNFACTORED:
         screen_body["speed"] = factored_screen_speed
-    if factored_screen_density is not _UNFACTORED:
+    if factored_screen_density is not _UNFACTORED and factored_screen_density is not None:
         screen_body["density"] = factored_screen_density
     if factored_screen_text is not _UNFACTORED:
         screen_body["text"] = _escape_export_text_modifier(factored_screen_text)
@@ -515,8 +515,11 @@ def _export_screen_definition(config_screen: dict, area_states: dict[str, dict],
             "widget": area["mode"],
         }
         if "density" in widget_supports(area["mode"]):
-            if factored_screen_density is _UNFACTORED or entry["density"] != factored_screen_density:
-                region_body["density"] = clamp_density(area.get("density"))
+            density_source = (area.get("modifier_sources") or {}).get("density")
+            if density_source in {None, "widget_default"}:
+                region_body["density"] = 50
+            else:
+                region_body["density"] = clamp_density(entry["density"])
 
         if factored_screen_speed is _UNFACTORED or entry["speed"] != factored_screen_speed:
             region_body["speed"] = entry["speed"]
@@ -998,6 +1001,8 @@ def main(stdscr):
     def _draw_showcase_header():
         if not _screen_showcase_state["active"] or not CONFIG_SCREEN:
             return
+        if _screen_showcase_state.get("mode") == "widgets":
+            return
         header_lines = CONFIG_SCREEN.get("showcase_header_lines") or []
         if not header_lines:
             return
@@ -1016,7 +1021,9 @@ def main(stdscr):
     def _draw_showcase_footer():
         if not _screen_showcase_state["active"] or rows < 1:
             return
-        label = f"[Left/h] back  [Right/l] forward  [+/-] faster/slower  [Q] exit   Speed: {current_base_speed}"
+        if _screen_showcase_state.get("mode") == "widgets":
+            return
+        label = f"[PgUp/Dn] browse  [←/→] speed  [Space] pause  [Q] exit  Speed: {current_base_speed}%"
         try:
             stdscr.addnstr(
                 rows - 1,
@@ -1215,24 +1222,108 @@ def main(stdscr):
         except curses.error:
             pass
 
-    def _set_showcase_scene(next_idx: int) -> None:
+    def _apply_showcase_runtime(runtime_screen: dict, next_idx: int) -> None:
         global CONFIG_SCREEN, THEME_ARG
-        nonlocal area_specs, area_states
+        nonlocal area_specs, area_states, current_base_speed
         now = time.monotonic()
-        screens = _screen_showcase_state.get("screens", [])
-        if not screens:
-            return
-        next_idx %= len(screens)
         _screen_showcase_state["idx"] = next_idx
         _screen_showcase_state["done"] = False
-        CONFIG_SCREEN = screens[next_idx]
+        CONFIG_SCREEN = runtime_screen
         THEME_ARG = CONFIG_SCREEN.get("theme", THEME_ARG)
+        current_base_speed = int(CONFIG_SCREEN.get("speed") or current_base_speed)
         GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
         area_specs = _current_area_specs(rows, cols)
         area_states = _sync_areas(area_specs, now)
         _sync_cycle_start_modes(area_specs, area_states, now)
         for spec in area_specs:
             _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"], now)
+
+    def _set_showcase_scene(next_idx: int) -> None:
+        screens = _screen_showcase_state.get("screens", [])
+        if not screens:
+            return
+        next_idx %= len(screens)
+        if _screen_showcase_state.get("mode") == "widgets":
+            try:
+                runtime_screen = build_widget_showcase_screen(
+                    _screen_showcase_state,
+                    next_idx,
+                    image_module=Image,
+                    image_checker=lambda: shutil.which("jp2a") is not None,
+                )
+            except ValueError:
+                return
+            _screen_showcase_state["screens"][next_idx] = runtime_screen
+            _apply_showcase_runtime(runtime_screen, next_idx)
+            return
+        _apply_showcase_runtime(screens[next_idx], next_idx)
+
+    def _current_widget_showcase_state() -> tuple[str, dict] | tuple[None, None]:
+        if _screen_showcase_state.get("mode") != "widgets":
+            return None, None
+        pages = _screen_showcase_state.get("pages") or []
+        if not isinstance(pages, list) or not pages:
+            return None, None
+        page_cfg = pages[_screen_showcase_state["idx"] % len(pages)]
+        if not isinstance(page_cfg, dict):
+            return None, None
+        widget = str(page_cfg.get("widget") or "")
+        states = _screen_showcase_state.get("states") or {}
+        state = states.get(widget) if isinstance(states, dict) else None
+        if not widget or not isinstance(state, dict):
+            return None, None
+        return widget, state
+
+    def _cycle_widget_showcase_list(key_name: str) -> None:
+        widget, state = _current_widget_showcase_state()
+        if not widget or not state:
+            return
+        values = list(state.get(key_name) or [])
+        if len(values) < 2:
+            return
+        current_key = "color" if key_name == "colour_values" else key_name[:-7]
+        current_value = state.get(current_key)
+        try:
+            current_idx = values.index(str(current_value))
+        except ValueError:
+            current_idx = -1
+        state[current_key] = values[(current_idx + 1) % len(values)]
+        _set_showcase_scene(_screen_showcase_state["idx"])
+
+    def _cycle_widget_showcase_theme() -> None:
+        widget, state = _current_widget_showcase_state()
+        if not widget or not state or "theme" not in widget_supports(widget):
+            return
+        if not _ALL_THEMES:
+            return
+        current = str(state.get("theme") or _ALL_THEMES[0])
+        try:
+            current_idx = _ALL_THEMES.index(current)
+        except ValueError:
+            current_idx = -1
+        state["theme"] = _ALL_THEMES[(current_idx + 1) % len(_ALL_THEMES)]
+        _set_showcase_scene(_screen_showcase_state["idx"])
+
+    def _cycle_widget_showcase_direction() -> None:
+        widget, state = _current_widget_showcase_state()
+        if not widget or not state or "direction" not in widget_supports(widget):
+            return
+        choices = ["forward", "backward", "random", "none"]
+        current = str(state.get("direction") or choices[0])
+        try:
+            current_idx = choices.index(current)
+        except ValueError:
+            current_idx = -1
+        state["direction"] = choices[(current_idx + 1) % len(choices)]
+        _set_showcase_scene(_screen_showcase_state["idx"])
+
+    def _adjust_widget_showcase_numeric(modifier: str, delta: int) -> None:
+        widget, state = _current_widget_showcase_state()
+        if not widget or not state or modifier not in widget_supports(widget):
+            return
+        current = int(state.get(modifier) or 50)
+        state[modifier] = max(1, min(100, current + delta))
+        _set_showcase_scene(_screen_showcase_state["idx"])
 
     def _legacy_area_specs(cols: int):
         return build_legacy_area_specs(
@@ -1440,10 +1531,44 @@ def main(stdscr):
                 )
             break
         if _screen_showcase_state["active"] and key in (curses.KEY_LEFT, ord('h'), ord('H')):
-            _set_showcase_scene(_screen_showcase_state["idx"] - 1)
+            if _screen_showcase_state.get("mode") == "widgets":
+                _adjust_widget_showcase_numeric("speed", -1)
+            else:
+                speed_now = time.monotonic()
+                _adjust_runtime_speeds(-1, speed_now)
+                _show_speed_overlay(speed_now)
             continue
         if _screen_showcase_state["active"] and key in (curses.KEY_RIGHT, ord('l'), ord('L')):
+            if _screen_showcase_state.get("mode") == "widgets":
+                _adjust_widget_showcase_numeric("speed", 1)
+            else:
+                speed_now = time.monotonic()
+                _adjust_runtime_speeds(1, speed_now)
+                _show_speed_overlay(speed_now)
+            continue
+        if _screen_showcase_state["active"] and key == curses.KEY_PPAGE:
+            _set_showcase_scene(_screen_showcase_state["idx"] - 1)
+            continue
+        if _screen_showcase_state["active"] and key == curses.KEY_NPAGE:
             _set_showcase_scene(_screen_showcase_state["idx"] + 1)
+            continue
+        if _screen_showcase_state["active"] and _screen_showcase_state.get("mode") == "widgets" and key == curses.KEY_UP:
+            _adjust_widget_showcase_numeric("density", 1)
+            continue
+        if _screen_showcase_state["active"] and _screen_showcase_state.get("mode") == "widgets" and key == curses.KEY_DOWN:
+            _adjust_widget_showcase_numeric("density", -1)
+            continue
+        if _screen_showcase_state["active"] and _screen_showcase_state.get("mode") == "widgets" and key in (ord('t'), ord('T')):
+            _cycle_widget_showcase_list("text_values")
+            continue
+        if _screen_showcase_state["active"] and _screen_showcase_state.get("mode") == "widgets" and key in (ord('c'), ord('C')):
+            _cycle_widget_showcase_list("colour_values")
+            continue
+        if _screen_showcase_state["active"] and _screen_showcase_state.get("mode") == "widgets" and key in (ord('d'), ord('D')):
+            _cycle_widget_showcase_direction()
+            continue
+        if _screen_showcase_state["active"] and _screen_showcase_state.get("mode") == "widgets" and key in (ord('v'), ord('V')):
+            _cycle_widget_showcase_theme()
             continue
         if key == ord(' '):
             if _paused:
@@ -1453,11 +1578,11 @@ def main(stdscr):
             else:
                 _paused = True
                 _paused_at = time.monotonic()
-        elif key in (ord('+'), ord('=')):
+        elif key in (ord('+'), ord('=')) and _screen_showcase_state.get("mode") != "widgets":
             speed_now = time.monotonic()
             _adjust_runtime_speeds(1, speed_now)
             _show_speed_overlay(speed_now)
-        elif key == ord('-'):
+        elif key == ord('-') and _screen_showcase_state.get("mode") != "widgets":
             speed_now = time.monotonic()
             _adjust_runtime_speeds(-1, speed_now)
             _show_speed_overlay(speed_now)

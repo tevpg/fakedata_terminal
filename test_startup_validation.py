@@ -15,6 +15,8 @@ import yaml
 from cli_config import prepare_runtime_config
 import fakedata_terminal
 from fakedata_terminal import _export_screen_definition
+from scene_config import widget_showcase_pages
+from widget_metadata import widget_description
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -30,6 +32,35 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 class StartupValidationTests(unittest.TestCase):
+    def test_widget_metadata_descriptions_are_available(self) -> None:
+        self.assertEqual(
+            widget_description("gauge"),
+            "Large gauge-style instrumentation with dial motion and text.",
+        )
+
+    def test_widget_showcase_pages_follow_packaged_order(self) -> None:
+        pages = widget_showcase_pages()
+        self.assertGreaterEqual(len(pages), 5)
+        self.assertEqual([page["widget"] for page in pages[:5]], ["blank", "title_card", "text", "text_scant", "text_wide"])
+
+    def test_prepare_runtime_builds_interactive_widget_showcase_state(self) -> None:
+        runtime = prepare_runtime_config(
+            ["--widgets"],
+            image_module=None,
+            image_checker=lambda: False,
+            demo_scenes=[],
+        )
+        showcase = runtime["screen_showcase"]
+        self.assertTrue(showcase["active"])
+        self.assertEqual(showcase["mode"], "widgets")
+        self.assertIn(str((ROOT_DIR / "data" / "widget_showcase.yaml").resolve()), showcase["config_paths"])
+        self.assertEqual(runtime["config_screen"]["showcase_widget"], "blank")
+        self.assertTrue(showcase["states"]["blank"]["text_values"])
+        self.assertEqual(showcase["states"]["blank"]["text_values"][0], "")
+        self.assertEqual(showcase["states"]["gauge"]["colour_values"], ["cyan", "yellow", "multi"])
+        self.assertEqual(showcase["states"]["gauge"]["direction"], "random")
+        self.assertTrue(showcase["states"]["image"]["image_paths"][0].endswith("/data/geom_33_torus.png"))
+
     def test_speed_precedence_widget_defaults_region_and_cli(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
             handle.write(
