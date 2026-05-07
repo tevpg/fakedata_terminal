@@ -17,23 +17,22 @@ widget_showcase:
         Title cards are for short bold labels rather than animation-heavy content.
       speed: 50
       text:
-        - "MISSION"
-        - "ALERT"
-        - "WELCOME"
+        - "SAMPLE"
+        - "MULTIPLE\nLINE\nSAMPLE"
       colour:
+        - bright-green
         - bright-white
         - cyan
         - multi
     - widget: text
       note: >
         Dense text benefits from theme shifts and clear direction changes.
-      speed: 58
+      speed: 40
       theme: science
-      direction: forward
+      direction: random
       text:
-        - "SIGNAL LOCK"
-        - "PHASE DRIFT"
-        - "ACQUIRE TARGET"
+        - "  **** THIS IS INSERTED TEXT ****  "
+        - ""
     - widget: text_scant
       note: >
         Sparse text leaves room for the words to read cleanly at a distance.
@@ -46,23 +45,17 @@ widget_showcase:
         - "tracking"
     - widget: text_wide
       note: >
-        Wide text reads like a banner and works well with slower motion.
+        This is a dense wall of text with a theme-based vocabulary.
       speed: 40
-      theme: navigation
+      theme: science
       direction: forward
       text:
-        - "WAYPOINT"
-        - "DOCKING"
-        - "TRANSFER"
+        - "  **** THIS IS INSERTED TEXT ****  "
+        - ""
     - widget: text_spew
       note: >
-        This variant is useful when you want the console to feel overloaded.
+        This throws easily-available text on the screen as fast as possible.
       speed: 78
-      theme: military
-      text:
-        - "burst mode"
-        - "link unstable"
-        - "retrying"
     - widget: bars
       note: >
         Bars take text samples but primarily read as a motion-heavy meter bank.

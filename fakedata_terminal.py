@@ -1023,7 +1023,7 @@ def main(stdscr):
             return
         if _screen_showcase_state.get("mode") == "widgets":
             return
-        label = f"[Left/h] back  [Right/l] forward  [+/-] faster/slower  [Q] exit   Speed: {current_base_speed}"
+        label = f"[PgUp/Dn] browse  [←/→] speed  [Space] pause  [Q] exit  Speed: {current_base_speed}%"
         try:
             stdscr.addnstr(
                 rows - 1,
@@ -1534,13 +1534,17 @@ def main(stdscr):
             if _screen_showcase_state.get("mode") == "widgets":
                 _adjust_widget_showcase_numeric("speed", -1)
             else:
-                _set_showcase_scene(_screen_showcase_state["idx"] - 1)
+                speed_now = time.monotonic()
+                _adjust_runtime_speeds(-1, speed_now)
+                _show_speed_overlay(speed_now)
             continue
         if _screen_showcase_state["active"] and key in (curses.KEY_RIGHT, ord('l'), ord('L')):
             if _screen_showcase_state.get("mode") == "widgets":
                 _adjust_widget_showcase_numeric("speed", 1)
             else:
-                _set_showcase_scene(_screen_showcase_state["idx"] + 1)
+                speed_now = time.monotonic()
+                _adjust_runtime_speeds(1, speed_now)
+                _show_speed_overlay(speed_now)
             continue
         if _screen_showcase_state["active"] and key == curses.KEY_PPAGE:
             _set_showcase_scene(_screen_showcase_state["idx"] - 1)
