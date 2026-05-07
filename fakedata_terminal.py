@@ -10,12 +10,12 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from typing import TypedDict, cast
 
 if sys.platform == "win32":
     try:
         import curses
     except ImportError:
-        import subprocess
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "windows-curses"],
             stdout=subprocess.DEVNULL,
@@ -44,9 +44,47 @@ except ImportError:
 SCRIPT_NAME = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else os.path.basename(__file__)
 CONFIG_SCREEN = None
 IGNORE_KEYBOARD = False
-_screen_showcase_state = {"active": False, "screens": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
+IMAGE_PATHS: list[str] = []
+SPEED_ARG = 50
+MAIN_SPEED_ARG = None
+SIDEBAR_SPEED_ARG = None
+LIFE_MAX_ITERATIONS = 200
+INJECT_TEXT = ""
+MAIN_MODE = "text"
+SIDEBAR_MODE = "none"
+THEME_ARG = "science"
+_ALL_THEMES: list[str] = []
+GLITCH_INTERVAL = 0.0
+EXIT_AFTER = None
 ESC_EXIT_COUNT = 3
 ESC_EXIT_WINDOW_SECONDS = 1.0
+
+
+class DemoScreen(TypedDict):
+    theme: str
+    main: str
+    sidebar: str
+    duration: float
+
+
+class DemoState(TypedDict):
+    active: bool
+    screens: list[DemoScreen]
+    idx: int
+    screen: DemoScreen | None
+    next: float
+    done: bool
+
+
+_demo_state: DemoState = {
+    "active": False,
+    "screens": [],
+    "idx": 0,
+    "screen": None,
+    "next": float("inf"),
+    "done": False,
+}
+_screen_showcase_state = {"active": False, "screens": [], "idx": 0, "next": float("inf"), "pair_duration": 10.0, "done": False}
 
 try:
     from .cli_config import build_widget_showcase_screen, prepare_runtime_config
@@ -141,7 +179,7 @@ except ImportError:
         HEX_WORD, _build_pools, get_bar_config, get_gauge_config, random_line, random_rcol_line,
     )
 
-DEMO_SCENES = [
+DEMO_SCENES: list[DemoScreen] = [
     {"theme": "hacker",     "main": "text_wide",     "sidebar": "bars",         "duration": 10.0},
     {"theme": "medicine",   "main": "readouts",      "sidebar": "text_scant",   "duration": 10.0},
     {"theme": "pharmacy",   "main": "text",          "sidebar": "sparkline",    "duration": 10.0},
@@ -753,6 +791,12 @@ def main(stdscr):
         image_widgets,
     ]
 
+    def _family_for_mode(mode: str):
+        for family in widget_families:
+            if family.handles_mode(mode):
+                return family
+        return None
+
     def _draw_separator(nrows, left_w):
         if _effective_sidebar_mode() == "none":
             return
@@ -879,12 +923,6 @@ def main(stdscr):
         area[key] = visible[:]
         area["direction_motion_prev"] = motion
 
-    def _family_for_mode(mode: str):
-        for family in widget_families:
-            if family.handles_mode(mode):
-                return family
-        return None
-
     def _reset_area_timing(area: dict, now: float):
         role = area.get("role", "main")
         _sync_area_speed_state(area, role)
@@ -903,9 +941,10 @@ def main(stdscr):
         mode = text_widgets.effective_mode(area)
         area["role"] = role
         _sync_area_speed_state(area, role)
-        family = _family_for_mode(mode)
-        if family is not None:
-            family.ensure(area, rows, width, role, now)
+        for family in widget_families:
+            if family.handles_mode(mode):
+                family.ensure(area, rows, width, role, now)
+                break
 
     def _step_area(area: dict, rows: int, width: int, role: str, now: float, dt: float):
         if area["mode"] == "cycle":
@@ -921,14 +960,16 @@ def main(stdscr):
         if not frozen_by_direction:
             area["tick"] += 1
         _ensure_area(area, rows, width, role, now)
-        family = _family_for_mode(mode)
-        if family is text_widgets:
-            family.update(area, rows, width, role, now, dt)
-        elif family is visual_widgets:
+        if text_widgets.handles_mode(mode):
+            text_widgets.update(area, rows, width, role, now, dt)
+        elif visual_widgets.handles_mode(mode):
             if not (frozen_by_direction and mode in {"gauge", "scope", "tunnel"}):
-                family.update(area, rows, width, role, now, dt, area_speed)
-        elif family is metrics_widgets:
-            family.update(
+                visual_widgets.update(area, rows, width, role, now, dt, area_speed)
+        elif metrics_widgets.handles_mode(mode):
+            # Pylint sometimes loses the concrete MetricsWidgets type here and
+            # misreads the keyword-only tail of MetricsWidgets.update(...).
+            # pylint: disable=too-many-function-args,unexpected-keyword-arg
+            metrics_widgets.update(
                 area,
                 rows,
                 width,
@@ -938,8 +979,8 @@ def main(stdscr):
                 resolved_direction_motion=_resolved_area_direction_motion,
                 stabilize_direction_history=_stabilize_direction_history,
             )
-        elif family is image_widgets:
-            family.update(area, rows, width, role, now, dt)
+        elif image_widgets.handles_mode(mode):
+            image_widgets.update(area, rows, width, role, now, dt)
 
         interval = widget_interval(mode, area_speed)
         area["next_update"] = schedule_next(area["next_update"], now, interval)
@@ -1596,9 +1637,13 @@ def main(stdscr):
                 break
             _demo_state["idx"] = next_idx
             _demo_state["screen"] = _demo_state["screens"][next_idx]
-            THEME_ARG = _demo_state["screen"]["theme"]
-            MAIN_MODE = _demo_state["screen"]["main"]
-            SIDEBAR_MODE = _demo_state["screen"]["sidebar"]
+            current_demo_screen = _demo_state["screen"]
+            if current_demo_screen is None:
+                _demo_state["done"] = True
+                break
+            THEME_ARG = current_demo_screen["theme"]  # pylint: disable=unsubscriptable-object
+            MAIN_MODE = current_demo_screen["main"]  # pylint: disable=unsubscriptable-object
+            SIDEBAR_MODE = current_demo_screen["sidebar"]  # pylint: disable=unsubscriptable-object
             GEN_POOL[:], RCOL_POOL[:] = _build_pools(THEME_ARG)
             area_specs = _current_area_specs(rows, cols)
             scene_now = time.monotonic()
@@ -1606,7 +1651,7 @@ def main(stdscr):
             _sync_cycle_start_modes(area_specs, area_states, scene_now)
             for spec in area_specs:
                 _ensure_area(area_states[spec["name"]], spec["height"], spec["width"], spec["role"], scene_now)
-            _demo_state["next"] = scene_now + _demo_state["screen"]["duration"]
+            _demo_state["next"] = scene_now + current_demo_screen["duration"]  # pylint: disable=unsubscriptable-object
         time.sleep(0.01)
 
 
@@ -1638,7 +1683,7 @@ def run(argv=None) -> int:
     THEME_ARG = config["theme"]
     CONFIG_SCREEN = config["config_screen"]
     SIDEBAR_MODE = config["sidebar_mode"]
-    _demo_state = config["demo_state"]
+    _demo_state = cast(DemoState, config["demo_state"])
     _screen_showcase_state = config["screen_showcase"]
     GLITCH_INTERVAL = config["glitch_interval"]
     EXIT_AFTER = config["exit_after"]

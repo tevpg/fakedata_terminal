@@ -400,10 +400,10 @@ def centre_delay(speed: int) -> float:
 def make_burst_fn(speed: int):
     centre = centre_delay(speed)
     if centre == 0.0:
-        def new_burst():
+        def zero_burst():
             return 0.0, BURST_SIZE
 
-        return new_burst
+        return zero_burst
 
     tiers = [
         (centre * 0.40, centre * 0.75, 30),
@@ -412,13 +412,13 @@ def make_burst_fn(speed: int):
     ]
     pool = [tier for tier in tiers for _ in range(tier[2])]
 
-    def new_burst():
+    def sampled_burst():
         low, high, _ = random.choice(pool)
         delay = random.uniform(low, high)
         count = BURST_SIZE + random.randint(-12, 12)
         return delay, count
 
-    return new_burst
+    return sampled_burst
 
 
 def clamp_speed(speed: int) -> int:
